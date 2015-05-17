@@ -1,8 +1,34 @@
+
+Require Import Program.
+(* REFACTOR *)
+
+Ltac join H L R := first [ assert (H := conj L R); clear L R
+                         | assert (H := L); clear L
+                         | assert (H := R); clear R
+                         | idtac ].
+
+Ltac aux H R := match type of H with
+| _ /\ _   => let G1 := fresh in let G2 := fresh in
+              destruct H as (G1,G2); aux G1 R; aux G2 R; join H G1 G2
+| ?x  =  _  => subst x; clear R; set (R := true)
+| _   = ?y  => subst y; clear R; set (R := true)
+| ?x ~= ?y => try (let H' := fresh in assert (H' := H); dependent destruction H';
+                      match goal with 
+                      | _ : x ~= y |- _ => fail 2 
+                      | _               => clear H R; set (R := true) 
+                      end)
+| _        => idtac
+end.
+
+Ltac rec_subst H := let R := fresh in
+                    repeat (set (R := false);
+                            aux H R; 
+                            match R with false => clear R; fail | _ => clear R end).
+
 Require Import Setoid.
 Require Export refocusing_signatures.
 Require Import Wellfounded.Inclusion.
 Require Import Wellfounded.Inverse_Image.
-Require Import Program.
 
 Module Lang_Prop (R : RED_LANG) : LANG_PROP R.
 
@@ -181,97 +207,72 @@ right; left; exists v0; auto.
 right; right; exists ec1; exists t; auto.
 Qed.
 *)
-    Lemma dec_val : forall k1 k2 (v : R.R.value k2) (c : R.R.context k1 k2) (d : R.R.decomp k1), 
-                        dec (R.R.value_to_term v) c d -> decctx v c d.
+
+(* REFACTOR *)
+
+Ltac discriminateJM H := 
+match type of H with ?x ~= ?y => 
+let H := fresh in 
+assert (H : eq_dep _ _ _ x _ y); 
+[apply JMeq_eq_depT; auto | discriminate (eq_dep_eq_sigT _ _ _ _ _ _ H)]
+end.
+
+
+    Lemma dec_val : forall k1 k2 (v : R.R.value k2) (c : R.R.context k1 k2) 
+                                (d : R.R.decomp k1),
+
+                        dec (R.R.value_to_term v) c d  ->  decctx v c d.
+
     Proof with eauto.
-      intros k1 k2 v.
-      remember (R.R.value_to_term v). revert k2 v Heqt.
+      intros k1 k2 v; remember (R.R.value_to_term v); revert k2 v Heqt.
       induction t using (well_founded_ind R.wf_sto); intros.
-      rewrite Heqt in H0.
-
-      dependent destruction H0; unfold dec_term in *;
-      assert (hh := R.dec_term_correct (R.R.value_to_term v) k2); rewrite H0 in hh.
-
-      symmetry in hh; contradiction (R.R.value_redex _ _ _ hh).
-
-      rewrite<- (R.R.value_to_term_injective _ _ _ hh).
-      assumption.
-
-      destruct (R.R.value_trivial _ v t1 _ (R.R.ccons ec R.R.empty)); simpl; auto;
-      destruct H2.
-
-      assert (eq_dep _ _ (R.R.ckind_trans k2 ec) (R.R.ccons ec (@R.R.empty k2)) k2 (@R.R.empty k2)).
-
-
-      apply JMeq_eq_depT; auto.
-      discriminate (eq_dep_eq_sigT _ _ _ _ _ _ H4).
-      
-      assert (decctx x (R.R.ccons ec c) d).
-
-      apply (H t1).
-      do 2 econstructor 1.
-      rewrite<- hh in Heqt.
-      apply Heqt.
-      auto.
-      auto.
-
-      dependent destruction H3;
-      assert (G1 := ccons_inj _ _ _ _ x1 x);
-      destruct G1 as (G1a,(G1b, G1c)); destruct G1a; destruct G1b; subst;
-      unfold dec_context in *;
-
-      assert (gg := R.dec_context_correct ec0 k0 x0); rewrite H3 in gg.
-
-      contradiction (R.R.value_redex _ v r).
-      transitivity (R.R.atom_plug (R.R.value_to_term x0) ec0); auto.
-
-      assert (v0 = v).
-      apply (R.R.value_to_term_injective _ v0 v ).
-      transitivity (R.R.atom_plug (R.R.value_to_term x0) ec0); auto.
-      subst; auto.
-
-clear x H x1 H4 H1 gg.
-      revert v H0 hh.
-      induction ec0 using (well_founded_ind (R.wf_eco k0)); intros.
-      assert (HH := H 
-
-      inversion H3.
       subst.
-      assert (H13' := inj_pair2 _ _ _ _ _ H13); subst; clear H13.
-      assert (H7' := inj_pair2 _ _ _ _ _ H7); subst; clear H7.
-      assert (H12' := inj_pair2 _ _ _ _ _ H12); 
-      assert (H12'' := inj_pair2 _ _ _ _ _ H12'); subst; clear H4 H5 H9 H12 H12'.
-      assert (gg := R.dec_context_correct ec k2 v1). unfold dec_context in *.
-      rewrite H8 in gg.
-      rewrite x2 in *.
-      constructor 2.
-      
-      rewrite<- H3.
-      generalize k2 at 5.
-      rewrite<- H2.
-      discriminate H2.
-      destruct H1 as [v0 H1]; subst t.
-      symmetry in hh; assert (ht := R.st_1 _ _ _ hh);
-      apply (tn1_step _ value_one_step) in ht; change (v0 <v| v) in ht.
-      inversion H0; subst; unfold dec_term in DT; rewrite DT in Heqi; inversion Heqi; subst.
-      clear H0 Heqi DT; assert (H0 := H _ ht _ _ R_T); clear ht R_T.
-      generalize dependent v0.
-      induction ec using (well_founded_ind R.wf_eco); intros.
-      remember (R.dec_context ec v0); assert (hc := R.dec_context_correct ec v0);
-      destruct i; rewrite <- Heqi in hc; rewrite <- hh in hc.
-      symmetry in hc; contradiction (R.R.value_redex _ _ hc).
-      clear H H0; apply R.R.value_to_term_injective in hc; subst.
-      inversion H1; subst; unfold dec_context in DC; rewrite DC in Heqi; inversion Heqi; subst; auto.
-      destruct (R.R.value_trivial v t (e :: nil)); simpl...
-      discriminate.
-      destruct H2 as [v1 H2]; subst t.
-      inversion H1; subst; unfold dec_context in DC; rewrite DC in Heqi; inversion Heqi; subst.
-      clear Heqi H1.
-      apply H0 with ec1 v1...
-      destruct (R.dec_context_term_next _ _ _ _ DC)...
-      apply H...
-      repeat econstructor...
+
+      dependent destruction H0;
+          unfold dec_term in *;
+          assert (hh := R.dec_term_correct (R.R.value_to_term v) k2); rewrite H0 in hh.
+
+      - symmetry in hh; contradiction (R.R.value_redex _ _ _ hh).
+
+      - rewrite<- (R.R.value_to_term_injective _ _ _ hh)...
+
+      - destruct (R.R.value_trivial _ v t0 _ (R.R.ccons ec R.R.empty)); 
+            try solve [auto];
+            destruct H2.
+
+        * discriminateJM H3.
+
+        * { clear H0; revert t0 H1 x hh H2.
+          induction ec using (well_founded_ind (R.wf_eco k2)); intros.
+
+          assert (decctx x (R.R.ccons ec c) d).
+          + apply (H t0)... 
+            do 2 econstructor...
+
+          + { dependent destruction H3;
+                assert (G1 := ccons_inj _ _ _ _ x1 x);
+                subst; rec_subst G1;
+                unfold dec_context in *;
+
+                assert (gg := R.dec_context_correct ec k2 x0); rewrite H3 in gg.
+
+            - contradiction (R.R.value_redex _ v r); symmetry; etransitivity...
+
+            - assert (v0 = v).
+              * apply (R.R.value_to_term_injective _ v0 v ); etransitivity...
+              * subst...
+
+            - destruct (R.R.value_trivial _ v t _ (R.R.ccons ec1 R.R.empty));
+                  try solve [etransitivity; eauto];
+                  destruct H2.
+              * discriminateJM H5.
+              * eapply (H0 ec1)...
+                + destruct (R.dec_context_term_next _ _ _ _ _ H3)...
+                + etransitivity... 
+            }
+          }
     Qed.
+
 
     Lemma val_dec : forall v c d, decctx v c d -> dec (R.R.value_to_term v) c d.
     Proof with eauto.

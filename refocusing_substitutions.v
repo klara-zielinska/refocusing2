@@ -226,30 +226,67 @@ Qed.
     Qed.
 
 
-    Lemma val_dec : forall v c d, decctx v c d -> dec (R.R.value_to_term v) c d.
+    Lemma val_dec : forall k1 k2 (v : R.R.value k2) (c : R.R.context k1 k2) 
+                                (d : R.R.decomp k1),
+
+                        decctx v c d -> dec (R.R.value_to_term v) c d.
+
     Proof with eauto.
-      induction v using (well_founded_ind wf_vo); intros.
-      remember (R.dec_term (R.R.value_to_term v)); assert (hh := R.dec_term_correct (R.R.value_to_term v));
+      intros k1 k2 v; remember (R.R.value_to_term v); revert k2 v Heqt.
+      induction t using (well_founded_ind R.wf_sto); intros.
+      subst.
+
+      remember (R.dec_term (R.R.value_to_term v) k2).
+      assert (hh := R.dec_term_correct (R.R.value_to_term v) k2).
       destruct i; rewrite <- Heqi in hh.
-      symmetry in hh; contradiction (R.R.value_redex _ _ hh).
-      apply R.R.value_to_term_injective in hh; subst; econstructor...
-      destruct (R.R.value_trivial v t (e :: nil)); simpl...
-      discriminate H1.
-      destruct H1 as [v0 H1]; subst t; econstructor 3...
-      apply H; [ repeat econstructor | clear Heqi; generalize dependent v0]...
-      induction e using (well_founded_ind R.wf_eco); intros.
-      remember (R.dec_context e v0); assert (hc := R.dec_context_correct e v0);
-      destruct i; rewrite <- Heqi in hc; rewrite hh in hc.
-      symmetry in hc; contradiction (R.R.value_redex _ _ hc).
-      clear H H1; apply R.R.value_to_term_injective in hc; subst; econstructor...
-      destruct (R.R.value_trivial v t (e0 :: nil)); simpl...
-      discriminate.
-      destruct H2 as [v1 H2]; subst t; econstructor 4...
-      apply H.
-      repeat econstructor...
-      apply H1...
-      symmetry in Heqi; destruct (R.dec_context_term_next _ _ _ _ Heqi)...
+
+      symmetry in hh; contradiction (R.R.value_redex _ _ _ hh).
+
+      assert (H1 := R.R.value_to_term_injective _ _ _ hh); subst; econstructor...
+
+      symmetry in Heqi.
+      apply (d_term _ _ _ _ _ Heqi).
+      clear Heqi.
+      destruct (R.R.value_trivial _ v t _ (R.R.ccons e R.R.empty));
+            try solve [auto];
+            destruct H1.
+
+      discriminateJM H2.
+
+      revert e t hh x H1.
+      induction e using (well_founded_ind (R.wf_eco k2)); intros.
+
+      apply (H t) with (v := x).
+      do 2 econstructor...
+      auto.
+
+      remember (R.dec_context e _ x). assert (gg := R.dec_context_correct e _ x).
+      destruct i; rewrite<- Heqi in gg; subst.
+
+      contradiction (R.R.value_redex _ v r); symmetry; etransitivity...
+
+      apply (dc_val v0). auto.
+      assert (v0 = v).
+          apply (R.R.value_to_term_injective _ v0 v ); etransitivity...
+      subst...
+
+      destruct (R.R.value_trivial _ v t0 _ (R.R.ccons e0 R.R.empty));
+                  try solve [etransitivity; eauto];
+                  destruct H2.
+
+      discriminateJM H3.
+
+      apply dc_term with (ec0:=e0) (t:=t0). auto.
+      apply (H1 e0) with (x := x0).
+      symmetry in Heqi.
+      destruct (R.dec_context_term_next _ _ _ _ _ Heqi)...
+
+      etransitivity...
+
+      auto.
     Qed.
+
+  (* REFACTOR ABOVE *)
 
   Module RS : RED_SEM R.R with Definition dec := dec.
     Definition dec := dec.

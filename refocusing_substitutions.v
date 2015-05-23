@@ -1,30 +1,4 @@
-
 Require Import Program.
-(* REFACTOR *)
-
-Ltac join H L R := first [ assert (H := conj L R); clear L R
-                         | assert (H := L); clear L
-                         | assert (H := R); clear R
-                         | idtac ].
-
-Ltac aux H R := match type of H with
-| _ /\ _   => let G1 := fresh in let G2 := fresh in
-              destruct H as (G1,G2); aux G1 R; aux G2 R; join H G1 G2
-| ?x  =  _  => subst x; clear R; set (R := true)
-| _   = ?y  => subst y; clear R; set (R := true)
-| ?x ~= ?y => try (let H' := fresh in assert (H' := H); dependent destruction H';
-                      match goal with 
-                      | _ : x ~= y |- _ => fail 2 
-                      | _               => clear H R; set (R := true) 
-                      end)
-| _        => idtac
-end.
-
-Ltac rec_subst H := let R := fresh in
-                    repeat (set (R := false);
-                            aux H R; 
-                            match R with false => clear R; fail | _ => clear R end).
-
 Require Import Setoid.
 Require Export refocusing_signatures.
 Require Import Wellfounded.Inclusion.
@@ -34,13 +8,15 @@ Module Lang_Prop (R : RED_LANG) : LANG_PROP R.
 
   Lemma plug_empty : forall t k, R.plug t (@R.empty k) = t.
   Proof.
-    intros; simpl; auto.
+    intros; auto.
   Qed.
   Hint Resolve plug_empty : prop.
 
   Lemma compose_empty : forall k1 k2 (c : R.context k1 k2), c = R.compose c R.empty.
   Proof.
-    intros. induction c. auto. simpl. rewrite<- IHc. auto.
+    intros; induction c.
+    - auto.
+    - simpl; rewrite<- IHc; auto.
   Qed.
   Hint Resolve compose_empty : prop.
 
@@ -48,7 +24,9 @@ Module Lang_Prop (R : RED_LANG) : LANG_PROP R.
                                (t : R.term), 
                            R.plug t (R.compose c c') = R.plug (R.plug t c) c'.
   Proof.
-    intros ? ? ?. induction c; intros. auto. apply IHc.
+    intros ? ? ?; induction c; intros.
+    - auto.
+    - apply IHc.
   Qed.
   Hint Resolve plug_compose : prop.
 
@@ -90,37 +68,52 @@ Module RedRefSem (R : RED_REF_LANG) <: RED_REF_SEM R.R.
   Scheme dec_Ind := Induction for dec Sort Prop
   with decctx_Ind := Induction for decctx Sort Prop.
     
-  Notation " a <| b " := (R.subterm_order a b) (at level 40).
+  Notation "a <| b" := (R.subterm_order a b) (at level 40, no associativity).
   Notation "k |-  a << b " := (R.ec_order k a b) (at level 40, no associativity).
 
   Lemma sto_trans : forall t t0 t1, t <| t0 -> t0 <| t1 -> t <| t1.
-  Proof with auto.
+  Proof with eauto.
     induction 1.
-    econstructor 2; eauto.
-    econstructor 2; eauto; apply IHclos_trans_1n; auto.
+    - econstructor 2...
+    - econstructor 2. 
+      * eauto.
+      * apply IHclos_trans_1n...
   Qed.
-
 
   Lemma plug_le_eq : forall k1 k2 (c : R.R.context k1 k2) t t0, R.R.plug t0 c = t -> 
                          t0 <| t \/ (c ~= @R.R.empty k1 /\ t = t0).
-  Proof with auto.
-    intros k1 k2.
+  Proof with eauto.
+    intros k1 k2;
     induction c; intros.
-    simpl in H; right; auto.
-    left; simpl in H. destruct (IHc t (R.R.atom_plug t0 ec)); auto.
-      apply t1n_trans with (y := R.R.atom_plug t0 ec). econstructor. reflexivity. assumption. 
-      destruct H0. subst. rewrite H1. do 2 econstructor. reflexivity.
+    - simpl in H...
+    - left; simpl in H. 
+      destruct (IHc t (R.R.atom_plug t0 ec)). 
+      * eauto.
+      * apply t1n_trans with (y := R.R.atom_plug t0 ec).
+        + econstructor... 
+        + assumption. 
+      * destruct H0. 
+        subst; rewrite H1.
+        do 2 econstructor...
   Qed.
 
 
   Lemma st_c : forall t0 t1, t0 <| t1 -> 
                    forall k1, exists k2 (c : R.R.context k1 k2), R.R.plug t0 c = t1.
-  Proof with auto.
-    intros t0 t1 H k1. induction H; intros. inversion H; subst. 
-    exists (R.R.ckind_trans k1 ec). exists (R.R.ccons ec (@R.R.empty k1)); simpl; auto.
-    destruct IHclos_trans_1n as [k2 [c H1]]. inversion H; subst.
-    exists (R.R.ckind_trans k2 ec). exists (R.R.ccons ec c). auto.
+  Proof with eauto.
+    intros t0 t1 H k1;
+    induction H; intros.
+    - inversion H; subst. 
+      exists (R.R.ckind_trans k1 ec).
+      exists (R.R.ccons ec (@R.R.empty k1)).
+      simpl...
+    - destruct IHclos_trans_1n as [k2 [c H1]]. 
+      inversion H.
+      subst.
+      exists (R.R.ckind_trans k2 ec).
+      exists (R.R.ccons ec c)...
   Qed.
+
 (*
   Definition value_one_step {k1} (v : R.R.value k1) {k2} (v0 : R.R.value k2) : Prop := 
       R.subterm_one_step (R.R.value_to_term v) (R.R.value_to_term v0).
@@ -151,39 +144,6 @@ Module RedRefSem (R : RED_REF_LANG) <: RED_REF_SEM R.R.
     Qed.*)
 
 
-
-
-(* REFACTOR *)
-
-Require Import Coq.Logic.EqdepFacts.
-
-Definition JMeq_eq_depT := 
-fun (U : Type) (P : U -> Type) (p q : U) (x : P p) (y : P q) (H : p = q)
-  (H0 : x ~= y) =>
-match
-  H in (_ = y0) return (forall y1 : P y0, x ~= y1 -> eq_dep U P p x y0 y1)
-with
-| eq_refl =>
-    fun (y0 : P p) (H1 : x ~= y0) =>
-    (fun H2 : x = y0 =>
-     eq_ind_r (fun x0 : P p => eq_dep U P p x0 p y0) (eq_dep_intro U P p y0)
-       H2) (JMeq_eq H1)
-end y H0.
-
-Lemma ccons_inj : forall ec {k1 k2} c ec' {k2'} c', 
-R.R.ckind_trans k2 ec = R.R.ckind_trans k2' ec' ->
-@R.R.ccons ec k1 k2 c ~= @R.R.ccons ec' k1 k2' c' ->
-ec = ec' /\ k2 = k2' /\ c ~= c'.
-Proof.
-intros.
-assert (H1 := JMeq_eq_depT _ _ _ _ _ _ H H0).
-assert (H2 := eq_dep_eq_sigT _ _ _ _ _ _ H1). 
-inversion H2; subst.
-assert (H7' := inj_pair2 _ _ _ _ _ H7); subst; clear H7.
-assert (H7'' := inj_pair2 _ _ _ _ _ H7'); subst; clear H7'.
-auto.
-Qed.
-
 (*
 Lemma decctx_des : forall ec {k2} (v : R.R.value (R.R.ckind_trans k2 ec)) 
                              {k1} (c : R.R.context k1 k2) (d : R.R.decomp k1),
@@ -208,15 +168,7 @@ right; right; exists ec1; exists t; auto.
 Qed.
 *)
 
-(* REFACTOR *)
-
-Ltac discriminateJM H := 
-match type of H with ?x ~= ?y => 
-let H := fresh in 
-assert (H : eq_dep _ _ _ x _ y); 
-[apply JMeq_eq_depT; auto | discriminate (eq_dep_eq_sigT _ _ _ _ _ _ H)]
-end.
-
+    Include RED_LANG_Facts R.R.
 
     Lemma dec_val : forall k1 k2 (v : R.R.value k2) (c : R.R.context k1 k2) 
                                 (d : R.R.decomp k1),

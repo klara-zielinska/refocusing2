@@ -1,6 +1,7 @@
 Require Export List.
 Require Import Program.
 Require Export Util.
+Require Import Eqdep.
 
 Module Type RED_LANG.
 
@@ -69,6 +70,26 @@ Module Type RED_LANG.
   end.
 
 End RED_LANG.
+
+
+Module RED_LANG_Facts (R : RED_LANG).
+
+    Lemma ccons_inj : forall ec {k1 k2} c ec' {k2'} c', 
+    R.ckind_trans k2 ec = R.ckind_trans k2' ec' ->
+    @R.ccons ec k1 k2 c ~= @R.ccons ec' k1 k2' c' ->
+    ec = ec' /\ k2 = k2' /\ c ~= c'.
+    Proof.
+    intros.
+    assert (H1 := JMeq_eq_depT _ _ _ _ _ _ H H0).
+    assert (H2 := eq_dep_eq_sigT _ _ _ _ _ _ H1). 
+    inversion H2; subst.
+    assert (H7' := inj_pair2 _ _ _ _ _ H7); subst; clear H7.
+    assert (H7'' := inj_pair2 _ _ _ _ _ H7'); subst; clear H7'.
+    auto.
+    Qed.
+
+End RED_LANG_Facts.
+
 
 Module Type LANG_PROP (R : RED_LANG).
 

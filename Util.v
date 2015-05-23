@@ -3,6 +3,8 @@ Require Export Relations.
 Require Export Relation_Operators.
 Require Export List.
 Require Import Setoid.
+Require Import Program.
+Require Import Eqdep.
 
 Ltac isda := intros; simpl in *; try discriminate; auto.
 
@@ -123,6 +125,50 @@ Section streams.
   | b_cons : forall (x : A) (s0 s1 : stream), bisim_stream s0 s1 -> bisim_stream (s_cons x s0) (s_cons x s1).
 
 End streams.
+
+Ltac join H L R := first [ assert (H := conj L R); clear L R
+                         | assert (H := L); clear L
+                         | assert (H := R); clear R
+                         | idtac ].
+
+Ltac rec_subst H := 
+    let rec aux H R := match type of H with
+    | _ /\ _   => let G1 := fresh in let G2 := fresh in
+                  destruct H as (G1,G2); aux G1 R; aux G2 R; join H G1 G2
+    | ?x  =  _ => subst x; clear R; set (R := true)
+    | _   = ?y => subst y; clear R; set (R := true)
+    | ?x ~= ?y => try (let H' := fresh in assert (H' := H); dependent destruction H';
+                       match goal with 
+                       | _ : x ~= y |- _ => fail 2 
+                       | _               => clear H R; set (R := true) 
+                       end)
+    | _        => idtac
+    end
+    in
+    let R := fresh in
+        repeat (set (R := false);
+                aux H R; 
+                match R with false => clear R; fail | _ => clear R end).
+
+Definition JMeq_eq_depT := 
+fun (U : Type) (P : U -> Type) (p q : U) (x : P p) (y : P q) (H : p = q)
+  (H0 : x ~= y) =>
+match
+  H in (_ = y0) return (forall y1 : P y0, x ~= y1 -> eq_dep U P p x y0 y1)
+with
+| eq_refl =>
+    fun (y0 : P p) (H1 : x ~= y0) =>
+    (fun H2 : x = y0 =>
+     eq_ind_r (fun x0 : P p => eq_dep U P p x0 p y0) (eq_dep_intro U P p y0)
+       H2) (JMeq_eq H1)
+end y H0.
+
+Ltac discriminateJM H := 
+match type of H with ?x ~= ?y => 
+let H := fresh in 
+assert (H : eq_dep _ _ _ x _ y); 
+[apply JMeq_eq_depT; auto | discriminate (eq_dep_eq_sigT _ _ _ _ _ _ H)]
+end.
 
 Implicit Arguments s_nil [A].
 Implicit Arguments s_cons [A].

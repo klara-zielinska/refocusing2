@@ -240,84 +240,103 @@ Qed.
       assert (hh := R.dec_term_correct (R.R.value_to_term v) k2).
       destruct i; rewrite <- Heqi in hh.
 
-      symmetry in hh; contradiction (R.R.value_redex _ _ _ hh).
+      - symmetry in hh; contradiction (R.R.value_redex _ _ _ hh).
 
-      assert (H1 := R.R.value_to_term_injective _ _ _ hh); subst; econstructor...
+      - assert (H1 := R.R.value_to_term_injective _ _ _ hh); subst; econstructor...
 
-      symmetry in Heqi.
-      apply (d_term _ _ _ _ _ Heqi).
-      clear Heqi.
-      destruct (R.R.value_trivial _ v t _ (R.R.ccons e R.R.empty));
+      - symmetry in Heqi.
+        apply (d_term _ _ _ _ _ Heqi).
+
+        clear Heqi;
+        destruct (R.R.value_trivial _ v t _ (R.R.ccons e R.R.empty));
             try solve [auto];
             destruct H1.
 
-      discriminateJM H2.
+        * discriminateJM H2.
 
-      revert e t hh x H1.
-      induction e using (well_founded_ind (R.wf_eco k2)); intros.
+        * { revert e t hh x H1;
+          induction e using (well_founded_ind (R.wf_eco k2)); intros.
 
-      apply (H t) with (v := x).
-      do 2 econstructor...
-      auto.
+          apply (H t) with (v := x).
 
-      remember (R.dec_context e _ x). assert (gg := R.dec_context_correct e _ x).
-      destruct i; rewrite<- Heqi in gg; subst.
+          - do 2 econstructor...
 
-      contradiction (R.R.value_redex _ v r); symmetry; etransitivity...
+          - auto.
 
-      apply (dc_val v0). auto.
-      assert (v0 = v).
-          apply (R.R.value_to_term_injective _ v0 v ); etransitivity...
-      subst...
+          - remember (R.dec_context e _ x); assert (gg := R.dec_context_correct e _ x);
+            destruct i; rewrite<- Heqi in gg; subst.
 
-      destruct (R.R.value_trivial _ v t0 _ (R.R.ccons e0 R.R.empty));
+            * contradiction (R.R.value_redex _ v r); symmetry; etransitivity...
+
+            * apply (dc_val v0)...
+              assert (v0 = v).
+              + apply (R.R.value_to_term_injective _ v0 v ); etransitivity...
+              + subst...
+
+            * { destruct (R.R.value_trivial _ v t0 _ (R.R.ccons e0 R.R.empty));
                   try solve [etransitivity; eauto];
                   destruct H2.
 
-      discriminateJM H3.
+                - discriminateJM H3.
 
-      apply dc_term with (ec0:=e0) (t:=t0). auto.
-      apply (H1 e0) with (x := x0).
-      symmetry in Heqi.
-      destruct (R.dec_context_term_next _ _ _ _ _ Heqi)...
-
-      etransitivity...
-
-      auto.
+                - apply dc_term with (ec0:=e0) (t:=t0)...
+                  apply (H1 e0) with (x := x0)...
+                  * symmetry in Heqi;
+                    destruct (R.dec_context_term_next _ _ _ _ _ Heqi)...
+                  * etransitivity...
+               }
+            }
     Qed.
-
-  (* REFACTOR ABOVE *)
 
   Module RS : RED_SEM R.R with Definition dec := dec.
     Definition dec := dec.
 
-    Lemma decompose : forall t : R.R.term, (exists v:R.R.value, t = R.R.value_to_term v) \/
-      (exists r:R.R.redex, exists c:R.R.context, R.R.plug (R.R.redex_to_term r) c = t).
+    Module LP := Lang_Prop R.R.
+
+    Lemma decompose : forall (t : R.R.term) (k1 : R.R.ckind), 
+      (exists (v : R.R.value k1), t = R.R.value_to_term v) \/
+      (exists k2 (r : R.R.redex k2) (c : R.R.context k1 k2), R.R.plug (R.R.redex_to_term r) c = t).
+
     Proof with eauto.
       induction t using (well_founded_ind R.wf_sto); intros.
 
+      remember (R.dec_term t k1); assert (hh := R.dec_term_correct t k1);
+      destruct i; rewrite <- Heqi in hh.
 
-      remember (R.dec_term t); assert (hh := R.dec_term_correct t); destruct i;
-      rewrite <- Heqi in hh.
-      right; exists r; exists R.R.empty...
-      left; exists v...
-      destruct (H t0) as [[v Hv] | [r [c Hrc]]].
-      repeat econstructor...
-      subst t0; clear Heqi; generalize dependent v; induction e using (well_founded_ind R.wf_eco); intros.
-      remember (R.dec_context e v); assert (ht := R.dec_context_correct e v); destruct i;
-      rewrite <- Heqi in ht; rewrite hh in ht.
-      right; exists r; exists R.R.empty...
-      left; exists v0...
-      destruct (H t0) as [[v0 Hv] | [r [c Hrc]]].
-      repeat econstructor...
-      symmetry in Heqi; destruct (R.dec_context_term_next _ _ _ _ Heqi) as [H1 _].
-      subst t0; destruct (H0 e0 H1 v0 ht) as [[v1 Hv1] | [r [c Hrc]]].
-      left; exists v1...
-      right; exists r; exists c...
-      right; exists r; exists (c ++ (e0 :: nil)); 
-      subst t0; unfold R.R.plug in *; rewrite fold_left_app...
-      right; exists r; exists (c ++ (e :: nil));
-      subst t0; unfold R.R.plug in *; rewrite fold_left_app...
+      - right; exists k1; exists r; exists (@R.R.empty k1)...
+
+      - left; exists v...
+
+      - destruct (H t0) with (k1 := R.R.ckind_trans k1 e) as [(v, Hv) | (k2, (r, (c, Hrc)))].
+            repeat econstructor...
+
+        * { subst t0; clear Heqi; generalize dependent v. 
+          induction e using (well_founded_ind (R.wf_eco k1)); intros.
+
+          remember (R.dec_context e _ v); assert (ht := R.dec_context_correct e _ v); 
+          destruct i; rewrite <- Heqi in ht; rewrite hh in ht.
+
+          - right; exists k1; exists r; exists (@R.R.empty k1)...
+
+          - left; exists v0...
+
+          - destruct (H t0) with (k1 := R.R.ckind_trans k1 e0) as [(v0, Hv) | (k2, (r, (c, Hrc)))].
+                repeat econstructor...
+
+            + symmetry in Heqi; 
+              destruct (R.dec_context_term_next _ _ _ _ _ Heqi) as (H1, _).
+
+              subst t0.
+              destruct (H0 e0 H1 v0 ht) as [(v1, Hv1) | (k2, (r, (c, Hrc)))].
+              * left; exists v1...
+              * right; exists k2; exists r; exists c...
+
+            + right; exists k2; exists r; exists (R.R.compose c (R.R.ccons e0 R.R.empty)).
+              subst t0; rewrite LP.plug_compose...
+          }
+
+        * right; exists k2; exists r; exists (R.R.compose c (R.R.ccons e R.R.empty)).
+          subst t0; rewrite LP.plug_compose...
     Qed.
 
     Lemma dec_redex_self_e : forall (r : R.R.redex), dec (R.R.redex_to_term r) (R.R.empty) (R.R.d_red r R.R.empty).

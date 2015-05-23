@@ -97,9 +97,9 @@ Module Type PE_REF_SEM (R : RED_LANG).
 
   Declare Module Red_Sem : RED_REF_SEM R.
 
-  (* Axiom dec_context_not_val : forall k (v0 : R.value k) (ec : R.elem_context) 
+  Axiom dec_context_not_val : forall k (v0 : R.value k) (ec : R.elem_context) 
                                        (v  : R.value (R.ckind_trans k ec)), 
-            Red_Sem.dec_context ec k v <> R.in_val v0. ??? *)
+            Red_Sem.dec_context ec k v <> R.in_val v0.
   Axiom dec_term_value : forall k (v : R.value k), 
                              Red_Sem.dec_term (R.value_to_term v) k = R.in_val v.
 

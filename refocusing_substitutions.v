@@ -337,30 +337,56 @@ Qed.
 
         * right; exists k2; exists r; exists (R.R.compose c (R.R.ccons e R.R.empty)).
           subst t0; rewrite LP.plug_compose...
-    Qed.
+    Qed. 
 
-    Lemma dec_redex_self_e : forall (r : R.R.redex), dec (R.R.redex_to_term r) (R.R.empty) (R.R.d_red r R.R.empty).
+    Lemma dec_redex_self_e : forall k (r : R.R.redex k), 
+
+                dec (R.R.redex_to_term r) _ _ (R.R.empty) (R.R.d_red r R.R.empty).
+
     Proof with eauto.
-      intros; remember (dec_term (R.R.redex_to_term r)); destruct i; unfold dec_term in Heqi;
-      assert (hh := R.dec_term_correct (R.R.redex_to_term r)); rewrite <- Heqi in hh; simpl in hh.
-      apply R.R.redex_to_term_injective in hh; subst; constructor...
-      contradict hh;  apply R.R.value_redex.
-      symmetry in Heqi; assert (H := R.dec_term_term_top _ _ _ Heqi).
-      econstructor 3; simpl; eauto.
-      destruct (R.R.redex_trivial r t (e :: R.R.empty) hh) as [H1 | [v H1]]; [ discriminate | subst t].
-      clear H Heqi.
-      generalize dependent v; generalize dependent e.
-      induction e using (well_founded_ind R.wf_eco); intros.
-      apply val_dec.
-      remember (R.dec_context e v); assert (ht := R.dec_context_correct e v);
-      rewrite <- Heqi in ht; destruct i; simpl in ht.
-      rewrite hh in ht; apply R.R.redex_to_term_injective in ht; subst.
-      constructor...
-      rewrite <- ht in hh; contradiction (R.R.value_redex _ _ hh).
-      econstructor 4; simpl; eauto.
-      rewrite hh in ht; destruct (R.R.redex_trivial r t (e0 :: R.R.empty) ht) as [H4 | [v1 H4]].
-      discriminate.
-      subst t; symmetry in Heqi; destruct (R.dec_context_term_next _ _ _ _ Heqi); apply H...
+      intros; 
+      remember (dec_term (R.R.redex_to_term r) k).
+
+      destruct i; unfold dec_term in Heqi;
+          assert (hh := R.dec_term_correct (R.R.redex_to_term r) k);
+          rewrite <- Heqi in hh; 
+          simpl in hh.
+
+      - apply R.R.redex_to_term_injective in hh; subst; constructor...
+
+      - contradict hh;  apply R.R.value_redex.
+
+      - symmetry in Heqi; assert (H := R.dec_term_term_top _ _ _ _ Heqi).
+        econstructor 3. apply Heqi.
+        destruct (R.R.redex_trivial _ r t _ (R.R.ccons e R.R.empty) hh) 
+            as [(H1, H2) | (v, H1)].
+
+        * discriminateJM H2. 
+
+        * { subst t; clear H Heqi; generalize dependent v; generalize dependent e.
+          induction e using (well_founded_ind (R.wf_eco k)); intros.
+
+          apply val_dec.
+          remember (R.dec_context e _ v); assert (ht := R.dec_context_correct e _ v);
+          rewrite <- Heqi in ht.
+
+          destruct i; simpl in ht.
+
+          - rewrite hh in ht.
+            apply R.R.redex_to_term_injective in ht; subst.
+            constructor...
+
+          - rewrite <- ht in hh; contradiction (R.R.value_redex _ _ _ hh).
+
+          - econstructor 4. symmetry; apply Heqi.
+            rewrite hh in ht; 
+            destruct (R.R.redex_trivial _ r t _ (R.R.ccons e0 R.R.empty) ht) 
+                as [(H4, H5) | (v1, H4)].
+            * discriminateJM H5.
+            * subst t; symmetry in Heqi.
+              destruct (R.dec_context_term_next _ _ _ _ _ Heqi). 
+              apply H...
+          }
     Qed.
 
     Lemma dec_redex_self : forall (r : R.R.redex) (c : R.R.context), dec (R.R.redex_to_term r) c (R.R.d_red r c).

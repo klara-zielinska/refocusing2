@@ -71,6 +71,8 @@ Module RedRefSem (R : RED_REF_LANG) <: RED_REF_SEM R.R.
   Notation "a <| b" := (R.subterm_order a b) (at level 40, no associativity).
   Notation "k |-  a << b " := (R.ec_order k a b) (at level 40, no associativity).
 
+  Definition dec_term_correct := R.dec_term_correct.
+
   Lemma sto_trans : forall t t0 t1, t <| t0 -> t0 <| t1 -> t <| t1.
   Proof with eauto.
     induction 1.
@@ -339,7 +341,7 @@ Qed.
           subst t0; rewrite LP.plug_compose...
     Qed. 
 
-    Lemma dec_redex_self_e : forall k (r : R.R.redex k), 
+    Lemma dec_redex_self_e : forall {k} (r : R.R.redex k), 
 
                 dec (R.R.redex_to_term r) _ _ (R.R.empty) (R.R.d_red r R.R.empty).
 
@@ -389,20 +391,38 @@ Qed.
           }
     Qed.
 
-    Lemma dec_redex_self : forall (r : R.R.redex) (c : R.R.context), dec (R.R.redex_to_term r) c (R.R.d_red r c).
+    Lemma dec_redex_self : forall {k1 k2} (r : R.R.redex k2) (c : R.R.context k1 k2), 
+                               dec (R.R.redex_to_term r) _ _ c (R.R.d_red r c).
     Proof with eauto.
-      intros.
-      assert (hh := dec_redex_self_e r).
-      induction hh using dec_Ind with
-      (P := fun t c0 d (H : dec t c0 d) => match d with
+      intros;
+      assert (hh := dec_redex_self_e r);
+      generalize c.
+
+      apply dec_Ind with
+
+      (P  := fun t k1' k2' c0 d (H : dec t k1' k2' c0 d) => match d with
         | R.R.d_val v => True
-        | R.R.d_red r' c1 => dec t (R.R.compose c0 c) (R.R.d_red r' (R.R.compose c1 c))
+        | R.R.d_red k' r' c1 => forall c : R.R.context k1 k1', 
+                                dec t _ _ (R.R.compose c0 c) (R.R.d_red r' (R.R.compose c1 c))
       end)
-      (P0:= fun v c0 d (H : decctx v c0 d) => match d with
+
+      (P0 := fun k2' v k1' c0 d (H : @decctx k2' v k1' c0 d) => match d with
         | R.R.d_val v => True
-        | R.R.d_red r' c1 => decctx v (R.R.compose c0 c) (R.R.d_red r' (R.R.compose c1 c))
-      end); try destruct d; auto; 
-      [ constructor | econstructor | econstructor 3 | constructor | econstructor | econstructor 4]...
+        | R.R.d_red k' r' c1 => forall c : R.R.context k1 k1', 
+                                decctx v (R.R.compose c0 c) (R.R.d_red r' (R.R.compose c1 c))
+      end)
+
+      (d0 := hh);
+      
+          intros; try destruct d; auto.
+
+      - constructor...
+      - econstructor...
+      - econstructor 3... apply H.
+      - constructor... 
+      - econstructor...
+      - econstructor 4... apply H.
+
     Qed.
 
     Lemma dec_correct : forall t c d, dec t c d -> R.R.decomp_to_term d = R.R.plug t c.    
@@ -482,7 +502,6 @@ Qed.
 
   End RS.
 
-  Definition dec_term_correct := R.dec_term_correct.
   Definition dec_context_correct := R.dec_context_correct.
 
   Lemma dec_val_self : forall v c d, dec (R.R.value_to_term v) c d <-> decctx v c d.

@@ -5,7 +5,7 @@ Module Type RED_SEM (R : RED_LANG).
   Parameter dec : R.term -> forall {k1 k2}, R.context k1 k2 -> R.decomp k1 -> Prop.
 
   (** A redex in context will only ever be reduced to itself *)
-  Axiom dec_redex_self : forall k1 k2 (r : R.redex k2) (c : R.context k1 k2), 
+  Axiom dec_redex_self : forall {k1 k2} (r : R.redex k2) (c : R.context k1 k2), 
                              dec (R.redex_to_term r) c (R.d_red r c).
 
   Axiom decompose : forall (t : R.term) (k1 : R.ckind), 

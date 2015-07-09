@@ -147,9 +147,9 @@ Module Type RED_REF_LANG.
     end.
 
   Axiom ec_order_antisym : forall k (ec ec0 : R.elem_context), k |- ec << ec0 -> ~ k |- ec0 << ec.
-  (*Axiom dec_ec_ord : forall t0 t1 k ec0 ec1, 
+  Axiom dec_ec_ord : forall t0 t1 k ec0 ec1, 
       R.atom_plug t0 ec0 = R.atom_plug t1 ec1 -> 
-      k |- ec0 << ec1 \/ k |- ec1 << ec0 \/ (t0 = t1 /\ ec0 = ec1).*)
+      k |- ec0 << ec1 \/ k |- ec1 << ec0 \/ (t0 = t1 /\ ec0 = ec1).
   Axiom elem_context_det : forall t0 t1 k ec0 ec1, 
     k |- ec0 << ec1 -> R.atom_plug t0 ec0 = R.atom_plug t1 ec1 ->
     exists v : R.value (R.ckind_trans k ec1), t1 = R.value_to_term v.

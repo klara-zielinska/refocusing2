@@ -322,8 +322,9 @@ Qed.
 
           - left; exists v0...
 
-          - destruct (H t0) with (k1 := R.R.ckind_trans k1 e0) as [(v0, Hv) | (k2, (r, (c, Hrc)))].
-                repeat econstructor...
+          - destruct (H t0) with (k1 := R.R.ckind_trans k1 e0) 
+                              as [(v0, Hv) | (k2, (r, (c, Hrc)))].
+            + repeat econstructor...
 
             + symmetry in Heqi; 
               destruct (R.dec_context_term_next _ _ _ _ _ Heqi) as (H1, _).
@@ -456,30 +457,59 @@ Qed.
     Qed.
 
 
-    Lemma dec_plug_rev : forall c c0 t d, dec t (R.R.compose c c0) d -> dec (R.R.plug t c) c0 d.
+    Lemma dec_plug_rev : forall {k1 k2 k3} c c0 t d, 
+
+        dec t k3 k2 (R.R.compose c c0) d -> dec (R.R.plug t c) k3 k1 c0 d.
+
     Proof with auto.
-      induction c; intros; simpl; auto.
-      apply IHc; clear IHc; remember (R.dec_term (R.R.atom_plug t a)); destruct i;
-      assert (hh := R.dec_term_correct (R.R.atom_plug t a)); rewrite <- Heqi in hh.
-      symmetry in Heqi; discriminate ( R.dec_term_red_empty _ _ Heqi t (a :: nil)); reflexivity.
-      symmetry in Heqi; discriminate (R.dec_term_val_empty _ _ Heqi t (a :: nil))...
-      destruct (R.dec_ec_ord t0 t e a hh) as [H0 | [H0 | [H0 H1]]]; try (subst; econstructor 3; eauto; fail).
-      symmetry in Heqi; contradict (R.dec_term_term_top _ _ _ Heqi _ H0).
-      symmetry in hh; destruct (R.elem_context_det _ _ _ _ H0 hh) as [v H1]; subst t0.
-      econstructor 3; eauto.
-      clear Heqi; generalize dependent v; generalize dependent e.
-      induction e using (well_founded_ind R.wf_eco); intros.
-      apply val_dec.
-      remember (R.dec_context e v); destruct i; symmetry in Heqi;
-      assert (ht := R.dec_context_correct e v); rewrite Heqi in ht.
-      contradiction (R.dec_context_red_bot _ _ _ Heqi a).
-      contradiction (R.dec_context_val_bot _ _ _ Heqi a).
-      destruct (R.dec_context_term_next _ _ _ _ Heqi) as [H2 H3].
-      econstructor 4; eauto; rewrite <- hh in ht.
-      destruct (R.dec_ec_ord _ _ _ _ ht) as [H4 | [H4 | [H4 H5]]]; try (subst; auto; fail).
-      contradiction (H3 a H1).
-      symmetry in ht; clear H3; destruct (R.elem_context_det _ _ _ _ H4 ht) as [v0 H5]; subst t0.
-      apply H0; auto.
+      induction c; intros; simpl.
+      - auto.
+
+      - apply IHc; clear IHc.
+        remember (R.dec_term (R.R.atom_plug t ec) k2) as i.
+        destruct i;
+          assert (hh := R.dec_term_correct (R.R.atom_plug t ec) k2);
+          rewrite <- Heqi in hh.
+
+        * symmetry in Heqi.
+          destruct ( R.dec_term_red_empty _ _ _ Heqi t _ (R.R.ccons ec R.R.empty))...
+          discriminateJM H1.
+
+        * symmetry in Heqi.
+          destruct (R.dec_term_val_empty _ _ _ Heqi t _ (R.R.ccons ec R.R.empty))...
+          discriminateJM H1.
+
+        * destruct (R.dec_ec_ord t0 t k2 e ec hh) as [H0 | [H0 | (H0, H1)]];
+              try (subst; econstructor 3; eauto; fail).
+
+          + symmetry in Heqi.
+            contradict (R.dec_term_term_top _ _ _ _ Heqi _ H0).
+
+          + symmetry in hh.
+            destruct (R.elem_context_det _ _ _ _ _ H0 hh) as [v H1]; subst t0.
+            econstructor 3; eauto.
+            {
+              clear Heqi; generalize dependent v; generalize dependent e.
+              induction e using (well_founded_ind (R.wf_eco k2)); intros.
+
+              apply val_dec.
+              remember (R.dec_context e _ v).
+              destruct i;
+                  symmetry in Heqi;
+                  assert (ht := R.dec_context_correct e _ v); 
+                  rewrite Heqi in ht.
+
+              - contradiction (R.dec_context_red_bot _ _ _ _ Heqi ec).
+              - contradiction (R.dec_context_val_bot _ _ _ _ Heqi ec).
+              - destruct (R.dec_context_term_next _ _ _ _ _ Heqi) as [H2 H3].
+                econstructor 4; eauto; rewrite <- hh in ht.
+                destruct (R.dec_ec_ord _ _ k2 _ _ ht) as [H4 | [H4 | [H4 H5]]];
+                    try (subst; auto; fail).
+                * contradiction (H3 ec H1).
+                * symmetry in ht; clear H3. 
+                  destruct (R.elem_context_det _ _ _ _ _ H4 ht) as [v0 H5]; subst t0.
+                  apply H0...
+            }
     Qed.
 
     Lemma dec_plug : forall c c0 t d, dec (R.R.plug t c) c0 d -> dec t (R.R.compose c c0) d.

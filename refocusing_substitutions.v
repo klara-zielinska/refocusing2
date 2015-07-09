@@ -425,16 +425,36 @@ Qed.
 
     Qed.
 
-    Lemma dec_correct : forall t c d, dec t c d -> R.R.decomp_to_term d = R.R.plug t c.    
+    Lemma dec_correct : 
+        forall t {k1 k2} c d, dec t k1 k2 c d -> R.R.decomp_to_term d = R.R.plug t c.
+  
     Proof.
       induction 1 using dec_Ind with
-      (P := fun t c d (H:dec t c d) => R.R.decomp_to_term d = R.R.plug t c)
-      (P0:= fun v c d (H:decctx v c d) => R.R.decomp_to_term d = R.R.plug (R.R.value_to_term v) c); 
-      simpl; auto; match goal with
-      | [ DT: (dec_term ?t = ?int) |- _ ] => unfold dec_term in DT; assert (hh := R.dec_term_correct t); rewrite DT in hh
-      | [ DC: (dec_context ?ec ?v = ?int) |- _ ] => unfold dec_context in DC; assert (hh := R.dec_context_correct ec v); rewrite DC in hh
-      end; try rewrite IHdec; rewrite <- hh; subst; auto.
+
+      (P := fun t k1 k2 c d (H:dec t k1 k2 c d) => 
+                 R.R.decomp_to_term d = R.R.plug t c)
+
+      (P0:= fun k2 v k1 c d (H:decctx v c d) => 
+                 R.R.decomp_to_term d = R.R.plug (R.R.value_to_term v) c);
+
+      let final_tac := 
+          try rewrite IHdec;
+          rewrite <- hh;
+          subst; auto
+      in
+
+      simpl; auto; solve
+      [ unfold dec_term in e; 
+        assert (hh := R.dec_term_correct t k2); 
+        rewrite e in hh; 
+        final_tac
+
+      | unfold dec_context in e; 
+        assert (hh := R.dec_context_correct ec _ v); 
+        rewrite e in hh; 
+        final_tac ].
     Qed.
+
 
     Lemma dec_plug_rev : forall c c0 t d, dec t (R.R.compose c c0) d -> dec (R.R.plug t c) c0 d.
     Proof with auto.
@@ -509,4 +529,5 @@ Qed.
     split; [apply dec_val | apply val_dec]; auto.
   Qed.
 
-End RedRefSem.
+End RedRefSem.x
+      let tac _ := try rewrit

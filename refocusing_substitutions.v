@@ -69,7 +69,7 @@ Module RedRefSem (R : RED_REF_LANG) <: RED_REF_SEM R.R.
   with decctx_Ind := Induction for decctx Sort Prop.
     
   Notation "a <| b" := (R.subterm_order a b) (at level 40, no associativity).
-  Notation "k |-  a << b " := (R.ec_order k a b) (at level 40, no associativity).
+  Notation "k |~  a << b " := (R.ec_order k a b) (at level 40, no associativity).
 
   Definition dec_term_correct := R.dec_term_correct.
 
@@ -456,16 +456,19 @@ Qed.
         final_tac ].
     Qed.
 
+    Module RF := RED_REF_LANG_Facts R LP.
 
-    Lemma dec_plug_rev : forall {k1 k2 k3} c c0 t d, 
+    Lemma dec_plug_rev : 
+        forall {k1 k2 k3} c c0 t d, 
+            R.indecomp_proper c t -> dec t k3 k2 (R.R.compose c c0) d -> 
+            dec (R.R.plug t c) k3 k1 c0 d.
 
-        dec t k3 k2 (R.R.compose c c0) d -> dec (R.R.plug t c) k3 k1 c0 d.
-
-    Proof with auto.
+    Proof with eauto.
       induction c; intros; simpl.
-      - auto.
+      - trivial.
 
       - apply IHc; clear IHc.
+        apply RF.indecomp_proper_ec...
         remember (R.dec_term (R.R.atom_plug t ec) k2) as i.
         destruct i;
           assert (hh := R.dec_term_correct (R.R.atom_plug t ec) k2);
@@ -473,23 +476,27 @@ Qed.
 
         * symmetry in Heqi.
           destruct ( R.dec_term_red_empty _ _ _ Heqi t _ (R.R.ccons ec R.R.empty))...
-          discriminateJM H1.
+          discriminateJM H2.
 
         * symmetry in Heqi.
           destruct (R.dec_term_val_empty _ _ _ Heqi t _ (R.R.ccons ec R.R.empty))...
-          discriminateJM H1.
+          discriminateJM H2.
 
-        * destruct (R.dec_ec_ord t0 t k2 e ec hh) as [H0 | [H0 | (H0, H1)]];
-              try (subst; econstructor 3; eauto; fail).
+        * destruct (R.dec_ec_ord (R.R.atom_plug t ec) k2 e ec) as [H1 | [H1 | H1]].
+              exists t0; exists e...
+              apply (H ec _ R.R.empty c)...
 
           + symmetry in Heqi.
-            contradict (R.dec_term_term_top _ _ _ _ Heqi _ H0).
+            contradict (R.dec_term_term_top _ _ _ _ Heqi _ H1).
 
           + symmetry in hh.
-            destruct (R.elem_context_det _ _ _ _ _ H0 hh) as [v H1]; subst t0.
+            destruct (R.elem_context_det _ _ _ _ _ H1 hh) as (v, H2); subst t0.
             econstructor 3; eauto.
             {
-              clear Heqi; generalize dependent v; generalize dependent e.
+              assert (exists t0 e0, R.R.in_term t0 e0 =
+                                 R.dec_term (R.R.atom_plug t ec) k2
+                             /\ (e = e0 \/ k2 |~ e << e0)               )...
+              clear H Heqi; generalize dependent v; generalize dependent e.
               induction e using (well_founded_ind (R.wf_eco k2)); intros.
 
               apply val_dec.
@@ -501,35 +508,79 @@ Qed.
 
               - contradiction (R.dec_context_red_bot _ _ _ _ Heqi ec).
               - contradiction (R.dec_context_val_bot _ _ _ _ Heqi ec).
-              - destruct (R.dec_context_term_next _ _ _ _ _ Heqi) as [H2 H3].
+              - destruct (R.dec_context_term_next _ _ _ _ _ Heqi) as (H3, H4).
                 econstructor 4; eauto; rewrite <- hh in ht.
-                destruct (R.dec_ec_ord _ _ k2 _ _ ht) as [H4 | [H4 | [H4 H5]]];
-                    try (subst; auto; fail).
-                * contradiction (H3 ec H1).
-                * symmetry in ht; clear H3. 
-                  destruct (R.elem_context_det _ _ _ _ _ H4 ht) as [v0 H5]; subst t0.
-                  apply H0...
+                destruct (R.dec_ec_ord (R.R.atom_plug t ec) k2 e0 ec) as [H5 | [H5 | H5]];
+                try (destruct H2 as (t_0, (e_0, (H2, [H2' | H2'])));
+                     exists t_0 e_0; solve 
+                     [ subst; intuition
+                     | intuition; right; apply R.ec_order_trans with (ec1 := e); eauto ]).
+                * contradiction (H4 ec H1).
+                * symmetry in ht; clear H4. 
+                  destruct (R.elem_context_det _ _ _ _ _ H5 ht) as (v0, H6); subst t0.
+                  apply H...
+                  try (destruct H2 as (t_0, (e_0, (H2, [H2' | H2'])));
+                     exists t_0 e_0; solve 
+                     [ subst; intuition
+                     | intuition; right; apply R.ec_order_trans with (ec1 := e); eauto ]).
+                * subst.
+                  assert (H5 := R.R.atom_plug_injective1 _ _ _ ht).
+                  subst...
             }
+        + subst.
+          assert (H5 := R.R.atom_plug_injective1 _ _ _ hh).
+          subst.
+          econstructor 3...
     Qed.
 
-    Lemma dec_plug : forall c c0 t d, dec (R.R.plug t c) c0 d -> dec t (R.R.compose c c0) d.
-    Proof with auto.
-      induction c; intros; simpl; auto.
-      apply IHc in H; clear IHc; inversion H; subst; unfold dec_term in DT; clear H;
-      assert (hh := R.dec_term_correct (R.R.atom_plug t a)); rewrite DT in hh.
-      discriminate (R.dec_term_red_empty _ _ DT t (a :: nil)); reflexivity.
-      symmetry in hh; discriminate (R.dec_term_val_empty _ _ DT t (a :: R.R.empty))...
-      destruct (R.dec_ec_ord t1 t ec a hh) as [H2 | [H2 | [H2 H3]]].
-      contradiction (R.dec_term_term_top _ _ _ DT a).
-      symmetry in hh; destruct (R.elem_context_det _ _ _ _ H2 hh) as [v H3]; subst t1.
-      clear DT; generalize dependent v; generalize dependent ec.
-      induction ec using (well_founded_ind R.wf_eco); intros.
-      assert (H0 := dec_val _ _ _ R_T); inversion H0; subst; clear R_T;
-      assert (ht := R.dec_context_correct ec v); unfold dec_context in DC; rewrite DC in ht; simpl in ht.
-      contradiction (R.dec_context_red_bot _ _ _ DC a).
-      contradiction (R.dec_context_val_bot _ _ _ DC a).
-      clear H0.
-      rewrite <- hh in ht.
+    Lemma dec_plug : 
+        forall {k1 k2 k3} c c0 t d, R.indecomp_proper c t -> 
+            dec (R.R.plug t c) k3 k1 c0 d -> dec t k3 k2 (R.R.compose c c0) d.
+
+    Proof with eauto.
+      induction c; intros; simpl.
+      - trivial.
+
+      - apply IHc in H0; clear IHc.
+        Focus 2. apply RF.indecomp_proper_ec...
+        inversion H0; subst;
+            unfold dec_term in H6; clear H0;
+            assert (hh := R.dec_term_correct (R.R.atom_plug t ec) k2); 
+            rewrite H6 in hh.
+
+        * destruct (R.dec_term_red_empty _ _ _ H6 t _ (R.R.ccons ec R.R.empty))...
+          discriminateJM H2.
+
+        * destruct (R.dec_term_val_empty _ _ _ H6 t _ (R.R.ccons ec R.R.empty))...
+          discriminateJM H3.
+
+        * dependent destruction H2. STOP
+          destruct (R.dec_ec_ord t1 t k2 ec0 ec hh) as [H2 | [H2 | (H2, H3)]].
+          + contradiction (R.dec_term_term_top _ _ _ _ H5 ec).
+          + symmetry in hh.
+            destruct (R.elem_context_det _ _ _ _ _ H2 hh) as [v H3]; subst t1.
+          {
+            dependent destruction H1.
+            clear H5; generalize dependent v; generalize dependent ec0.
+            induction ec0 using (well_founded_ind (R.wf_eco k2)); intros.
+
+            assert (H3 := dec_val _ _ _ _ _ H6).
+            inversion H3;
+                subst; clear H3;
+                match goal with 
+                | H : dec_context _ _ _ = _ |- _ => assert (DC := H)
+                end.
+            - assert (ht := R.dec_context_correct ec0 _ v1).
+              unfold dec_context in DC; rewrite DC in ht; simpl in ht.
+              contradiction (R.dec_context_red_bot _ _ _ _ DC ec).
+            - assert (ht := R.dec_context_correct ec0 _ v2).
+              unfold dec_context in DC; rewrite DC in ht; simpl in ht.
+              contradiction (R.dec_context_val_bot _ _ _ _ DC ec).
+            - dependent destruction H4. dependent destruction H12. dependent destruction H11.
+              assert (ht := R.dec_context_correct ec0 _ v1).
+              unfold dec_context in DC; rewrite DC in ht; simpl in ht.
+              clear H5.
+              rewrite <- hh in ht.
       destruct (R.dec_context_term_next _ _ _ _ DC).
       destruct (R.dec_ec_ord _ _ _ _ ht) as [hq | [hq | [hq hw]]].
       contradiction (H1 a).

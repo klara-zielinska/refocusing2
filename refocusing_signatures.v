@@ -83,7 +83,7 @@ Module Type RED_REF_SEM (R : RED_LANG).
                 dec t (R.ccons ec0 c) d ->
                 decctx v (R.ccons ec c) d.
 
-  Axiom dec_val_self : forall k1 k2 (v : R.value k2) (c : R.context k1 k2) (d : R.decomp k1), 
+  Axiom dec_val_self : forall k2 (v : R.value k2) k1 (c : R.context k1 k2) (d : R.decomp k1), 
       dec (R.value_to_term v) c d <-> decctx v c d.
 
   Declare Module RS : RED_SEM R with Definition dec := dec.

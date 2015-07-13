@@ -13,13 +13,13 @@ Module Type RED_SEM (R : RED_LANG).
       (exists k2 (r : R.redex k2) (c : R.context k1 k2), R.plug (R.redex_to_term r) c = t).
 
   (** dec is left inverse of plug *)
-  Axiom dec_correct : forall k1 k2 t (c : R.context k1 k2) d, dec t c d -> 
+  Axiom dec_correct : forall t k1 k2 (c : R.context k1 k2) d, dec t c d -> 
       R.decomp_to_term d = R.plug t c.
 
   Axiom dec_plug : forall k1 k2 (c : R.context k1 k2) k3 (c0 : R.context k3 k1) t d, 
-                       dec (R.plug t c) c0 d -> dec t (R.compose c c0) d.
-  Axiom dec_plug_rev : forall k1 k2 k3 (c : R.context k1 k2) (c0 : R.context k3 k1) t d, 
-                           dec t (R.compose c c0) d -> dec (R.plug t c) c0 d.
+                     ~ R.dead_ckind k2 -> dec (R.plug t c) c0 d -> dec t (R.compose c c0) d.
+  Axiom dec_plug_rev : forall k1 k2 (c : R.context k1 k2) k3 (c0 : R.context k3 k1) t d, 
+                         ~ R.dead_ckind k2 -> dec t (R.compose c c0) d -> dec (R.plug t c) c0 d.
 
   Inductive decempty : R.term -> forall {k}, R.decomp k -> Prop :=
   | d_intro : forall (t : R.term) {k} (d : R.decomp k), dec t (@R.empty k) d -> decempty t d.

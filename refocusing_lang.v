@@ -3,6 +3,7 @@ Require Import Program.
 Require Export Util.
 Require Import Eqdep.
 
+
 Module Type RED_LANG.
 
   (** The languages of terms, values, redex, and context, the empty context is also needed. *)
@@ -10,6 +11,11 @@ Module Type RED_LANG.
   Parameters value redex : ckind -> Set.
   Parameter  ckind_trans : ckind -> elem_context -> ckind.
   Parameter  init_ckind : ckind.
+  Parameter  dead_ckind : ckind -> Prop.
+
+  Axiom ckind_death_propagation : 
+      forall k, dead_ckind k -> forall ec, dead_ckind (ckind_trans k ec). 
+
   Inductive context : ckind -> ckind -> Set :=
   | empty : forall {k}, context k k
   | ccons : forall (ec : elem_context) {k1 k2}, context k1 k2 -> context k1 (ckind_trans k2 ec).
@@ -30,7 +36,7 @@ Module Type RED_LANG.
   Fixpoint compose {k1 k2} (c0 : context k1 k2) {k3} (c1 : context k3 k1) : context k3 k2 := 
       match c0 in context k1' k2' return context k3 k1' -> context k3 k2' with
       | [_]     => fun c1' => c1'
-      | ec=:c0' => fun c1' => ec=:compose c0' c1'
+      | ec=:c0' => fun c1' => ec =: compose c0' c1'
       end c1.
   Infix "~+" := compose (at level 60, right associativity).
 
@@ -40,10 +46,13 @@ Module Type RED_LANG.
       atom_plug t0 ec = atom_plug t1 ec -> t0 = t1.
 
   Fixpoint plug (t : term) {k1 k2} (c : context k1 k2) : term :=
-  match c with
-  | [_]    => t 
-  | ec=:c' => plug (atom_plug t ec) c'
-  end.
+      match c with
+      | [_]    => t 
+      | ec=:c' => plug (atom_plug t ec) c'
+      end.
+
+  Definition transitable_from k ec := ~ dead_ckind (ckind_trans k ec).
+  Definition ec_siblings ec0 ec1 := exists t0 t1, atom_plug t0 ec0 = atom_plug t1 ec1.
 
 
   (** The other main function of reduction semantics -- contraction of a redex into a term *)
@@ -107,6 +116,15 @@ Module RED_LANG_Facts (R : RED_LANG).
     auto.
     Qed.
 
+    Lemma context_tail_liveness : 
+        forall k ec, ~dead_ckind (ckind_trans k ec) -> ~dead_ckind k.
+    Proof.
+    intuition.
+    apply H.
+    apply ckind_death_propagation.
+    assumption.
+    Qed.
+
 End RED_LANG_Facts.
 
 
@@ -121,6 +139,7 @@ Module Type LANG_PROP (R : RED_LANG).
            R.plug t (R.compose c0 c1) = R.plug (R.plug t c0) c1.
 
 End LANG_PROP.
+
 
 Module Type RED_REF_LANG.
 
@@ -145,7 +164,7 @@ Module Type RED_REF_LANG.
   Axiom wf_eco : forall k, well_founded (ec_order k).
 
 
-  Definition ec_proper_sub ec t k := 
+  (*Definition ec_proper_sub ec t k := 
 
       exists t0 ec0, dec_term t k = R.in_term t0 ec0 /\ (ec0 = ec \/ k |~ ec << ec0).
 
@@ -153,7 +172,7 @@ Module Type RED_REF_LANG.
   Definition indecomp_proper {k1 k2} (c : R.context k1 k2) t :=
 
       forall ec {k} (c0 : R.context _ k2) (c1 : R.context k1 k), 
-          c0~+ec=:c1 = c -> ec_proper_sub ec (R.plug t (c0~+ec=:[_])) k.
+          c0~+ec=:c1 = c -> ec_proper_sub ec (R.plug t (c0~+ec=:[_])) k.*)
 
 
   Axiom dec_term_red_empty  : forall t k (r : R.redex k), 
@@ -169,31 +188,41 @@ Module Type RED_REF_LANG.
   Axiom dec_context_term_next : 
       forall ec k v t ec', dec_context ec k v = R.in_term t ec' -> 
       k |~ ec' << ec /\ forall ec'', k |~ ec'' << ec -> ~ k |~ ec' << ec''.
+  Axiom dec_term_ec_most_transitable : forall {t0 ec0 t1 ec1 k},  
+      transitable_from k ec1 ->
+      dec_term (atom_plug t1 ec1) k = R.in_term t0 ec0 ->
+      transitable_from k ec0.
 
   Axiom dec_term_correct : forall t k, match dec_term t k with
-    | R.in_red r => R.redex_to_term r = t
-    | R.in_val v => R.value_to_term v = t
-    | R.in_term t' ec => R.atom_plug t' ec = t
-    end.
+      | R.in_red r => R.redex_to_term r = t
+      | R.in_val v => R.value_to_term v = t
+      | R.in_term t' ec => R.atom_plug t' ec = t
+      end.
   Axiom dec_context_correct : forall ec k v, match dec_context ec k v with
-    | R.in_red r => R.redex_to_term r = R.atom_plug (R.value_to_term v) ec
-    | R.in_val v' => R.value_to_term v' = R.atom_plug (R.value_to_term v) ec
-    | R.in_term t ec' => R.atom_plug t ec' = R.atom_plug (R.value_to_term v) ec
-    end.
+      | R.in_red r => R.redex_to_term r = R.atom_plug (R.value_to_term v) ec
+      | R.in_val v' => R.value_to_term v' = R.atom_plug (R.value_to_term v) ec
+      | R.in_term t ec' => R.atom_plug t ec' = R.atom_plug (R.value_to_term v) ec
+      end.
 
   Axiom ec_order_antisym : forall k (ec ec0 : R.elem_context), 
       k |~ ec << ec0 -> ~ k |~ ec0 << ec.
   Axiom ec_order_trans : forall k ec0 ec1 ec2,
       k |~ ec0 << ec1 -> k |~ ec1 << ec2 -> k |~ec0 << ec2.
-  Axiom dec_ec_ord : forall t k ec0 ec1,
-      ec_proper_sub ec0 t k -> ec_proper_sub ec1 t k ->
+  Axiom ec_order_comp_if :
+      forall ec0 ec1, ec_siblings ec0 ec1 -> 
+      forall k, transitable_from k ec0 -> transitable_from k ec1 ->
       k |~ ec0 << ec1 \/ k |~ ec1 << ec0 \/ ec0 = ec1.
+  Axiom ec_order_comp_fi :
+      forall ec0 ec1 k, k |~ ec0 << ec1 ->
+      ec_siblings ec0 ec1 /\ transitable_from k ec0 /\ transitable_from k ec1.
+
   Axiom elem_context_det : forall t0 t1 k ec0 ec1,
       k |~ ec0 << ec1 -> R.atom_plug t0 ec0 = R.atom_plug t1 ec1 ->
       exists v : R.value (R.ckind_trans k ec1), t1 = R.value_to_term v.
 
 End RED_REF_LANG.
 
+(*
 Module RED_REF_LANG_Facts (R : RED_REF_LANG) (RP : LANG_PROP R.R).
 
   Import R.R.
@@ -212,12 +241,21 @@ Module RED_REF_LANG_Facts (R : RED_REF_LANG) (RP : LANG_PROP R.R).
   apply f_equal...
   Qed.
 
-
 End RED_REF_LANG_Facts.
+*)
 
-  Ltac prove_st_wf := intro a; constructor; induction a; (intros y H; 
-      inversion H as [t t0 ec DECT]; subst; destruct ec; inversion DECT; subst; constructor; auto).
-  Ltac prove_ec_wf := intro a; destruct a; repeat (constructor; intros ec T; destruct ec; inversion T; subst; clear T).
+  Ltac prove_st_wf := 
+      intro a; constructor; induction a; 
+         (intros y H; 
+          inversion H as [t t0 ec DECT]; subst; 
+          destruct ec; inversion DECT; subst; 
+          constructor; auto).
+  Ltac prove_ec_wf := 
+      intro a; destruct a; repeat (
+          constructor; 
+          intros ec T; 
+          destruct ec; inversion T; subst; clear T).
+
 
 Module Type ABSTRACT_MACHINE.
 
@@ -235,6 +273,7 @@ Module Type ABSTRACT_MACHINE.
   | e_intro : forall (t : term) (v : value), trans_close (c_init t) (c_final v) -> eval t v.
 
 End ABSTRACT_MACHINE.
+
 
 Module Type SOS_SEM.
 

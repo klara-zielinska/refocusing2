@@ -93,6 +93,7 @@ Module Type RED_REF_SEM (R : RED_LANG).
 
 End RED_REF_SEM.
 
+
 Module Type PE_REF_SEM (R : RED_LANG).
 
   Declare Module Red_Sem : RED_REF_SEM R.
@@ -104,3 +105,24 @@ Module Type PE_REF_SEM (R : RED_LANG).
                              Red_Sem.dec_term (R.value_to_term v) k = R.in_val v.
 
 End PE_REF_SEM.
+
+Require Import Program.
+
+Module Type RED_PROP (R : RED_LANG) (RS : RED_REF_SEM(R)).
+
+  Axiom dec_is_function : forall t k (d d0 : R.decomp k), 
+                              RS.RS.decempty t d -> RS.RS.decempty t d0 -> d = d0.
+  Axiom iter_is_function : forall k d (v v0 : R.value k), 
+                              RS.RS.iter d v -> RS.RS.iter d v0 -> v = v0.
+  Axiom eval_is_function : forall t k (v v0 : R.value k), 
+                              RS.RS.eval t v -> RS.RS.eval t v0 -> v = v0.
+  Axiom dec_correct :  forall t k1 k2 (c : R.context k1 k2) d, 
+                              RS.RS.dec t c d -> R.decomp_to_term d = R.plug t c.
+  Axiom dec_total : forall t, exists k (d : R.decomp k), RS.RS.decempty t d.
+  Axiom unique_decomposition : forall t k, 
+      (exists v : R.value k, t = R.value_to_term v) \/ 
+      (exists k2 (r : R.redex k2) (c : R.context k k2),  R.plug (R.redex_to_term r) c = t /\ 
+	  forall k2' (r0 : R.redex k2') (c0 : R.context k k2'), 
+              R.plug (R.redex_to_term r0) c0 = t -> k2' = k2 /\ r ~= r0 /\ c ~= c0).
+
+End RED_PROP.

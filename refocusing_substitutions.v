@@ -291,7 +291,6 @@ Qed.
     Qed.
 
   Module RS : RED_SEM R.R with Definition dec := dec.
-    Definition dec := dec.
 
     Module LP := Lang_Prop R.R.
 
@@ -344,7 +343,7 @@ Qed.
 
     Lemma dec_redex_self_e : forall {k} (r : R.R.redex k), 
 
-                dec (R.R.redex_to_term r) _ _ (R.R.empty) (R.R.d_red r R.R.empty).
+                dec (R.R.redex_to_term r) (R.R.empty) (R.R.d_red r R.R.empty).
 
     Proof with eauto.
       intros; 
@@ -393,7 +392,7 @@ Qed.
     Qed.
 
     Lemma dec_redex_self : forall {k1 k2} (r : R.R.redex k2) (c : R.R.context k1 k2), 
-                               dec (R.R.redex_to_term r) _ _ c (R.R.d_red r c).
+                               dec (R.R.redex_to_term r) c (R.R.d_red r c).
     Proof with eauto.
       intros;
       assert (hh := dec_redex_self_e r);
@@ -401,10 +400,10 @@ Qed.
 
       apply dec_Ind with
 
-      (P  := fun t k1' k2' c0 d (H : dec t k1' k2' c0 d) => match d with
+      (P  := fun t k1' k2' c0 d (H : @dec t k1' k2' c0 d) => match d with
         | R.R.d_val v => True
         | R.R.d_red k' r' c1 => forall c : R.R.context k1 k1', 
-                                dec t _ _ (R.R.compose c0 c) (R.R.d_red r' (R.R.compose c1 c))
+                                dec t (R.R.compose c0 c) (R.R.d_red r' (R.R.compose c1 c))
       end)
 
       (P0 := fun k2' v k1' c0 d (H : @decctx k2' v k1' c0 d) => match d with
@@ -419,23 +418,23 @@ Qed.
 
       - constructor...
       - econstructor...
-      - econstructor 3... apply H.
+      - econstructor 3...
       - constructor... 
       - econstructor...
-      - econstructor 4... apply H.
+      - econstructor 4...
 
     Qed.
 
     Lemma dec_correct : 
-        forall t {k1 k2} c d, dec t k1 k2 c d -> R.R.decomp_to_term d = R.R.plug t c.
+        forall t {k1 k2} c d, @dec t k1 k2 c d -> R.R.decomp_to_term d = R.R.plug t c.
   
     Proof.
       induction 1 using dec_Ind with
 
-      (P := fun t k1 k2 c d (H:dec t k1 k2 c d) => 
+      (P := fun t k1 k2 c d (H : @dec t k1 k2 c d) => 
                  R.R.decomp_to_term d = R.R.plug t c)
 
-      (P0:= fun k2 v k1 c d (H:decctx v c d) => 
+      (P0:= fun k2 v k1 c d (H : decctx v c d) => 
                  R.R.decomp_to_term d = R.R.plug (R.R.value_to_term v) c);
 
       let final_tac := 
@@ -471,28 +470,10 @@ Qed.
     Qed.*)
 
 
-(* REFACTOR *)
-Require Import Eqdep.
-
-Ltac injection_ccons H :=
-match type of H with R.R.ccons ?ec1 ?c1 ~= R.R.ccons ?ec2 ?c2 => 
-let H0 := fresh in 
-assert (H0 : eq_dep _ _ _ (R.R.ccons ec1 c1) _ (R.R.ccons ec2 c2)); 
-[ apply JMeq_eq_depT; eauto
-| inversion H0; subst; 
-match goal with 
-H1 : existT _ _ _ = existT _ _ _ |- _ => 
-let tmp := fresh in 
-assert (tmp := H1); clear H1;
-dependent destruction tmp
-end;
-clear H0 ]
-end.
-
     Lemma dec_plug : 
         forall k1 k2 c k3 c0 t d, 
-            ~ R.R.dead_ckind k2 -> dec (R.R.plug t c) k3 k1 c0 d -> 
-            dec t k3 k2 (R.R.compose c c0) d.
+            ~ R.R.dead_ckind k2 -> @dec (R.R.plug t c) k3 k1 c0 d -> 
+            @dec t k3 k2 (R.R.compose c c0) d.
 
     Proof with eauto.
       induction c; intros; simpl.
@@ -552,8 +533,8 @@ end.
 
     Lemma dec_plug_rev : 
         forall k1 k2 c k3 c0 t d, 
-            ~ R.R.dead_ckind k2 -> dec t k3 k2 (R.R.compose c c0) d -> 
-            dec (R.R.plug t c) k3 k1 c0 d.
+            ~ R.R.dead_ckind k2 -> @dec t k3 k2 (R.R.compose c c0) d -> 
+            @dec (R.R.plug t c) k3 k1 c0 d.
 
     Proof with eauto.
       induction c; intros; simpl.
@@ -689,7 +670,7 @@ inversion H1. subst. dependent destruction H10. clear H1 H5 H6. subst.
 discriminate Hc3. *)
 
   Inductive decempty : R.R.term -> forall {k}, R.R.decomp k -> Prop :=
-  | d_intro : forall (t : R.R.term) {k} (d : R.R.decomp k), dec t _ _(@R.R.empty k) d -> decempty t d.
+  | d_intro : forall (t : R.R.term) {k} (d : R.R.decomp k), dec t (@R.R.empty k) d -> decempty t d.
 
   Inductive iter : forall {k}, R.R.decomp k -> R.R.value k -> Prop :=
   | i_val : forall {k} (v : R.R.value k), iter (R.R.d_val v) v
@@ -699,6 +680,8 @@ discriminate Hc3. *)
 
   Inductive eval : R.R.term -> forall {k}, R.R.value k -> Prop :=
   | e_intro : forall t {k} (d : R.R.decomp k) v, decempty t d -> iter d v -> eval t v.
+
+  Definition dec := dec.
 
   End RS.
 
@@ -711,3 +694,115 @@ discriminate Hc3. *)
   Qed.
 
 End RedRefSem.
+
+
+Module Red_Prop (R : RED_LANG) (RS : RED_REF_SEM(R)) : RED_PROP R RS.
+
+  Module LP := Lang_Prop R.
+
+Ltac super_subst :=
+            subst;
+            match goal with 
+            | G : existT _ _ _ = existT _ _ _ |- _ => 
+                  let tmp := fresh in assert (tmp := G); clear G; dependent destruction tmp
+            | _ => idtac
+            end.
+
+
+  Lemma dec_is_function :  forall t k (d d0 : R.decomp k), 
+                              RS.RS.decempty t d -> RS.RS.decempty t d0 -> d = d0.
+
+
+
+(* REFACTOR *)
+Require Import Eqdep.
+
+Ltac injection_ccons H :=
+match type of H with R.ccons ?ec1 ?c1 ~= R.ccons ?ec2 ?c2 => 
+let H0 := fresh in 
+assert (H0 : eq_dep _ _ _ (R.ccons ec1 c1) _ (R.ccons ec2 c2)); 
+[ apply JMeq_eq_depT; eauto
+| inversion H0; subst; 
+match goal with 
+H1 : existT _ _ _ = existT _ _ _ |- _ => 
+let tmp := fresh in 
+assert (tmp := H1); clear H1;
+dependent destruction tmp
+end;
+clear H0 ]
+end.
+
+  Proof.
+    intros t k d d0 DE DE0. dependent destruction DE. dependent destruction DE0.
+
+    refine (RS.dec_Ind 
+       (fun t k1 k2 c d (H : @RS.RS.dec t k1 k2 c d) => 
+            forall d0 (DEC : RS.RS.dec t c d0), d = d0)
+       (fun k2 v k1 c d (H : @RS.decctx k2 v k1 c d) => 
+            forall d0 (DCTX : RS.decctx v c d0),  d = d0)
+       _ _ _ _ _ _ _ t _ _ R.empty d H d0 H0);
+
+    intros;
+
+    match goal with
+    | [ RD : (RS.RS.dec ?t ?c ?d), DT : (RS.dec_term ?t ?k = _) |- _ ] => 
+             inversion RD; super_subst; 
+             try match goal with DT2 : (RS.dec_term ?t ?k = _) |- _ => 
+                     rewrite DT2 in DT; inversion DT end
+    | [ RC : (RS.decctx ?v (R.ccons ?ec ?c) ?d), DC : (RS.dec_context ?ec ?k ?v = _) |- _ ] => 
+             dependent_destruction2 RC; injection_ccons x; do 2 super_subst;
+             try match goal with DC2 : (RS.dec_context ?ec' ?k' ?v' = _) |- _ => 
+                     rewrite DC2 in DC; inversion DC end
+    | [ RC : (RS.decctx ?v R.empty ?d) |- _] => 
+             dependent_destruction2 RC
+    end; 
+
+    subst; eauto.
+  Qed.
+  Hint Resolve dec_is_function : prop.
+
+  Lemma iter_is_function : forall d v v0, RS.RS.iter d v -> RS.RS.iter d v0 -> v = v0.
+  Proof with eauto with prop.
+    induction 1; intros.
+    inversion H...
+    inversion H0; subst; rewrite CONTR0 in CONTR; inversion CONTR; subst;
+    apply IHiter; cutrewrite (d = d0)...
+  Qed.
+  Hint Resolve iter_is_function : prop.
+
+  Lemma eval_is_function : forall t v v0, RS.RS.eval t v -> RS.RS.eval t v0 -> v = v0.
+  Proof with eauto with prop.
+    induction 1; intros; inversion H; subst; cutrewrite (d = d0) in ITER...
+  Qed.
+
+  Lemma dec_correct : forall t c d, RS.RS.dec t c d -> R.decomp_to_term d = R.plug t c.
+  Proof.
+    induction 1 using RS.dec_Ind with
+    (P := fun t c d (H:RS.RS.dec t c d) => R.decomp_to_term d = R.plug t c)
+    (P0:= fun v c d (H:RS.decctx v c d) => R.decomp_to_term d = R.plug (R.value_to_term v) c); simpl; auto;
+    try (assert (hh := RS.dec_term_correct t); rewrite DT in hh; simpl in hh; try rewrite IHdec; subst; auto);
+    assert (hh := RS.dec_context_correct ec v); rewrite DC in hh; simpl in hh; try rewrite IHdec; try (contradiction hh); rewrite <- hh; auto.
+  Qed.
+
+  Lemma dec_total : forall t, exists d, RS.RS.decempty t d.
+  Proof.
+    intro t; destruct (RS.RS.decompose t) as [[v Hv] | [r [c Hp]]]; intros; subst t.
+    exists (R.d_val v); constructor; rewrite RS.dec_val_self; constructor.
+    exists (R.d_red r c); constructor; apply RS.RS.dec_plug_rev;
+    rewrite <- LP.compose_empty; apply RS.RS.dec_redex_self.
+  Qed.
+
+  Lemma unique_decomposition : forall t:R.term, (exists v:R.value, t = R.value_to_term v) \/ 
+      (exists r:R.redex, exists c:R.context, R.plug (R.redex_to_term r) c = t /\ 
+	  forall (r0:R.redex) c0, (R.plug (R.redex_to_term r0) c0 = t -> r=r0 /\ c= c0)).
+  Proof.
+    intro t; destruct (RS.RS.decompose t) as [[v H] | [r [c H]]]; intros;
+    [left; exists v | right; exists r; exists c]; auto; split; auto; intros.
+    assert (RS.RS.decempty t (R.d_red r c)).
+    constructor; rewrite <- H; apply RS.RS.dec_plug_rev; rewrite <- LP.compose_empty; apply RS.RS.dec_redex_self.
+    assert (RS.RS.decempty t (R.d_red r0 c0)).
+    constructor; rewrite <- H0; apply RS.RS.dec_plug_rev; rewrite <- LP.compose_empty; apply RS.RS.dec_redex_self.
+    assert (hh := dec_is_function _ _ _ H1 H2); injection hh; intros; auto.
+  Qed.
+
+End Red_Prop.

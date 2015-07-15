@@ -95,6 +95,28 @@ Module Type RED_LANG.
     | d_red _ r c0 => plug (redex_to_term r) c0
   end.
 
+  Axiom proper_death : forall k, dead_ckind k -> ~ exists (d : decomp k), True.
+
+
+  Ltac inversion_ccons H :=
+
+      match type of H with ?ec1 =: ?c1  ~=  ?ec2 =: ?c2 => 
+
+      let H0 := fresh in 
+      assert (H0 : eq_dep _ _ _ (ec1=:c1) _ (ec2=:c2));
+
+      [ apply JMeq_eq_depT; eauto
+
+      | inversion H0; subst; 
+        match goal with H1 : existT _ _ _ = existT _ _ _ |- _ => 
+        let tmp := fresh in 
+        assert (tmp := H1); clear H1;
+        dependent destruction tmp
+        end;
+        clear H0 ]
+
+      end.
+
 End RED_LANG.
 
 
@@ -117,12 +139,19 @@ Module RED_LANG_Facts (R : RED_LANG).
     Qed.
 
     Lemma context_tail_liveness : 
-        forall k ec, ~dead_ckind (ckind_trans k ec) -> ~dead_ckind k.
+        forall k ec, ~dead_ckind (ckind_trans k ec) -> ~ dead_ckind k.
     Proof.
     intuition.
     apply H.
     apply ckind_death_propagation.
     assumption.
+    Qed.
+
+    Lemma proper_death2 : forall k (d : decomp k), ~ dead_ckind k.
+    Proof.
+    intuition.
+    eapply proper_death;
+    eauto.
     Qed.
 
 End RED_LANG_Facts.

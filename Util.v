@@ -8,6 +8,7 @@ Require Import Eqdep.
 
 Ltac isda := intros; simpl in *; try discriminate; auto.
 
+
 Section tcl.
 
 Variable A : Type.
@@ -93,11 +94,13 @@ Qed.
 
 End tcl.
 
-Definition opt_to_list {T} (o : option T) : list T :=
+
+(*Definition opt_to_list {T} (o : option T) : list T :=
   match o with
   | None => nil
   | Some x => x :: nil
-  end.
+  end.*)
+
 
 Section map_injective.
 
@@ -111,6 +114,7 @@ Section map_injective.
   Qed.
 
 End map_injective.
+
 
 Section streams.
 
@@ -126,10 +130,18 @@ Section streams.
 
 End streams.
 
+
 Ltac join H L R := first [ assert (H := conj L R); clear L R
                          | assert (H := L); clear L
                          | assert (H := R); clear R
                          | idtac ].
+
+
+Ltac dependent_destruction2 H :=
+    let tmp := fresh in assert (tmp := H); 
+    clear H; 
+    dependent destruction tmp. 
+
 
 Ltac rec_subst H := 
     let rec aux H R := match type of H with
@@ -150,25 +162,28 @@ Ltac rec_subst H :=
                 aux H R; 
                 match R with false => clear R; fail | _ => clear R end).
 
+
 Definition JMeq_eq_depT := 
-fun (U : Type) (P : U -> Type) (p q : U) (x : P p) (y : P q) (H : p = q)
-  (H0 : x ~= y) =>
-match
-  H in (_ = y0) return (forall y1 : P y0, x ~= y1 -> eq_dep U P p x y0 y1)
-with
-| eq_refl =>
-    fun (y0 : P p) (H1 : x ~= y0) =>
-    (fun H2 : x = y0 =>
-     eq_ind_r (fun x0 : P p => eq_dep U P p x0 p y0) (eq_dep_intro U P p y0)
-       H2) (JMeq_eq H1)
-end y H0.
+    fun (U : Type) (P : U -> Type) (p q : U) (x : P p) (y : P q) (H : p = q)
+        (H0 : x ~= y) =>
+    match
+    H in (_ = y0) return (forall y1 : P y0, x ~= y1 -> eq_dep U P p x y0 y1)
+    with
+    | eq_refl =>
+        fun (y0 : P p) (H1 : x ~= y0) =>
+        (fun H2 : x = y0 =>
+            eq_ind_r (fun x0 : P p => eq_dep U P p x0 p y0) (eq_dep_intro U P p y0)
+        H2) (JMeq_eq H1)
+    end y H0.
+
 
 Ltac discriminateJM H := 
-match type of H with ?x ~= ?y => 
-let H := fresh in 
-assert (H : eq_dep _ _ _ x _ y); 
-[apply JMeq_eq_depT; auto | discriminate (eq_dep_eq_sigT _ _ _ _ _ _ H)]
-end.
+    match type of H with ?x ~= ?y => 
+    let H := fresh in 
+    assert (H : eq_dep _ _ _ x _ y); 
+    [ apply JMeq_eq_depT; auto | discriminate (eq_dep_eq_sigT _ _ _ _ _ _ H) ]
+    end.
+
 
 Implicit Arguments s_nil [A].
 Implicit Arguments s_cons [A].

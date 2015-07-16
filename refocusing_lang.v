@@ -95,27 +95,8 @@ Module Type RED_LANG.
     | d_red _ r c0 => plug (redex_to_term r) c0
   end.
 
-  Axiom proper_death : forall k, dead_ckind k -> ~ exists (d : decomp k), True.
-
-
-  Ltac inversion_ccons H :=
-
-      match type of H with ?ec1 =: ?c1  ~=  ?ec2 =: ?c2 => 
-
-      let H0 := fresh in 
-      assert (H0 : eq_dep _ _ _ (ec1=:c1) _ (ec2=:c2));
-
-      [ apply JMeq_eq_depT; eauto
-
-      | inversion H0; subst; 
-        match goal with H1 : existT _ _ _ = existT _ _ _ |- _ => 
-        let tmp := fresh in 
-        assert (tmp := H1); clear H1;
-        dependent destruction tmp
-        end;
-        clear H0 ]
-
-      end.
+  Axiom proper_death : forall k, dead_ckind k -> 
+                           ~ exists k' (c : context k k') (r : redex k'), True.
 
 End RED_LANG.
 
@@ -147,12 +128,31 @@ Module RED_LANG_Facts (R : RED_LANG).
     assumption.
     Qed.
 
-    Lemma proper_death2 : forall k (d : decomp k), ~ dead_ckind k.
+    Lemma proper_death2 : forall k1 k2, context k1 k2 -> redex k2 -> ~ dead_ckind k1.
     Proof.
     intuition.
     eapply proper_death;
     eauto.
     Qed.
+
+  Ltac inversion_ccons H :=
+
+      match type of H with ?ec1 =: ?c1  ~=  ?ec2 =: ?c2 => 
+
+      let H0 := fresh in 
+      assert (H0 : eq_dep _ _ _ (ec1=:c1) _ (ec2=:c2));
+
+      [ apply JMeq_eq_depT; eauto
+
+      | inversion H0; subst; 
+        match goal with H1 : existT _ _ _ = existT _ _ _ |- _ => 
+        let tmp := fresh in 
+        assert (tmp := H1); clear H1;
+        dependent destruction tmp
+        end;
+        clear H0 ]
+
+      end.
 
 End RED_LANG_Facts.
 
@@ -217,7 +217,7 @@ Module Type RED_REF_LANG.
   Axiom dec_context_term_next : 
       forall ec k v t ec', dec_context ec k v = R.in_term t ec' -> 
       k |~ ec' << ec /\ forall ec'', k |~ ec'' << ec -> ~ k |~ ec' << ec''.
-  Axiom dec_term_ec_most_transitable : forall {t0 ec0 t1 ec1 k},  
+  Axiom dec_term_ec_most_transitable : forall {t0 ec0 t1 ec1 k},
       transitable_from k ec1 ->
       dec_term (atom_plug t1 ec1) k = R.in_term t0 ec0 ->
       transitable_from k ec0.

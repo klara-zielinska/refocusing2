@@ -296,7 +296,8 @@ Qed.
 
     Lemma decompose : forall (t : R.R.term) (k1 : R.R.ckind), 
       (exists (v : R.R.value k1), t = R.R.value_to_term v) \/
-      (exists k2 (r : R.R.redex k2) (c : R.R.context k1 k2), R.R.plug (R.R.redex_to_term r) c = t).
+      (exists k2 (r : R.R.redex k2) (c : R.R.context k1 k2), 
+      R.R.plug (R.R.redex_to_term r) c = t).
 
     Proof with eauto.
       induction t using (well_founded_ind R.wf_sto); intros.
@@ -507,7 +508,7 @@ Qed.
                 
                 assert (H3 := dec_val _ _ _ _ _ H7).
                 dependent destruction H3;
-                injection_ccons x.
+                inversion_ccons x.
                 - contradiction (R.dec_context_red_bot _ _ _ _ H1 ec).
                 - contradiction (R.dec_context_val_bot _ _ _ _ H1 ec).
                 - assert (ht := R.dec_context_correct ec0 _ v).
@@ -698,8 +699,11 @@ End RedRefSem.
 
 Module Red_Prop (R : RED_LANG) (RS : RED_REF_SEM(R)) : RED_PROP R RS.
 
+  Include RED_LANG_Facts R.
+
   Module LP := Lang_Prop R.
 
+(* REFACTORING *)
 Ltac super_subst :=
             subst;
             match goal with 
@@ -711,30 +715,11 @@ Ltac super_subst :=
 
   Lemma dec_is_function :  forall t k (d d0 : R.decomp k), 
                               RS.RS.decempty t d -> RS.RS.decempty t d0 -> d = d0.
-
-
-
-(* REFACTOR *)
-Require Import Eqdep.
-
-Ltac injection_ccons H :=
-match type of H with R.ccons ?ec1 ?c1 ~= R.ccons ?ec2 ?c2 => 
-let H0 := fresh in 
-assert (H0 : eq_dep _ _ _ (R.ccons ec1 c1) _ (R.ccons ec2 c2)); 
-[ apply JMeq_eq_depT; eauto
-| inversion H0; subst; 
-match goal with 
-H1 : existT _ _ _ = existT _ _ _ |- _ => 
-let tmp := fresh in 
-assert (tmp := H1); clear H1;
-dependent destruction tmp
-end;
-clear H0 ]
-end.
-
   Proof.
-    intros t k d d0 DE DE0. dependent destruction DE. dependent destruction DE0.
+    intros t k d d0 DE DE0.
+    dependent destruction DE; dependent destruction DE0.
 
+    (* induction H *)
     refine (RS.dec_Ind 
        (fun t k1 k2 c d (H : @RS.RS.dec t k1 k2 c d) => 
             forall d0 (DEC : RS.RS.dec t c d0), d = d0)
@@ -744,65 +729,106 @@ end.
 
     intros;
 
+    (* automated cases *)
     match goal with
+
     | [ RD : (RS.RS.dec ?t ?c ?d), DT : (RS.dec_term ?t ?k = _) |- _ ] => 
              inversion RD; super_subst; 
              try match goal with DT2 : (RS.dec_term ?t ?k = _) |- _ => 
                      rewrite DT2 in DT; inversion DT end
+
     | [ RC : (RS.decctx ?v (R.ccons ?ec ?c) ?d), DC : (RS.dec_context ?ec ?k ?v = _) |- _ ] => 
-             dependent_destruction2 RC; injection_ccons x; do 2 super_subst;
+             dependent_destruction2 RC; inversion_ccons x; do 2 super_subst;
              try match goal with DC2 : (RS.dec_context ?ec' ?k' ?v' = _) |- _ => 
                      rewrite DC2 in DC; inversion DC end
+
     | [ RC : (RS.decctx ?v R.empty ?d) |- _] => 
              dependent_destruction2 RC
+
     end; 
 
     subst; eauto.
   Qed.
   Hint Resolve dec_is_function : prop.
 
-  Lemma iter_is_function : forall d v v0, RS.RS.iter d v -> RS.RS.iter d v0 -> v = v0.
+
+  Lemma iter_is_function : forall k d (v v0 : R.value k), 
+                               RS.RS.iter d v -> RS.RS.iter d v0 -> v = v0.
   Proof with eauto with prop.
     induction 1; intros.
-    inversion H...
-    inversion H0; subst; rewrite CONTR0 in CONTR; inversion CONTR; subst;
-    apply IHiter; cutrewrite (d = d0)...
+    - dependent destruction H...
+    - dependent destruction H2; subst. 
+      rewrite H2 in H; inversion H; subst.
+      apply IHiter.
+      cutrewrite (d = d0)...
   Qed.
   Hint Resolve iter_is_function : prop.
 
-  Lemma eval_is_function : forall t v v0, RS.RS.eval t v -> RS.RS.eval t v0 -> v = v0.
+
+  Lemma eval_is_function : forall t k (v v0 : R.value k), 
+                              RS.RS.eval t v -> RS.RS.eval t v0 -> v = v0.
   Proof with eauto with prop.
-    induction 1; intros; inversion H; subst; cutrewrite (d = d0) in ITER...
+    induction 1; intros.
+    - dependent destruction H1.
+      cutrewrite (d = d0) in H0...
   Qed.
 
-  Lemma dec_correct : forall t c d, RS.RS.dec t c d -> R.decomp_to_term d = R.plug t c.
+
+  Lemma dec_correct : forall t k1 k2 (c : R.context k1 k2) d, 
+                          RS.RS.dec t c d -> R.decomp_to_term d = R.plug t c.
   Proof.
     induction 1 using RS.dec_Ind with
-    (P := fun t c d (H:RS.RS.dec t c d) => R.decomp_to_term d = R.plug t c)
-    (P0:= fun v c d (H:RS.decctx v c d) => R.decomp_to_term d = R.plug (R.value_to_term v) c); simpl; auto;
-    try (assert (hh := RS.dec_term_correct t); rewrite DT in hh; simpl in hh; try rewrite IHdec; subst; auto);
-    assert (hh := RS.dec_context_correct ec v); rewrite DC in hh; simpl in hh; try rewrite IHdec; try (contradiction hh); rewrite <- hh; auto.
+    (P := fun t _ _ c d (H : RS.RS.dec t c d) => 
+              R.decomp_to_term d = R.plug t c)
+    (P0:= fun P_ v _ c d (H:RS.decctx v c d) => 
+              R.decomp_to_term d = R.plug (R.value_to_term v) c);
+    simpl; auto;
+
+    try (assert (hh := RS.dec_term_correct t k2); rewrite e in hh; simpl in hh; 
+    try rewrite IHdec; subst; auto);
+
+    assert (hh := RS.dec_context_correct ec k2 v); rewrite e in hh; simpl in hh; 
+    try rewrite IHdec;
+    try (contradiction hh); 
+    rewrite <- hh; auto.
   Qed.
 
-  Lemma dec_total : forall t, exists d, RS.RS.decempty t d.
+
+  Lemma dec_total : forall t k, exists (d : R.decomp k), RS.RS.decempty t d.
   Proof.
-    intro t; destruct (RS.RS.decompose t) as [[v Hv] | [r [c Hp]]]; intros; subst t.
-    exists (R.d_val v); constructor; rewrite RS.dec_val_self; constructor.
-    exists (R.d_red r c); constructor; apply RS.RS.dec_plug_rev;
-    rewrite <- LP.compose_empty; apply RS.RS.dec_redex_self.
+    intros t k.
+    destruct (RS.RS.decompose t k) as [(v, Hv) | (k', (r, (c, Hp)))]; intros; subst t.
+    - exists (R.d_val v); constructor; rewrite RS.dec_val_self; constructor.
+    - exists (R.d_red r c); constructor; apply RS.RS.dec_plug_rev.
+        { apply (proper_death2 _ _ R.empty r); apply (R.d_red r R.empty). }
+      rewrite <- LP.compose_empty; apply RS.RS.dec_redex_self.
   Qed.
 
-  Lemma unique_decomposition : forall t:R.term, (exists v:R.value, t = R.value_to_term v) \/ 
-      (exists r:R.redex, exists c:R.context, R.plug (R.redex_to_term r) c = t /\ 
-	  forall (r0:R.redex) c0, (R.plug (R.redex_to_term r0) c0 = t -> r=r0 /\ c= c0)).
-  Proof.
-    intro t; destruct (RS.RS.decompose t) as [[v H] | [r [c H]]]; intros;
-    [left; exists v | right; exists r; exists c]; auto; split; auto; intros.
-    assert (RS.RS.decempty t (R.d_red r c)).
-    constructor; rewrite <- H; apply RS.RS.dec_plug_rev; rewrite <- LP.compose_empty; apply RS.RS.dec_redex_self.
-    assert (RS.RS.decempty t (R.d_red r0 c0)).
-    constructor; rewrite <- H0; apply RS.RS.dec_plug_rev; rewrite <- LP.compose_empty; apply RS.RS.dec_redex_self.
-    assert (hh := dec_is_function _ _ _ H1 H2); injection hh; intros; auto.
+
+  Lemma unique_decomposition : forall t k, 
+
+      (exists v : R.value k, t = R.value_to_term v) \/ 
+
+      (exists k2 (r : R.redex k2) (c : R.context k k2),  R.plug (R.redex_to_term r) c = t /\ 
+	  forall k2' (r0 : R.redex k2') (c0 : R.context k k2'), 
+              R.plug (R.redex_to_term r0) c0 = t -> k2' = k2 /\ r ~= r0 /\ c ~= c0).
+
+  Proof with eauto.
+    intros.
+    destruct (RS.RS.decompose t k) as [(v, H) | (k', (r, (c, H)))]; intros.
+    - left; exists v...
+    - right; exists k' r; exists c; split. 
+      * trivial.
+      * intros.
+        assert (RS.RS.decempty t (R.d_red r c) /\ RS.RS.decempty t (R.d_red r0 c0)).
+          { split; 
+            constructor; [rewrite <- H | rewrite <- H0]; apply RS.RS.dec_plug_rev;
+            try solve
+            [ apply (proper_death2 _ _ R.empty); auto
+            | rewrite <- LP.compose_empty; apply RS.RS.dec_redex_self ]. }
+        destruct H1.
+        assert (hh := dec_is_function _ _ _ _ H1 H2); dependent destruction hh.
+        intuition.
   Qed.
 
 End Red_Prop.

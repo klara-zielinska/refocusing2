@@ -236,7 +236,7 @@ Module Type RED_REF_LANG.
   Axiom ec_order_antisym : forall k (ec ec0 : R.elem_context), 
       k |~ ec << ec0 -> ~ k |~ ec0 << ec.
   Axiom ec_order_trans : forall k ec0 ec1 ec2,
-      k |~ ec0 << ec1 -> k |~ ec1 << ec2 -> k |~ec0 << ec2.
+      k |~ ec0 << ec1 -> k |~ ec1 << ec2 -> k |~ ec0 << ec2.
   Axiom ec_order_comp_if :
       forall ec0 ec1, ec_siblings ec0 ec1 -> 
       forall k, transitable_from k ec0 -> transitable_from k ec1 ->
@@ -280,7 +280,7 @@ End RED_REF_LANG_Facts.
           destruct ec; inversion DECT; subst; 
           constructor; auto).
   Ltac prove_ec_wf := 
-      intro a; destruct a; repeat (
+      intros k a; destruct a; repeat (
           constructor; 
           intros ec T; 
           destruct ec; inversion T; subst; clear T).

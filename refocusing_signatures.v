@@ -8,7 +8,8 @@ Module Type RED_SEM (R : RED_LANG).
   Axiom dec_redex_self : forall {k1 k2} (r : R.redex k2) (c : R.context k1 k2), 
                              dec (R.redex_to_term r) c (R.d_red r c).
 
-  Axiom decompose : forall (t : R.term) (k1 : R.ckind), 
+  Import R.
+  Axiom decompose : forall (t : R.term) k1, 
       (exists (v : R.value k1), t = R.value_to_term v) \/
       (exists k2 (r : R.redex k2) (c : R.context k1 k2), R.plug (R.redex_to_term r) c = t).
 
@@ -16,10 +17,13 @@ Module Type RED_SEM (R : RED_LANG).
   Axiom dec_correct : forall t k1 k2 (c : R.context k1 k2) d, dec t c d -> 
       R.decomp_to_term d = R.plug t c.
 
-  Axiom dec_plug : forall k1 k2 (c : R.context k1 k2) k3 (c0 : R.context k3 k1) t d, 
-                     ~ R.dead_ckind k2 -> dec (R.plug t c) c0 d -> dec t (R.compose c c0) d.
+  Import R.
+  Axiom dec_plug     : forall k1 k2 (c : R.context k1 k2) k3 (c0 : R.context k3 k1) t d, 
+                          ~ dead_ckind k2 -> dec (R.plug t c) c0 d -> 
+                          dec t (R.compose c c0) d.
   Axiom dec_plug_rev : forall k1 k2 (c : R.context k1 k2) k3 (c0 : R.context k3 k1) t d, 
-                         ~ R.dead_ckind k2 -> dec t (R.compose c c0) d -> dec (R.plug t c) c0 d.
+                          ~ dead_ckind k2 ->  dec t (R.compose c c0) d -> 
+                          dec (R.plug t c) c0 d.
 
   Inductive decempty : R.term -> forall {k}, R.decomp k -> Prop :=
   | d_intro : forall (t : R.term) {k} (d : R.decomp k), dec t (@R.empty k) d -> decempty t d.
@@ -37,12 +41,20 @@ End RED_SEM.
 
 Module Type RED_REF_SEM (R : RED_LANG).
 
+  Import R.
+
   (** Functions specifying atomic steps of induction on terms and contexts -- needed to avoid explicit induction on terms and contexts in construction of the AM *)
   Parameter dec_term    : R.term -> forall k, R.interm_dec k.
   Parameter dec_context : forall (ec : R.elem_context) (k : R.ckind),
                               R.value (R.ckind_trans k ec) -> R.interm_dec k.
 
-  Axiom dec_term_correct : forall t k, match dec_term t k with
+
+  (*Axiom dec_term_liveness : 
+      forall t k, ~ R.dead_ckind k -> 
+      forall t0 ec0, dec_term t k = R.in_term t0 ec0 ->
+      ~ R.dead_ckind (R.ckind_trans k ec0).*)
+
+  Axiom dec_term_correct : forall t kL, match dec_term t kL with
     | R.in_red r => R.redex_to_term r = t
     | R.in_val v => R.value_to_term v = t
     | R.in_term t0 ec0 => R.atom_plug t0 ec0 = t
@@ -84,7 +96,7 @@ Module Type RED_REF_SEM (R : RED_LANG).
                 decctx v (R.ccons ec c) d.
 
   Axiom dec_val_self : forall k2 (v : R.value k2) k1 (c : R.context k1 k2) (d : R.decomp k1), 
-      dec (R.value_to_term v) c d <-> decctx v c d.
+                           dec (R.value_to_term v) c d <-> decctx v c d.
 
   Declare Module RS : RED_SEM R with Definition dec := dec.
 
@@ -101,7 +113,8 @@ Module Type PE_REF_SEM (R : RED_LANG).
   Axiom dec_context_not_val : forall k (v0 : R.value k) (ec : R.elem_context) 
                                        (v  : R.value (R.ckind_trans k ec)), 
             Red_Sem.dec_context ec k v <> R.in_val v0.
-  Axiom dec_term_value : forall k (v : R.value k), 
+  Import R.
+  Axiom dec_term_value : forall k v, 
                              Red_Sem.dec_term (R.value_to_term v) k = R.in_val v.
 
 End PE_REF_SEM.

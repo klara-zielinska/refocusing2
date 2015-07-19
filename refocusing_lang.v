@@ -12,6 +12,8 @@ Module Type RED_LANG.
   Parameter  ckind_trans : ckind -> elem_context -> ckind.
   Parameter  init_ckind : ckind.
   Parameter  dead_ckind : ckind -> Prop.
+(*  Definition ckind_L := { k : ckind | ~ dead_ckind k }.
+  Coercion ckind_L2any (kL : ckind_L) := proj1_sig kL.*)
 
   Axiom ckind_death_propagation : 
       forall k, dead_ckind k -> forall ec, dead_ckind (ckind_trans k ec). 
@@ -59,10 +61,10 @@ Module Type RED_LANG.
   Parameter contract : forall {k}, redex k -> option term.
 
   Definition only_empty (t : term) (k : ckind) : Prop := 
-      forall t' k' (c : context k k'), plug t' c = t -> k = k' /\ c ~= @empty k.
+      forall t' k' (c : context k k'), ~ dead_ckind k' -> plug t' c = t -> k = k' /\ c ~= @empty k.
 
   Definition only_trivial (t : term) (k : ckind) : Prop := 
-      forall t' k' (c : context k k'), plug t' c = t -> 
+      forall t' k' (c : context k k'), ~ dead_ckind k' -> plug t' c = t -> 
           k = k' /\ c ~= @empty k \/ exists (v : value k'), t' = value_to_term v.
 
   Axiom value_trivial : forall k (v : value k), only_trivial (value_to_term v) k.
@@ -70,7 +72,7 @@ Module Type RED_LANG.
   Axiom value_redex   : forall k (v : value k) (r : redex k), 
                             value_to_term v <> redex_to_term r.
   Axiom trivial_val_red : 
-      forall k (t : term), only_trivial t k ->
+      forall k (t : term), ~ dead_ckind k -> only_trivial t k ->
          (exists (v : value k), t = value_to_term v) \/
          (exists (r : redex k), t = redex_to_term r).
 
@@ -176,9 +178,13 @@ Module Type RED_REF_LANG.
 
   Import R.
 
-  Parameter dec_term    : R.term -> forall k,  R.interm_dec k.
+  Parameter dec_term    : R.term -> forall k, R.interm_dec k.
   Parameter dec_context : forall (ec : R.elem_context) (k : R.ckind), 
                               R.value (R.ckind_trans k ec) -> R.interm_dec k.
+
+  Axiom dec_term_liveness : 
+      forall t kL t0 ec0, dec_term t kL = R.in_term t0 ec0 ->
+      ~ R.dead_ckind (R.ckind_trans kL ec0).
 
   Inductive subterm_one_step : R.term -> R.term -> Prop :=
   | st_1 : forall t t0 ec, t = R.atom_plug t0 ec -> subterm_one_step t0 t.
@@ -204,9 +210,9 @@ Module Type RED_REF_LANG.
           c0~+ec=:c1 = c -> ec_proper_sub ec (R.plug t (c0~+ec=:[_])) k.*)
 
 
-  Axiom dec_term_red_empty  : forall t k (r : R.redex k), 
+  Axiom dec_term_red_empty  : forall t k r, 
                                   dec_term t k = R.in_red r -> R.only_empty t k.
-  Axiom dec_term_val_empty  : forall t k (v : R.value k), 
+  Axiom dec_term_val_empty  : forall t k v, 
                                   dec_term t k = R.in_val v -> R.only_empty t k.
   Axiom dec_term_term_top   : forall t t' k ec, 
             dec_term t k = R.in_term t' ec -> forall ec', ~ k |~ ec << ec'.
@@ -275,15 +281,19 @@ End RED_REF_LANG_Facts.
 
   Ltac prove_st_wf := 
       intro a; constructor; induction a; 
-         (intros y H; 
+      (
+          intros y H; 
           inversion H as [t t0 ec DECT]; subst; 
           destruct ec; inversion DECT; subst; 
-          constructor; auto).
+          constructor; auto
+      ).
   Ltac prove_ec_wf := 
-      intros k a; destruct a; repeat (
+      intros k a; destruct a; repeat 
+      (
           constructor; 
           intros ec T; 
-          destruct ec; inversion T; subst; clear T).
+          destruct ec; inversion T; subst; clear T
+      ).
 
 
 Module Type ABSTRACT_MACHINE.

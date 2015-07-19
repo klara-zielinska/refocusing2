@@ -2,65 +2,61 @@ Require Import refocusing_substitutions.
 Require Import Program.
 (*Require Import Setoid.*)
 
-Module MiniML <: RED_LANG.
+Module lc_ECCa <: RED_LANG.
 
 Definition v_name := nat.
 
 Inductive expr :=
-| Z : expr
-| S : expr -> expr
 | App : expr -> expr -> expr
 | Var : v_name -> expr
-| Lam : v_name -> expr -> expr
-| Case: expr -> expr -> v_name -> expr -> expr
-| Letv: v_name -> expr -> expr -> expr
-| Fix : v_name -> expr -> expr
-| Pair: expr -> expr -> expr
-| Fst : expr -> expr
-| Snd : expr -> expr.
+| Lam : v_name -> expr -> expr.
 Definition term := expr.
 
-Definition ckind := unit.
+Inductive _ckind := C | ECa | Ca | CBot.
+Definition ckind := _ckind.
 
-Inductive val :=
-| vZ : val
-| vS : val -> val
-| vLam : v_name -> term -> val
-| vVar : v_name -> val
-| vPair : val -> val -> val.
-Definition value (_ : ckind) := val.
-Notation value' := (value tt).
+Inductive val : ckind -> Set :=
 
-Inductive red :=
-| rApp : value' -> value' -> red
-| rLet : v_name -> value' -> expr -> red
-| rFix : v_name -> term -> red
-| rFst : value' -> red
-| rSnd : value' -> red
-| rCase: value' -> expr -> v_name -> expr -> red.
-Definition redex (_ : ckind) := red.
-Notation redex' := (redex tt).
+| vCLam : v_name -> val C -> val C
+| vCVar : v_name -> val C
+| vCApp : val Ca -> val C -> val C
+
+| vECaLam : v_name -> term -> val ECa
+| vECaVar : v_name -> val ECa
+| vECaApp : val Ca -> val C -> val ECa
+
+| vCaVar : v_name -> val Ca
+| vCaApp : val Ca -> val C -> val Ca.
+
+Definition value := val.
+
+Inductive red : ckind -> Set :=
+| rCApp   : v_name -> term -> term -> red C
+| rECaApp : v_name -> term -> term -> red ECa.
+Definition redex := red.
 
 Inductive ec :=
-| s_c : ec
-| ap_l : value' -> ec
-| ap_r : expr -> ec
-| case_c : expr -> v_name -> expr -> ec
-| let_c : v_name -> expr -> ec
-| fst_c : ec
-| snd_c : ec
-| pair_l : value' -> ec
-| pair_r : expr -> ec.
+| lam_c : v_name -> ec
+| ap_r  : term -> ec
+| ap_l  : value Ca -> ec.
 Definition elem_context := ec.
 
-Definition ckind_trans (_ : ckind) (_ : elem_context) : ckind := tt.
-Definition init_ckind : ckind := tt.
-Definition dead_ckind (_ : ckind) := False.
+Definition ckind_trans (k : ckind) (ec : elem_context) := 
+match k with
+| C    => match ec with lam_c _ => C    | ap_r _ => ECa | ap_l _ => C end
+| ECa  => match ec with lam_c _ => CBot | ap_r _ => ECa | ap_l _ => C end
+| _    => CBot
+end.
+Definition init_ckind : ckind := C.
+Definition dead_ckind (k : ckind) := match k with CBot | Ca => True | _ => False end.
 
 Lemma ckind_death_propagation : 
     forall k, dead_ckind k -> forall ec, dead_ckind (ckind_trans k ec).
 Proof.
 intuition.
+destruct k;
+inversion H;
+reflexivity.
 Qed.
 
 
@@ -73,43 +69,43 @@ Infix "=:" := ccons (at level 60, right associativity).
 
 Fixpoint value_to_term {k} (v : value k) : term :=
 match v with
-| vZ => Z
-| vS v => S (@value_to_term tt v)
-| vLam x e => Lam x e
-| vVar x => Var x
-| vPair vl vr => Pair (@value_to_term tt vl) (@value_to_term tt vr)
+| vCLam x v => Lam x (value_to_term v)
+| vCVar x => Var x
+| vCApp v1 v2 => App (value_to_term v1) (value_to_term v2)
+| vECaLam x t => Lam x t
+| vECaVar x => Var x
+| vECaApp v1 v2 => App (value_to_term v1) (value_to_term v2)
+| vCaVar x => Var x
+| vCaApp v1 v2 => App (value_to_term v1) (value_to_term v2)
 end.
 Coercion value_to_term : value >-> term.
 
 
 Definition redex_to_term {k} (r : redex k) : term :=
 match r with
-| rApp vl vr => App (vl:term) (vr:term)
-| rLet x v t => Letv x (v:term) t
-| rFix x v => Fix x (v:term)
-| rFst v => Fst (v:term)
-| rSnd v => Snd (v:term)
-| rCase v ez x es => Case (v:term) ez x es
+| rCApp x t1 t2 => App (Lam x t1) t2
+| rECaApp x t1 t2 => App (Lam x t1) t2
 end.
 Coercion redex_to_term : redex >-> term.
 
 
 Lemma value_to_term_injective : 
     forall k (v v' : value k), value_to_term v = value_to_term v' -> v = v'.
+
 Proof with auto.
-destruct k.
-induction v; destruct v'; intro H; inversion H; f_equal...
+dependent induction v; dependent destruction v'; intro H; inversion H; f_equal...
 Qed.
-Hint Resolve value_to_term_injective : miniml.
+Hint Resolve value_to_term_injective : lc_ecca.
 
 
 Lemma redex_to_term_injective : 
     forall k (r r' : redex k), redex_to_term r = redex_to_term r' -> r = r'.
-Proof with auto with miniml.
-destruct k.
-induction r; destruct r'; simpl; intro H; inversion H; f_equal...
+
+Proof with auto with lc_ecca.
+destruct k;
+induction r; dependent destruction r'; simpl; intro H; inversion H; f_equal...
 Qed.
-Hint Resolve redex_to_term : miniml.
+Hint Resolve redex_to_term : lc_ecca.
 
   (** The main functions of reduction semantics, defining plugging terms into contexts and
       composing contexts, effectively defining reduction semantics, and some properties. *)
@@ -122,15 +118,9 @@ Hint Resolve redex_to_term : miniml.
 
   Definition atom_plug (t : term) (ec : elem_context) : term :=
   match ec with
-  | s_c => S t
-  | ap_l v => App (v:term) t
-  | ap_r e => App t e
-  | case_c ez x es => Case t ez x es
-  | let_c x e => Letv x t e
-  | fst_c => Fst t
-  | snd_c => Snd t
-  | pair_l v => Pair (v:term) t
-  | pair_r e => Pair t e
+  | lam_c x => Lam x t
+  | ap_r tr => App t tr
+  | ap_l v  => App (v : term) t
   end.
 
   Lemma atom_plug_injective1 : forall t0 t1 ec,
@@ -171,14 +161,8 @@ Hint Resolve redex_to_term : miniml.
   (** The other main function of reduction semantics -- contraction of a redex into a term *)
   Definition contract {k} (r : redex k) : option term :=
   match r with
-  | rApp (vLam x e) vr => Some (subst x (vr:term) e)
-  | rLet x v e => Some (subst x (v:term) e)
-  | rFix x e => Some (subst x (Fix x e) e)
-  | rFst (vPair vl vr) => Some (@value_to_term tt vl)
-  | rSnd (vPair vl vr) => Some (@value_to_term tt vr)
-  | rCase vZ ez x es => Some ez
-  | rCase (vS v) ez x es => Some (subst x (@value_to_term tt v) es)
-  | _ => None
+  | rCApp   x t tx => Some (subst x tx t)
+  | rECaApp x t tx => Some (subst x tx t)
   end.
 
   (** Datatype of decompositions -- either a value or a redex in a context (analogous to the decompose lemma) *)
@@ -202,54 +186,76 @@ Hint Resolve redex_to_term : miniml.
   end.
 
   Definition only_empty (t : term) (k : ckind) : Prop := 
-      forall t' k' (c : context k k'), plug t' c = t -> k = k' /\ c ~= @empty k.
+      forall t' k' (c : context k k'), ~ dead_ckind k' -> plug t' c = t -> k = k' /\ c ~= @empty k.
 
   Definition only_trivial (t : term) (k : ckind) : Prop := 
-      forall t' k' (c : context k k'), plug t' c = t -> 
+      forall t' k' (c : context k k'), ~ dead_ckind k' -> plug t' c = t -> 
           k = k' /\ c ~= @empty k \/ exists (v : value k'), t' = value_to_term v.
+
+
+Lemma L : forall v1 : value Ca, exists v2 : value ECa, (v1 : term) = (v2 : term).
+Proof with auto.
+dependent destruction v1; intros.
+- exists (vECaVar v)...
+- exists (vECaApp v1_1 v1_2)...
+Qed.
 
   Lemma value_trivial : forall k (v : value k), only_trivial (value_to_term v) k.
   Proof with auto.
-    intros k1 v t k2 c.
-    generalize dependent t; induction c; simpl in *; auto; right.
-    intros; destruct (IHc _ _ H) as [(H0, H1) | (v0, H0)]; 
-        subst; try dependent destruction H1; simpl in *;
-    match goal with 
-    | [Hv : atom_plug ?t ?a = _ ?v |- _] => destruct a; destruct v; inversion Hv; subst 
-    end;
-    match goal with 
-    | [ |- exists u, _ ?v = _ u] => exists v 
-    end...
+    intros k1 v t k2 c H; revert t.
+    induction c.
+    - intuition.
+    - intros.
+      right.
+      destruct IHc with v (atom_plug t ec0) as [(H1, H2) | (v0, H1)];
+          try solve [intro; apply H; apply ckind_death_propagation; auto | auto];
+          subst; [ dependent destruction H2 | ]; simpl in *;
+      match goal with 
+      | [Hv : atom_plug ?t ?a = _ ?v |- _] => 
+            destruct a; destruct v; 
+            try solve [contradiction H; compute; trivial]; 
+            dependent_destruction2 Hv
+      end;
+      try solve [eexists; eauto | apply L]...
   Qed.
 
   Lemma redex_trivial : forall k (r : redex k), only_trivial (redex_to_term r) k.
   Proof with auto.
-    intros k1 r t k2 c.
-    generalize dependent t; induction c; simpl in *; auto; intros; right.
-    destruct (IHc _ _ H) as [(H0, H1) | (v, H0)]; 
-        subst; try dependent destruction H1; simpl in H;
-    match goal with
-    | [Hvr : atom_plug ?t ?a = _ ?v |- _] => destruct a; destruct v; inversion Hvr; subst
-    end;
-    match goal with 
-    | [ |- exists u, _ ?v = _ u] => exists v
-    end...
+    intros k1 r t k2 c H; revert t.
+    induction c.
+    - intuition.
+    - intros.
+      right.
+      destruct IHc with r (atom_plug t ec0) as [(H1, H2) | (v0, H1)];
+          try solve [intro; apply H; apply ckind_death_propagation; auto | auto];
+          subst; [ dependent destruction H2 | ]; simpl in *;
+      match goal with
+      | [Hvr : atom_plug ?t ?a = _ ?r |- _] => 
+            destruct a; destruct r; 
+            try solve [contradiction H; compute; trivial]; 
+            dependent_destruction2 Hvr
+      end; simpl in *; 
+      try solve [ exists (vECaLam v t1); auto 
+                | dependent destruction v; discriminate
+                | eexists; eauto
+                | apply L].
   Qed.
 
   Lemma value_redex : forall k (v : value k) (r : redex k), 
                           value_to_term v <> redex_to_term r.
   Proof with auto.
-    destruct v; destruct r; intro H; discriminate H.
+    destruct v; destruct r; intro H; try dependent destruction v1; try discriminate H. 
   Qed.
 
   Lemma ot_subt : 
-      forall t t0 ec k, only_trivial t k -> atom_plug t0 ec = t -> 
-          exists v : value k, t0 = value_to_term v.
+      forall t t0 ec k, ~ dead_ckind (ckind_trans k ec) ->
+                        only_trivial t k -> atom_plug t0 ec = t -> 
+          exists v : value (ckind_trans k ec), t0 = value_to_term v.
 
   Proof with auto.
     intros.
-    destruct (H t0 _ (ec0 =: [_])) as [(H1, H2) | (v, H1)]...
-    - discriminateJM H2.
+    destruct (H0 t0 _ (ec0 =: [_])) as [(H2, H3) | (v, H2)]...
+    - discriminateJM H3.
     - exists v; destruct k...
   Qed.
 
@@ -269,53 +275,103 @@ Hint Resolve redex_to_term : miniml.
     end; simpl; auto
   end.
 
+
+  Lemma plug_compose : forall k1 k2 k3 (c : context k1 k2) (c' : context k3 k1) 
+                               (t : term), 
+                           plug t (compose c c') = plug (plug t c) c'.
+  Proof.
+    intros ? ? ?; induction c; intros.
+    - auto.
+    - apply IHc.
+  Qed.
+
+Lemma L2 : forall t ec k, ~ dead_ckind (ckind_trans k ec) ->
+               only_trivial (atom_plug t ec) k -> only_trivial t (ckind_trans k ec).
+Proof with eauto.
+intros.
+intros t' k' c H1 H2.
+destruct (H0 t' k' (c ~+ ec0 =: [_])) as [(H3, H4) | ?]... rewrite plug_compose... subst...
+absurd_hyp H4... revert H3; clear; intro. dependent induction c; intro H; discriminateJM H.
+Qed.
+
+
   Lemma trivial_val_red : 
-      forall k (t : term), only_trivial t k ->
+      forall k (t : term), ~ dead_ckind k -> only_trivial t k ->
          (exists (v : value k), t = value_to_term v) \/
          (exists (r : redex k), t = redex_to_term r).
 
   Proof with auto.
-    intros; destruct t.
-    - mlr (vZ : value').
-    - ot_v t s_c; mlr (vS v : value').
-    - destruct k; ot_v t1 (ap_r t2); ot_v t2 (ap_l v); mlr (rApp v v0 : redex').
-    - mlr (vVar v : value').
-    - mlr (vLam v t : value').
-    - ot_v t1 (case_c t2 v t3); mlr (rCase v0 t2 v t3 : redex').
-    - ot_v t1 (let_c v t2); mlr (rLet v v0 t2 : redex').
-    - mlr (rFix v t : redex').
-    - destruct k; ot_v t1 (pair_r t2); ot_v t2 (pair_l v); mlr (vPair v v0 : value').
-    - ot_v t fst_c; mlr (rFst v : redex').
-    - ot_v t snd_c; mlr (rSnd v : redex').
+    intros. revert k H H0.
+    induction t; intros;
+    destruct k; try solve [contradiction H; simpl; auto].
+    Focus 5. 
+    destruct (ot_subt _ t (lam_c v) C H H0); eauto; subst;
+    left; exists (vCLam v x); subst...
+    Focus 5.
+    left; exists (vECaLam v t)...
+
+    Focus 3.
+    left; exists (vCVar v)...
+    Focus 3.
+    left; exists (vECaVar v)...
+
+    Focus 1.
+    destruct (ot_subt _ t1 (ap_r t2) C H H0); eauto; subst.
+    dependent destruction x.
+    right. exists (rCApp v t t2)...
+    destruct (ot_subt _ t2 (ap_l (vCaVar v)) C H H0); eauto; subst.
+    left. exists (vCApp (vCaVar v) x0)...
+    destruct (ot_subt _ t2 (ap_l (vCaApp x1 x2)) C H H0); eauto; subst.
+    left. exists (vCApp (vCaApp x1 x2) x0)...
+
+    destruct (ot_subt _ t1 (ap_r t2) ECa H H0); eauto; subst.
+    dependent destruction x.
+    right. exists (rECaApp v t t2)...
+    destruct (ot_subt _ t2 (ap_l (vCaVar v)) ECa H H0); eauto; subst.
+    left. exists (vECaApp (vCaVar v) x0)...
+    destruct (ot_subt _ t2 (ap_l (vCaApp x1 x2)) ECa H H0); eauto; subst.
+    left. exists (vECaApp (vCaApp x1 x2) x0)...
   Qed.
 
   Lemma proper_death : forall k, dead_ckind k -> 
                            ~ exists k' (c : context k k') (r : redex k'), True.
   Proof.
-  intuition.
+  destruct k;
+  intuition;
+  destruct H0 as (k', (c, (r, _)));
+  cut (k' = Ca \/ k' = CBot);
+  solve [ intro H0; destruct H0; subst; dependent destruction r
+        | clear r; dependent induction c; auto; 
+          destruct IHc; auto; subst; auto ].
   Qed.
 
-End MiniML.
+End lc_ECCa.
 
 
-Module MiniMLRef <: RED_REF_LANG.
+Module lc_ECCa_Ref <: RED_REF_LANG.
 
-  Module R := MiniML.
+  Module R := lc_ECCa.
 
-  Definition dec_term (t : R.term) k : R.interm_dec k :=
-  match t with
-  | R.Z              =>  R.in_val R.vZ
-  | R.S t            =>  R.in_term t R.s_c
-  | R.App t1 t2      =>  R.in_term t1 (R.ap_r t2)
-  | R.Var x          =>  R.in_val (R.vVar x)
-  | R.Lam x t        =>  R.in_val (R.vLam x t)
-  | R.Case t ez x es =>  R.in_term t (R.case_c ez x es)
-  | R.Letv x t e     =>  R.in_term t (R.let_c x e)
-  | R.Fix x t        =>  R.in_red (R.rFix x t)
-  | R.Pair t1 t2     =>  R.in_term t1 (R.pair_r t2)
-  | R.Fst t          =>  R.in_term t R.fst_c
-  | R.Snd t          =>  R.in_term t R.snd_c
-  end.
+  Definition dec_term (t : R.term) k : ~ R.dead_ckind k -> R.interm_dec k.
+  intro H.
+  refine (
+      match k as k0 return ~ R.dead_ckind k0 -> R.interm_dec k0 with 
+      | R.C =>   fun _ => match t with
+                          | R.App t1 t2 => R.in_term t1 (R.ap_r t2)
+                          | R.Var x     => R.in_val (R.vCVar x)
+                          | R.Lam x t1  => R.in_term t1 (R.lam_c x)
+                          end
+      | R.ECa => fun _ => match t with
+                          | R.App t1 t2 => R.in_term t1 (R.ap_r t2)
+                          | R.Var x     => R.in_val (R.vECaVar x)
+                          | R.Lam x t1  => R.in_val (R.vECaLam x t1)
+                          end
+      | R.Ca   => fun H0 => _
+      | R.CBot => fun H0 => _
+      end H
+  );
+  simpl in H0; intuition.
+  Defined.
 
   Definition dec_context (ec : R.elem_context) k (v : R.value (R.ckind_trans k ec)) 
                  : R.interm_dec k :=

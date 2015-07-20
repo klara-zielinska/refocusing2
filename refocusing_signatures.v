@@ -9,13 +9,13 @@ Module Type RED_SEM (R : RED_LANG).
                              dec (R.redex_to_term r) c (R.d_red r c).
 
   Import R.
-  Axiom decompose : forall (t : R.term) k1, 
+  Axiom decompose : forall (t : R.term) k1, ~ R.dead_ckind k1 ->
       (exists (v : R.value k1), t = R.value_to_term v) \/
       (exists k2 (r : R.redex k2) (c : R.context k1 k2), R.plug (R.redex_to_term r) c = t).
 
   (** dec is left inverse of plug *)
   Axiom dec_correct : forall t k1 k2 (c : R.context k1 k2) d, dec t c d -> 
-      R.decomp_to_term d = R.plug t c.
+                          R.decomp_to_term d = R.plug t c.
 
   Import R.
   Axiom dec_plug     : forall k1 k2 (c : R.context k1 k2) k3 (c0 : R.context k3 k1) t d, 
@@ -54,15 +54,17 @@ Module Type RED_REF_SEM (R : RED_LANG).
       forall t0 ec0, dec_term t k = R.in_term t0 ec0 ->
       ~ R.dead_ckind (R.ckind_trans k ec0).*)
 
-  Axiom dec_term_correct : forall t kL, match dec_term t kL with
+  Axiom dec_term_correct : forall t k, match dec_term t k with
     | R.in_red r => R.redex_to_term r = t
     | R.in_val v => R.value_to_term v = t
     | R.in_term t0 ec0 => R.atom_plug t0 ec0 = t
+    | R.in_dead => R.dead_ckind k
   end.
   Axiom dec_context_correct : forall ec k v, match dec_context ec k v with
     | R.in_red r => R.redex_to_term r = R.atom_plug (R.value_to_term v) ec
     | R.in_val v0 => R.value_to_term v0 = R.atom_plug (R.value_to_term v) ec
     | R.in_term t ec0 => R.atom_plug t ec0 = R.atom_plug (R.value_to_term v) ec
+    | R.in_dead => R.dead_ckind (R.ckind_trans k ec) 
   end.
 
   (** A decomposition function specified in terms of the atomic functions above *)
@@ -79,7 +81,9 @@ Module Type RED_REF_SEM (R : RED_LANG).
                dec t0 (R.ccons ec c) d ->
                dec t c d
   with decctx : forall {k2}, R.value k2 -> forall {k1}, R.context k1 k2 -> R.decomp k1 -> Prop :=
-  | dc_end  : forall {k} (v : R.value k), decctx v (@R.empty k) (R.d_val v)
+  | dc_end  : forall {k} (v : R.value k), 
+                ~ R.dead_ckind k ->
+                decctx v (@R.empty k) (R.d_val v)
   | dc_dec  : forall ec {k2} (v : R.value (R.ckind_trans k2 ec)) 
                         {k1} (c : R.context k1 k2) (r : R.redex k2),
                 dec_context ec k2 v = R.in_red r ->
@@ -131,8 +135,8 @@ Module Type RED_PROP (R : RED_LANG) (RS : RED_REF_SEM(R)).
                                RS.RS.eval t v -> RS.RS.eval t v0 -> v = v0.
   Axiom dec_correct : forall t k1 k2 (c : R.context k1 k2) d, 
                           RS.RS.dec t c d -> R.decomp_to_term d = R.plug t c.
-  Axiom dec_total : forall t k, exists (d : R.decomp k), RS.RS.decempty t d.
-  Axiom unique_decomposition : forall t k, 
+  Axiom dec_total : forall t k, ~ R.dead_ckind k -> exists (d : R.decomp k), RS.RS.decempty t d.
+  Axiom unique_decomposition : forall t k, ~ R.dead_ckind k ->  
       (exists v : R.value k, t = R.value_to_term v) \/ 
       (exists k2 (r : R.redex k2) (c : R.context k k2),  R.plug (R.redex_to_term r) c = t /\ 
 	  forall k2' (r0 : R.redex k2') (c0 : R.context k k2'), 

@@ -30,6 +30,28 @@ Module Lang_Prop (R : RED_LANG) : LANG_PROP R.
   Qed.
   Hint Resolve plug_compose : prop.
 
+  Import R.
+  Lemma context_snoc  : forall ec0 {k1 k2} (c0 : context k1 k2),
+                            exists ec1 c1, (ec0=:c0) = (c1~+ec1=:[_]).
+  Proof.
+  intros. revert ec0.
+  induction c0; intro.
+  exists ec0. eexists (@R.empty _). reflexivity.
+  destruct (IHc0 ec) as (ec1, (c1, H)).
+  exists ec1. exists (ec0=:c1).
+  simpl.
+  f_equal.
+  auto.
+  Qed.
+
+  Lemma dead_contex_dead : forall {k1 k2}, context k1 k2 -> dead_ckind k1 -> dead_ckind k2.
+  Proof.
+  intros ? ? c H. revert c.
+  induction 1.
+  - auto.
+  - apply ckind_death_propagation. auto.
+  Qed.
+
 End Lang_Prop.
 
 Module RedRefSem (R : RED_REF_LANG) <: RED_REF_SEM R.R.
@@ -49,7 +71,9 @@ Module RedRefSem (R : RED_REF_LANG) <: RED_REF_SEM R.R.
                dec t0 (R.R.ccons ec c) d ->
                dec t c d
   with decctx : forall {k2}, R.R.value k2 -> forall {k1}, R.R.context k1 k2 -> R.R.decomp k1 -> Prop :=
-  | dc_end  : forall {k} (v : R.R.value k), decctx v (@R.R.empty k) (R.R.d_val v)
+  | dc_end  : forall {k} (v : R.R.value k), 
+                 ~ R.R.dead_ckind k ->
+                 decctx v (@R.R.empty k) (R.R.d_val v)
   | dc_dec  : forall ec {k2} (v : R.R.value (R.R.ckind_trans k2 ec)) 
                         {k1} (c : R.R.context k1 k2) (r : R.R.redex k2),
                 dec_context ec k2 v = R.R.in_red r ->
@@ -228,6 +252,41 @@ Qed.
     Qed.
 
 
+    Lemma dec_not_dead : forall {t k1 k2} {c : R.R.context k1 k2} {d},
+                             dec t c d -> ~ R.R.dead_ckind k2.
+    Proof.
+    intros. intro.
+    assert (hh := R.dec_term_from_dead t k2 H0).
+    destruct H;
+    unfold dec_term in *;
+    rewrite H in hh;
+    discriminate hh.
+    Qed.
+
+    Lemma decctx_not_dead : forall {k1 k2} {c : R.R.context k1 k2} {v d},
+                                decctx v c d -> ~ R.R.dead_ckind k2.
+    Proof with auto.
+    intros. intro.
+    destruct H; auto;
+    assert (hh := R.dec_context_from_dead ec k2 v H0);
+    unfold dec_context in *;
+    rewrite H in hh;
+    discriminate hh.
+    Qed.
+
+    Lemma dec_context_not_dead : 
+        forall ec1 k v ec2 t,
+            ~ R.R.dead_ckind (R.R.ckind_trans k ec1) ->
+            dec_context ec1 k v = R.R.in_term t ec2 ->
+            ~ R.R.dead_ckind (R.R.ckind_trans k ec2).
+    Proof.
+    intros.
+    destruct (R.dec_context_term_next _ _ _ _ _ H0) as (H1, _).
+    destruct (R.ec_order_comp_fi _ _ _ H1) as (_, (H2, _)).
+    apply H2.
+    Qed.
+
+
     Lemma val_dec : forall k1 k2 (v : R.R.value k2) (c : R.R.context k1 k2) 
                                 (d : R.R.decomp k1),
 
@@ -249,6 +308,8 @@ Qed.
       - symmetry in Heqi.
         apply (d_term _ _ _ _ _ Heqi).
 
+        assert (~ R.R.dead_ckind (R.R.ckind_trans k2 e)) as Hndk.
+          { eapply (R.dec_term_liveness)... }
         clear Heqi;
         destruct (R.R.value_trivial _ v t _ (R.R.ccons e R.R.empty));
             try solve [auto];
@@ -256,7 +317,7 @@ Qed.
 
         * discriminateJM H2.
 
-        * { revert e t hh x H1;
+        * { revert e t hh Hndk x H1;
           induction e using (well_founded_ind (R.wf_eco k2)); intros.
 
           apply (H t) with (v := x).
@@ -265,8 +326,9 @@ Qed.
 
           - auto.
 
-          - remember (R.dec_context e _ x); assert (gg := R.dec_context_correct e _ x);
-            destruct i; rewrite<- Heqi in gg; subst.
+          - remember (R.dec_context e _ x).
+            assert (gg := R.dec_context_correct e _ x);
+                destruct i; rewrite <- Heqi in gg; subst.
 
             * contradiction (R.R.value_redex _ v r); symmetry; etransitivity...
 
@@ -286,15 +348,19 @@ Qed.
                   * symmetry in Heqi;
                     destruct (R.dec_context_term_next _ _ _ _ _ Heqi)...
                   * etransitivity...
-               }
-            }
+                  * symmetry in Heqi. 
+                    apply (dec_context_not_dead _ _ _ _ _ Hndk Heqi). 
+              }
+            * intuition.
+          }
+      - contradiction (decctx_not_dead H0). 
     Qed.
 
   Module RS : RED_SEM R.R with Definition dec := dec.
 
     Module LP := Lang_Prop R.R.
 
-    Lemma decompose : forall (t : R.R.term) (k1 : R.R.ckind), 
+    Lemma decompose : forall (t : R.R.term) (k1 : R.R.ckind), ~ R.R.dead_ckind k1 ->
       (exists (v : R.R.value k1), t = R.R.value_to_term v) \/
       (exists k2 (r : R.R.redex k2) (c : R.R.context k1 k2), 
       R.R.plug (R.R.redex_to_term r) c = t).
@@ -303,7 +369,8 @@ Qed.
       induction t using (well_founded_ind R.wf_sto); intros.
 
       remember (R.dec_term t k1); assert (hh := R.dec_term_correct t k1);
-      destruct i; rewrite <- Heqi in hh.
+      symmetry in Heqi;
+      destruct i; rewrite Heqi in hh.
 
       - right; exists k1; exists r; exists (@R.R.empty k1)...
 
@@ -311,12 +378,16 @@ Qed.
 
       - destruct (H t0) with (k1 := R.R.ckind_trans k1 e) as [(v, Hv) | (k2, (r, (c, Hrc)))].
             repeat econstructor...
+            eapply R.dec_term_liveness... 
 
-        * { subst t0; clear Heqi; generalize dependent v. 
+        * { subst t0.
+          assert (~ R.R.dead_ckind (R.R.ckind_trans k1 e)) as Hndk.
+            { eapply R.dec_term_liveness... } 
+          clear Heqi; generalize dependent v. 
           induction e using (well_founded_ind (R.wf_eco k1)); intros.
 
           remember (R.dec_context e _ v); assert (ht := R.dec_context_correct e _ v); 
-          destruct i; rewrite <- Heqi in ht; rewrite hh in ht.
+          destruct i; rewrite <- Heqi in ht; try rewrite hh in ht.
 
           - right; exists k1; exists r; exists (@R.R.empty k1)...
 
@@ -324,22 +395,29 @@ Qed.
 
           - destruct (H t0) with (k1 := R.R.ckind_trans k1 e0) 
                               as [(v0, Hv) | (k2, (r, (c, Hrc)))].
-            + repeat econstructor...
+                repeat econstructor...
+                eapply dec_context_not_dead...
 
-            + symmetry in Heqi; 
-              destruct (R.dec_context_term_next _ _ _ _ _ Heqi) as (H1, _).
+            + symmetry in Heqi.
+              destruct (R.dec_context_term_next _ _ _ _ _ Heqi) as (H2, _).
 
               subst t0.
-              destruct (H0 e0 H1 v0 ht) as [(v1, Hv1) | (k2, (r, (c, Hrc)))].
+              assert (~ R.R.dead_ckind (R.R.ckind_trans k1 e0)) as Hndk2.
+                { eapply dec_context_not_dead... }
+              destruct (H1 e0 H2 Hndk2 v0 ht) as [(v1, Hv1) | (k2, (r, (c, Hrc)))].
               * left; exists v1...
               * right; exists k2; exists r; exists c...
 
             + right; exists k2; exists r; exists (R.R.compose c (R.R.ccons e0 R.R.empty)).
               subst t0; rewrite LP.plug_compose...
+
+          - intuition. 
           }
 
         * right; exists k2; exists r; exists (R.R.compose c (R.R.ccons e R.R.empty)).
           subst t0; rewrite LP.plug_compose...
+
+      - intuition.
     Qed. 
 
     Lemma dec_redex_self_e : forall {k} (r : R.R.redex k), 
@@ -349,6 +427,8 @@ Qed.
     Proof with eauto.
       intros; 
       remember (dec_term (R.R.redex_to_term r) k).
+      assert (~ R.R.dead_ckind k).
+          eapply proper_death2... apply R.R.empty.
 
       destruct i; unfold dec_term in Heqi;
           assert (hh := R.dec_term_correct (R.R.redex_to_term r) k);
@@ -359,14 +439,17 @@ Qed.
 
       - contradict hh;  apply R.R.value_redex.
 
-      - symmetry in Heqi; assert (H := R.dec_term_term_top _ _ _ _ Heqi).
+      - symmetry in Heqi; assert (H0 := R.dec_term_term_top _ _ _ _ Heqi).
         econstructor 3. apply Heqi.
         destruct (R.R.redex_trivial _ r t _ (R.R.ccons e R.R.empty) hh) 
             as [(H1, H2) | (v, H1)].
 
         * discriminateJM H2. 
 
-        * { subst t; clear H Heqi; generalize dependent v; generalize dependent e.
+        * { subst t.
+          assert (~ R.R.dead_ckind (R.R.ckind_trans k e)) as Hndk.
+            { eapply R.dec_term_liveness... } 
+          clear H0 Heqi; generalize dependent v; generalize dependent e.
           induction e using (well_founded_ind (R.wf_eco k)); intros.
 
           apply val_dec.
@@ -388,8 +471,11 @@ Qed.
             * discriminateJM H5.
             * subst t; symmetry in Heqi.
               destruct (R.dec_context_term_next _ _ _ _ _ Heqi). 
-              apply H...
+              apply H0...
+                  eapply dec_context_not_dead...
+          - intuition. 
           }
+      - intuition.
     Qed.
 
     Lemma dec_redex_self : forall {k1 k2} (r : R.R.redex k2) (c : R.R.context k1 k2), 
@@ -423,7 +509,6 @@ Qed.
       - constructor... 
       - econstructor...
       - econstructor 4...
-
     Qed.
 
     Lemma dec_correct : 
@@ -509,7 +594,7 @@ Qed.
                 assert (H3 := dec_val _ _ _ _ _ H7).
                 dependent destruction H3;
                 inversion_ccons x.
-                - contradiction (R.dec_context_red_bot _ _ _ _ H1 ec).
+                - contradiction (R.dec_context_red_bot _ _ _ _ H1 _ _ hh).
                 - contradiction (R.dec_context_val_bot _ _ _ _ H1 ec).
                 - assert (ht := R.dec_context_correct ec0 _ v).
                   unfold dec_context in H1; rewrite H1 in ht. 
@@ -579,7 +664,7 @@ Qed.
                   assert (ht := R.dec_context_correct e _ v); 
                   rewrite Heqi in ht.
 
-              - contradiction (R.dec_context_red_bot _ _ _ _ Heqi ec).
+              - contradiction (R.dec_context_red_bot _ _ _ _ Heqi _ _ hh).
               - contradiction (R.dec_context_val_bot _ _ _ _ Heqi ec).
               - destruct (R.dec_context_term_next _ _ _ _ _ Heqi) as (H3, H4).
                 econstructor 4; eauto; rewrite <- hh in ht.
@@ -594,11 +679,15 @@ Qed.
                 * subst.
                   assert (H5 := R.R.atom_plug_injective1 _ _ _ ht).
                   subst...
+              - contradict ht.
+                eapply R.ec_order_comp_fi...
             }
-        + subst.
-          assert (H5 := R.R.atom_plug_injective1 _ _ _ hh).
-          subst.
-          econstructor 3...
+          + subst.
+            assert (H5 := R.R.atom_plug_injective1 _ _ _ hh).
+            subst.
+            econstructor 3...
+        * contradict H...
+          apply R.R.ckind_death_propagation...
     Qed.
 (*
 Lemma des_decctx : forall k2 v k1 c d P, @decctx k2 v k1 c d -> 
@@ -794,18 +883,18 @@ Ltac super_subst :=
   Qed.
 
 
-  Lemma dec_total : forall t k, exists (d : R.decomp k), RS.RS.decempty t d.
-  Proof.
-    intros t k.
-    destruct (RS.RS.decompose t k) as [(v, Hv) | (k', (r, (c, Hp)))]; intros; subst t.
-    - exists (R.d_val v); constructor; rewrite RS.dec_val_self; constructor.
+  Lemma dec_total : forall t k, ~ R.dead_ckind k -> exists (d : R.decomp k), RS.RS.decempty t d.
+  Proof with auto.
+    intros t k H.
+    destruct (RS.RS.decompose t k H) as [(v, Hv) | (k', (r, (c, Hp)))]; intros; subst t.
+    - exists (R.d_val v); constructor; rewrite RS.dec_val_self; constructor...
     - exists (R.d_red r c); constructor; apply RS.RS.dec_plug_rev.
         { apply (proper_death2 _ _ R.empty r); apply (R.d_red r R.empty). }
       rewrite <- LP.compose_empty; apply RS.RS.dec_redex_self.
   Qed.
 
 
-  Lemma unique_decomposition : forall t k, 
+  Lemma unique_decomposition : forall t k, ~ R.dead_ckind k ->
 
       (exists v : R.value k, t = R.value_to_term v) \/ 
 
@@ -815,19 +904,19 @@ Ltac super_subst :=
 
   Proof with eauto.
     intros.
-    destruct (RS.RS.decompose t k) as [(v, H) | (k', (r, (c, H)))]; intros.
+    destruct (RS.RS.decompose t k H) as [(v, H0) | (k', (r, (c, H0)))]; intros.
     - left; exists v...
     - right; exists k' r; exists c; split. 
       * trivial.
       * intros.
         assert (RS.RS.decempty t (R.d_red r c) /\ RS.RS.decempty t (R.d_red r0 c0)).
           { split; 
-            constructor; [rewrite <- H | rewrite <- H0]; apply RS.RS.dec_plug_rev;
+            constructor; [rewrite <- H0 | rewrite <- H1]; apply RS.RS.dec_plug_rev;
             try solve
             [ apply (proper_death2 _ _ R.empty); auto
             | rewrite <- LP.compose_empty; apply RS.RS.dec_redex_self ]. }
-        destruct H1.
-        assert (hh := dec_is_function _ _ _ _ H1 H2); dependent destruction hh.
+        destruct H2.
+        assert (hh := dec_is_function _ _ _ _ H2 H3); dependent destruction hh.
         intuition.
   Qed.
 

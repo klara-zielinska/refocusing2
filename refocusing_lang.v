@@ -61,7 +61,8 @@ Module Type RED_LANG.
   Parameter contract : forall {k}, redex k -> option term.
 
   Definition only_empty (t : term) (k : ckind) : Prop := 
-      forall t' k' (c : context k k'), plug t' c = t -> k = k' /\ c ~= @empty k.
+      forall t' k' (c : context k k'), plug t' c = t -> ~ dead_ckind k' -> 
+          k = k' /\ c ~= @empty k.
 
   Definition only_trivial (t : term) (k : ckind) : Prop := 
       forall t' k' (c : context k k'), plug t' c = t -> 
@@ -72,7 +73,7 @@ Module Type RED_LANG.
   Axiom value_redex   : forall k (v : value k) (r : redex k), 
                             value_to_term v <> redex_to_term r.
   Axiom trivial_val_red : 
-      forall k (t : term), ~ dead_ckind k -> only_trivial t k ->
+      forall k (t : term), only_trivial t k ->
          (exists (v : value k), t = value_to_term v) \/
          (exists (r : redex k), t = redex_to_term r).
 
@@ -87,7 +88,8 @@ Module Type RED_LANG.
   Inductive interm_dec k : Set :=
   | in_red  : redex k  -> interm_dec k
   | in_val  : value k -> interm_dec k
-  | in_term : term -> elem_context -> interm_dec k.
+  | in_term : term -> elem_context -> interm_dec k
+  | in_dead : interm_dec k.
 
   Arguments in_red {k} _. Arguments in_val {k} _. Arguments in_term {k} _ _.
 
@@ -168,6 +170,9 @@ Module Type LANG_PROP (R : RED_LANG).
   Axiom plug_compose  : 
       forall {k1 k2 k3} (c0 : R.context k1 k2) (c1 : R.context k3 k1) t, 
            R.plug t (R.compose c0 c1) = R.plug (R.plug t c0) c1.
+  Axiom context_snoc     : forall ec0 {k1 k2} (c0 : context k1 k2),
+                               exists ec1 c1, (ec0=:c0) = (c1~+ec1=:[_]).
+  Axiom dead_contex_dead : forall {k1 k2}, context k1 k2 -> dead_ckind k1 -> dead_ckind k2.
 
 End LANG_PROP.
 
@@ -216,8 +221,10 @@ Module Type RED_REF_LANG.
                                   dec_term t k = R.in_val v -> R.only_empty t k.
   Axiom dec_term_term_top   : forall t t' k ec, 
             dec_term t k = R.in_term t' ec -> forall ec', ~ k |~ ec << ec'.
-  Axiom dec_context_red_bot : forall k ec v r, 
-            dec_context ec k v = R.in_red r -> forall ec', ~ k |~ ec' << ec.
+  Axiom dec_context_red_bot : 
+      forall k ec v r, dec_context ec k v = R.in_red r -> 
+          forall ec' t', R.atom_plug t' ec' = R.atom_plug (R.value_to_term v) ec -> 
+              ~ k |~ ec' << ec.
   Axiom dec_context_val_bot : forall k ec v v', 
             dec_context ec k v = R.in_val v' -> forall ec', ~ k |~ ec' << ec.
   Axiom dec_context_term_next : 
@@ -232,12 +239,18 @@ Module Type RED_REF_LANG.
       | R.in_red r => R.redex_to_term r = t
       | R.in_val v => R.value_to_term v = t
       | R.in_term t' ec => R.atom_plug t' ec = t
+      | R.in_dead => R.dead_ckind k 
       end.
   Axiom dec_context_correct : forall ec k v, match dec_context ec k v with
       | R.in_red r => R.redex_to_term r = R.atom_plug (R.value_to_term v) ec
       | R.in_val v' => R.value_to_term v' = R.atom_plug (R.value_to_term v) ec
       | R.in_term t ec' => R.atom_plug t ec' = R.atom_plug (R.value_to_term v) ec
+      | R.in_dead => R.dead_ckind (R.ckind_trans k ec) 
       end.
+  Axiom dec_term_from_dead : forall t k, dead_ckind k -> dec_term t k = R.in_dead k.
+  Axiom dec_context_from_dead : 
+      forall ec k v, dead_ckind (ckind_trans k ec) -> dec_context ec k v = R.in_dead k.
+
 
   Axiom ec_order_antisym : forall k (ec ec0 : R.elem_context), 
       k |~ ec << ec0 -> ~ k |~ ec0 << ec.
@@ -288,7 +301,7 @@ End RED_REF_LANG_Facts.
           constructor; auto
       ).
   Ltac prove_ec_wf := 
-      intros k a; destruct a; repeat 
+      intros k a; destruct k, a; repeat 
       (
           constructor; 
           intros ec T; 

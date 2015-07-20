@@ -1,8 +1,7 @@
 Require Import refocusing_substitutions.
 Require Import Program.
-(*Require Import Setoid.*)
 
-Module lc_ECCa <: RED_LANG.
+Module no_ECCa.
 
 Definition v_name := nat.
 
@@ -110,7 +109,7 @@ induction v using val_Ind with
 (P0 := fun v   => forall v' : valCa, valCa_to_term v = valCa_to_term v' -> v = v');
 dependent destruction v'; intro H; inversion H; f_equal...
 Qed.
-Hint Resolve value_to_term_injective : lc_ecca.
+Hint Resolve value_to_term_injective : no_ecca.
 
 Lemma valCa_to_term_injective : 
     forall v v', valCa_to_term v = valCa_to_term v' -> v = v'.
@@ -121,17 +120,17 @@ induction v using valCa_Ind with
 (P0 := fun v   => forall v' : valCa, valCa_to_term v = valCa_to_term v' -> v = v');
 dependent destruction v'; intro H; inversion H; f_equal...
 Qed.
-Hint Resolve value_to_term_injective : lc_ecca.
+Hint Resolve value_to_term_injective : no_ecca.
 
 
 Lemma redex_to_term_injective : 
     forall k (r r' : redex k), redex_to_term r = redex_to_term r' -> r = r'.
 
-Proof with auto with lc_ecca.
+Proof with auto with no_ecca.
 destruct k;
 induction r; dependent destruction r'; simpl; intro H; inversion H; f_equal...
 Qed.
-Hint Resolve redex_to_term : lc_ecca.
+Hint Resolve redex_to_term : no_ecca.
 
   (** The main functions of reduction semantics, defining plugging terms into contexts and
       composing contexts, effectively defining reduction semantics, and some properties. *)
@@ -327,7 +326,7 @@ Proof with eauto.
 intros.
 intros t' k' c H1.
 destruct (H t' k' (c ~+ ec0 =: [_])) as [(H3, H4) | ?]... rewrite plug_compose... subst...
-absurd_hyp H4... revert H3; clear; intro. dependent induction c; intro H; discriminateJM H.
+contradict H4... revert H3; clear; intro. dependent induction c; intro H; discriminateJM H.
 Qed.
 
 
@@ -385,12 +384,12 @@ Qed.
     rewrite IHc; simpl; constructor.
   Qed. Print RED_LANG.
 
-End lc_ECCa.
+End no_ECCa.
 
 
-Module lc_ECCa_Ref <: RED_REF_LANG.
+Module no_ECCa_Ref <: RED_REF_LANG.
 
-  Module R := lc_ECCa.
+  Module R := no_ECCa.
   Include Lang_Prop R.
 
   Definition dec_term t k : R.interm_dec k :=
@@ -722,15 +721,13 @@ subst. simpl in *. inversion H0; destruct v0; discriminate.
     auto.
   Qed.
 
-End lc_ECCa_Ref.
+End no_ECCa_Ref.
 
-Module lc_ECCa_REF_SEM := RedRefSem lc_ECCa_Ref.
+Module no_ECCa_REF_SEM := RedRefSem no_ECCa_Ref.
 
-(*Module MiniML_EAM := ProperEAMachine MiniML MiniML_REF_SEM. *)
+Module no_ECCa_Sem <: RED_SEM no_ECCa.
 
-Module lc_ECCa_Sem <: RED_SEM lc_ECCa.
-
-  Import lc_ECCa.
+  Import no_ECCa.
 
   Inductive dec' : term -> forall {k1 k2}, context k1 k2 -> decomp k1 -> Prop :=
   | d_CVar   : forall x {k1} (c : context k1 C) d
@@ -874,7 +871,7 @@ Module lc_ECCa_Sem <: RED_SEM lc_ECCa.
   Lemma decompose : forall (t : term) k1, ~ dead_ckind k1 ->
       (exists (v : value k1), t = value_to_term v) \/
       (exists k2 (r : redex k2) (c : context k1 k2), plug (redex_to_term r) c = t).
-  Proof with auto with lc_ecca.
+  Proof with auto with no_ecca.
     induction t; intros.
     - destruct IHt1 with ECa as [(v1, H1) | (k2, (r1, (c1, H1)))]; auto;
       assert (G := IHt2 C id);
@@ -931,7 +928,7 @@ Module lc_ECCa_Sem <: RED_SEM lc_ECCa.
     intros; simpl; auto.
   Qed.
 
-  Include RED_LANG_Facts lc_ECCa.
+  Include RED_LANG_Facts no_ECCa.
 
   Lemma dec_plug : forall k1 k2 (c : context k1 k2) k3 (c0 : context k3 k1) t d, 
                           ~ dead_ckind k2 -> dec (plug t c) c0 d -> 
@@ -973,34 +970,34 @@ Module lc_ECCa_Sem <: RED_SEM lc_ECCa.
   Inductive eval : term -> forall {k}, value k -> Prop :=
   | e_intro : forall t {k} (d : decomp k) v, decempty t d -> iter d v -> eval t v.
 
-End lc_ECCa_Sem.
+End no_ECCa_Sem.
 
-Lemma dec_sem_ref : forall t k1 k2 (c : lc_ECCa.context k1 k2) d, 
-                        lc_ECCa_Sem.dec t c d -> lc_ECCa_REF_SEM.dec t c d.
+Lemma dec_sem_ref : forall t k1 k2 (c : no_ECCa.context k1 k2) d, 
+                        no_ECCa_Sem.dec t c d -> no_ECCa_REF_SEM.dec t c d.
 Proof.
-  induction 1 using lc_ECCa_Sem.dec_Ind with
-  (P := fun t _ _ c d (H : lc_ECCa_Sem.dec t c d) => lc_ECCa_REF_SEM.dec t c d)
-  (P0:= fun _ v _ c d (H : lc_ECCa_Sem.decctx v c d) => lc_ECCa_REF_SEM.decctx v c d);
+  induction 1 using no_ECCa_Sem.dec_Ind with
+  (P := fun t _ _ c d (H : no_ECCa_Sem.dec t c d) => no_ECCa_REF_SEM.dec t c d)
+  (P0:= fun _ v _ c d (H : no_ECCa_Sem.decctx v c d) => no_ECCa_REF_SEM.decctx v c d);
   try solve 
   [ econstructor; simpl; eauto
   | econstructor 3; simpl; eauto
-  | eapply (@lc_ECCa_REF_SEM.dc_dec)  with (ec:=lc_ECCa.ap_r t)(k2:= lc_ECCa.C); simpl; auto
-  | eapply (@lc_ECCa_REF_SEM.dc_term) with (ec:=lc_ECCa.ap_r t)(k2:= lc_ECCa.C); simpl; eauto 
-  | eapply (@lc_ECCa_REF_SEM.dc_dec)  with (ec:=lc_ECCa.ap_r t)(k2:= lc_ECCa.ECa); simpl; auto
-  | eapply (@lc_ECCa_REF_SEM.dc_term) with (ec:=lc_ECCa.ap_r t)(k2:= lc_ECCa.ECa); simpl; eauto
-  | eapply (@lc_ECCa_REF_SEM.dc_val)  with (ec:=lc_ECCa.ap_l v1)(k2:= lc_ECCa.C); simpl; auto
-  | eapply (@lc_ECCa_REF_SEM.dc_val)  with (ec:=lc_ECCa.ap_l v1)(k2:= lc_ECCa.ECa); simpl; auto
-  | eapply (@lc_ECCa_REF_SEM.dc_val)  with (ec:=lc_ECCa.lam_c x)(k2:= lc_ECCa.C); simpl; auto
+  | eapply (@no_ECCa_REF_SEM.dc_dec)  with (ec:=no_ECCa.ap_r t)(k2:= no_ECCa.C); simpl; auto
+  | eapply (@no_ECCa_REF_SEM.dc_term) with (ec:=no_ECCa.ap_r t)(k2:= no_ECCa.C); simpl; eauto 
+  | eapply (@no_ECCa_REF_SEM.dc_dec)  with (ec:=no_ECCa.ap_r t)(k2:= no_ECCa.ECa); simpl; auto
+  | eapply (@no_ECCa_REF_SEM.dc_term) with (ec:=no_ECCa.ap_r t)(k2:= no_ECCa.ECa); simpl; eauto
+  | eapply (@no_ECCa_REF_SEM.dc_val)  with (ec:=no_ECCa.ap_l v1)(k2:= no_ECCa.C); simpl; auto
+  | eapply (@no_ECCa_REF_SEM.dc_val)  with (ec:=no_ECCa.ap_l v1)(k2:= no_ECCa.ECa); simpl; auto
+  | eapply (@no_ECCa_REF_SEM.dc_val)  with (ec:=no_ECCa.lam_c x)(k2:= no_ECCa.C); simpl; auto
 ].
 Qed.
 Hint Resolve dec_sem_ref.
  
-Lemma dec_ref_sem : forall t k1 k2 (c : lc_ECCa.context k1 k2) d, 
-                        lc_ECCa_REF_SEM.dec t c d -> lc_ECCa_Sem.dec t c d.
+Lemma dec_ref_sem : forall t k1 k2 (c : no_ECCa.context k1 k2) d, 
+                        no_ECCa_REF_SEM.dec t c d -> no_ECCa_Sem.dec t c d.
 Proof.
-  induction 1 using lc_ECCa_REF_SEM.dec_Ind with
-  (P := fun t _ _ c d (H : lc_ECCa_REF_SEM.dec t c d) => lc_ECCa_Sem.dec t c d)
-  (P0:= fun _ v _ c d (H : lc_ECCa_REF_SEM.decctx v c d) => lc_ECCa_Sem.decctx v c d);
+  induction 1 using no_ECCa_REF_SEM.dec_Ind with
+  (P := fun t _ _ c d (H : no_ECCa_REF_SEM.dec t c d) => no_ECCa_Sem.dec t c d)
+  (P0:= fun _ v _ c d (H : no_ECCa_REF_SEM.decctx v c d) => no_ECCa_Sem.decctx v c d);
   try (destruct t, k2); try inversion e; subst;
   try solve 
   [ discriminate 
@@ -1009,132 +1006,18 @@ Proof.
 Qed.
 Hint Resolve dec_ref_sem.
 
-Lemma iter_sem_ref : forall k (d : lc_ECCa.decomp k) v, 
-                         lc_ECCa_Sem.iter d v <-> lc_ECCa_REF_SEM.RS.iter d v.
-Proof with eauto with lc_ecca.
+Lemma iter_sem_ref : forall k (d : no_ECCa.decomp k) v, 
+                         no_ECCa_Sem.iter d v <-> no_ECCa_REF_SEM.RS.iter d v.
+Proof with eauto with no_ecca.
 split; intros H; dependent induction H; subst; simpl in *; auto; try solve [constructor];
 dependent destruction H0; econstructor 2; simpl in *; eauto; constructor; first [apply dec_sem_ref | apply dec_ref_sem]; eauto.
 Qed.
 
-Lemma eval_sem_ref : forall t k (v : lc_ECCa.value k), 
-                         lc_ECCa_Sem.eval t v <-> lc_ECCa_REF_SEM.RS.eval t v.
+Lemma eval_sem_ref : forall t k (v : no_ECCa.value k), 
+                         no_ECCa_Sem.eval t v <-> no_ECCa_REF_SEM.RS.eval t v.
 Proof with auto.
 split; intro H; dependent destruction H; econstructor;
 try solve 
 [ apply iter_sem_ref; eauto
 | destruct H; constructor; first [apply dec_sem_ref | apply dec_ref_sem]; eauto ].
 Qed.
-
-Module MiniML_Machine <: ABSTRACT_MACHINE.
-
-Definition term := MiniML.term.
-Definition value := MiniML.value.
-
-Definition configuration := MiniML_EAM.configuration.
-Definition c_init := MiniML_EAM.c_init.
-Definition c_final := MiniML_EAM.c_final.
-Definition c_eval := MiniML_EAM.c_eval.
-Definition c_apply := MiniML_EAM.c_apply.
-
-Notation " [ a ] " := (c_init a) (at level 60, no associativity).
-Notation " [: a :] " := (c_final a) (at level 60).
-Notation " [ a , b ] " := (c_eval a b) (at level 60).
-Notation " [: a , b :] " := (c_apply a b) (at level 60).
-
-Reserved Notation " a → b " (at level 40).
-
-Inductive trans : configuration -> configuration -> Prop :=
-| t_init : forall t,           [ t ] →  [t, MiniML.empty]
-| t_final: forall v,           [: MiniML.empty, v :] → [: v :]
-| t_ez   : forall c,           [MiniML.Z, c] → [: c, MiniML.vZ :]
-| t_es   : forall t c,         [MiniML.S t, c] → [t, MiniML.s_c :: c]
-| t_evar : forall x c,         [MiniML.Var x, c] → [: c, MiniML.vVar x :]
-| t_elam : forall x t c,       [MiniML.Lam x t, c] → [: c, MiniML.vLam x t :]
-| t_eapp : forall t1 t2 c,     [MiniML.App t1 t2, c] → [t1, MiniML.ap_r t2 :: c]
-| t_ecas : forall t ez x es c, [MiniML.Case t ez x es, c] → [t, MiniML.case_c ez x es :: c]
-| t_efix : forall x t t0 c
-             (CTR : MiniML.contract (MiniML.rFix x t) = Some t0),
-             [MiniML.Fix x t, c] → [t0, c]
-| t_elet : forall x t e c,     [MiniML.Letv x t e, c] → [t, MiniML.let_c x e :: c]
-| t_epar : forall t1 t2 c,     [MiniML.Pair t1 t2, c] → [t1, MiniML.pair_r t2 :: c]
-| t_efst : forall t c,         [MiniML.Fst t, c] → [t, MiniML.fst_c :: c]
-| t_esnd : forall t c,         [MiniML.Snd t, c] → [t, MiniML.snd_c :: c]
-| t_as   : forall v c,         [: MiniML.s_c :: c, v :] → [: c, MiniML.vS v :]
-| t_aa_r : forall v t c,       [: MiniML.ap_r t :: c, v :] → [t, MiniML.ap_l v :: c]
-| t_aa_l : forall v v0 t c
-             (CTR : MiniML.contract (MiniML.rApp v0 v) = Some t),
-             [: MiniML.ap_l v0 :: c, v :] → [t, c]
-| t_acas : forall v ez x es c t
-             (CTR : MiniML.contract (MiniML.rCase v ez x es) = Some t),
-             [: MiniML.case_c ez x es :: c, v :] → [t, c]
-| t_alet : forall v x e c t
-             (CTR : MiniML.contract (MiniML.rLet x v e) = Some t),
-             [: MiniML.let_c x e :: c, v :] → [t, c]
-| t_ap_r : forall v t c,       [: MiniML.pair_r t :: c, v :] → [t, MiniML.pair_l v :: c]
-| t_ap_l : forall v v0 c,      [: MiniML.pair_l v0 :: c, v :] → [: c, MiniML.vPair v0 v :]
-| t_afst : forall v c t
-             (CTR : MiniML.contract (MiniML.rFst v) = Some t),
-             [: MiniML.fst_c :: c, v :] → [t, c]
-| t_asnd : forall v c t
-             (CTR : MiniML.contract (MiniML.rSnd v) = Some t),
-             [: MiniML.snd_c :: c, v :] → [t, c]
-where " a → b " := (trans a b).
-Definition transition := trans.
-
-Notation " a >> b " := (MiniML_EAM.transition a b) (at level 40).
-Notation " a >>+ b " := (MiniML_EAM.AM.trans_close a b) (at level 40).
-
-Reserved Notation " a →+ b " (at level 40, no associativity).
-
-Inductive trans_close : configuration -> configuration -> Prop :=
-| one_step   : forall c0 c1 (STEP : c0 → c1), c0 →+ c1
-| multi_step : forall c0 c1 c2 (STEP : c0 → c1) (REC : c1 →+ c2), c0 →+ c2
-where " a →+ b " := (trans_close a b).
-
-Inductive eval : term -> value -> Prop :=
-| e_intro : forall t v (TC : [ t ] →+ [: v :]), eval t v.
-
-Lemma trans_eam_mlm : forall c0 c1, c0 >> c1 -> c0 → c1.
-Proof with auto.
-  intros c0 c1 T; inversion T; subst; match goal with
-  | [ DT : MiniML_EAM.dec_term ?t = ?int |- _ ] => destruct t; inversion DT
-  | [ DC : MiniML_EAM.dec_context ?ec ?v = ?int |- _ ] => destruct ec; inversion DC
-  | [ |- _ ] => idtac
-  end; subst; constructor...
-Qed.
-Hint Resolve trans_eam_mlm.
-
-Lemma tcl_eam_mlm : forall c0 c1, c0 >>+ c1 -> c0 →+ c1.
-Proof with eauto.
-  intros c0 c1 TC; induction TC; subst; unfold MiniML_EAM.AM.transition in *;
-  [econstructor | econstructor 2]...
-Qed.
-
-Lemma eval_eam_mlm : forall t v, MiniML_EAM.AM.eval t v -> eval t v.
-Proof.
-  intros t v E; inversion_clear E; constructor; apply tcl_eam_mlm; auto.
-Qed.
-
-Lemma trans_mlm_eam : forall c0 c1, c0 → c1 -> c0 >> c1.
-Proof with auto.
-  intros w w' H; inversion H; subst; econstructor; simpl...
-Qed.
-Hint Resolve trans_mlm_eam.
-
-Lemma tcl_mlm_eam : forall c0 c1, c0 →+ c1 -> c0 >>+ c1.
-Proof with eauto.
-  induction 1; subst; [econstructor | econstructor 2]; unfold MiniML_EAM.AM.transition...
-Qed.
-
-Lemma eval_mlm_eam : forall t v, eval t v -> MiniML_EAM.AM.eval t v.
-Proof.
-  intros t v E; inversion_clear E; constructor; apply tcl_mlm_eam; auto.
-Qed.
-
-Theorem MiniML_Machine_correct : forall t v, MiniML_Sem.eval t v <-> eval t v.
-Proof.
-  intros; rewrite eval_sem_ref; rewrite MiniML_EAM.eval_apply_correct;
-  split; [apply eval_eam_mlm | apply eval_mlm_eam].
-Qed.
-
-End MiniML_Machine.*)

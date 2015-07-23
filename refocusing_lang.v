@@ -99,6 +99,7 @@ Module Type RED_LANG.
     | d_val v => value_to_term v
     | d_red _ r c0 => plug (redex_to_term r) c0
   end.
+  Coercion decomp_to_term : decomp >-> term.
 
   Axiom proper_death : forall k1, dead_ckind k1 -> 
                            ~ exists k2 (c : context k1 k2) (r : redex k2), True.

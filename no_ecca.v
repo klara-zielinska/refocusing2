@@ -1,4 +1,5 @@
 Require Import refocusing_substitutions.
+Require Import refocusing_lang_facts.
 Require Import Program.
 
 Module no_ECCa.
@@ -390,7 +391,6 @@ End no_ECCa.
 Module no_ECCa_Ref <: RED_REF_LANG.
 
   Module R := no_ECCa.
-  Include Lang_Prop R.
 
   Definition dec_term t k : R.interm_dec k :=
   match k as k0 return R.interm_dec k0 with 
@@ -861,7 +861,7 @@ Module no_ECCa_Sem <: RED_SEM no_ECCa.
   Qed.
 
   (** A redex in context will only ever be reduced to itself *)
-  Lemma dec_redex_self : forall {k1 k2} (r : redex k2) (c : context k1 k2), 
+  Lemma dec_redex_self : forall {k2} (r : redex k2) {k1} (c : context k1 k2), 
                              dec (redex_to_term r) c (d_red r c).
   Proof with auto.
     destruct r; intros; constructor;

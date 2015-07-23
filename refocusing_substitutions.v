@@ -1,58 +1,10 @@
 Require Import Program.
 Require Import Setoid.
 Require Export refocusing_signatures.
+Require Import refocusing_lang_facts.
 Require Import Wellfounded.Inclusion.
 Require Import Wellfounded.Inverse_Image.
 
-Module Lang_Prop (R : RED_LANG) : LANG_PROP R.
-
-  Lemma plug_empty : forall t k, R.plug t (@R.empty k) = t.
-  Proof.
-    intros; auto.
-  Qed.
-  Hint Resolve plug_empty : prop.
-
-  Lemma compose_empty : forall k1 k2 (c : R.context k1 k2), c = R.compose c R.empty.
-  Proof.
-    intros; induction c.
-    - auto.
-    - simpl; rewrite<- IHc; auto.
-  Qed.
-  Hint Resolve compose_empty : prop.
-
-  Lemma plug_compose : forall k1 k2 k3 (c : R.context k1 k2) (c' : R.context k3 k1) 
-                               (t : R.term), 
-                           R.plug t (R.compose c c') = R.plug (R.plug t c) c'.
-  Proof.
-    intros ? ? ?; induction c; intros.
-    - auto.
-    - apply IHc.
-  Qed.
-  Hint Resolve plug_compose : prop.
-
-  Import R.
-  Lemma context_snoc  : forall ec0 {k1 k2} (c0 : context k1 k2),
-                            exists ec1 c1, (ec0=:c0) = (c1~+ec1=:[_]).
-  Proof.
-  intros. revert ec0.
-  induction c0; intro.
-  exists ec0. eexists (@R.empty _). reflexivity.
-  destruct (IHc0 ec) as (ec1, (c1, H)).
-  exists ec1. exists (ec0=:c1).
-  simpl.
-  f_equal.
-  auto.
-  Qed.
-
-  Lemma dead_contex_dead : forall {k1 k2}, context k1 k2 -> dead_ckind k1 -> dead_ckind k2.
-  Proof.
-  intros ? ? c H. revert c.
-  induction 1.
-  - auto.
-  - apply ckind_death_propagation. auto.
-  Qed.
-
-End Lang_Prop.
 
 Module RedRefSem (R : RED_REF_LANG) <: RED_REF_SEM R.R.
 
@@ -358,7 +310,7 @@ Qed.
 
   Module RS : RED_SEM R.R with Definition dec := dec.
 
-    Module LP := Lang_Prop R.R.
+    (*Module LP := Lang_Prop R.R.*)
 
     Lemma decompose : forall (t : R.R.term) (k1 : R.R.ckind), ~ R.R.dead_ckind k1 ->
       (exists (v : R.R.value k1), t = R.R.value_to_term v) \/
@@ -409,13 +361,13 @@ Qed.
               * right; exists k2; exists r; exists c...
 
             + right; exists k2; exists r; exists (R.R.compose c (R.R.ccons e0 R.R.empty)).
-              subst t0; rewrite LP.plug_compose...
+              subst t0; rewrite plug_compose...
 
           - intuition. 
           }
 
         * right; exists k2; exists r; exists (R.R.compose c (R.R.ccons e R.R.empty)).
-          subst t0; rewrite LP.plug_compose...
+          subst t0; rewrite plug_compose...
 
       - intuition.
     Qed. 
@@ -478,7 +430,7 @@ Qed.
       - intuition.
     Qed.
 
-    Lemma dec_redex_self : forall {k1 k2} (r : R.R.redex k2) (c : R.R.context k1 k2), 
+    Lemma dec_redex_self : forall {k2} (r : R.R.redex k2) {k1} (c : R.R.context k1 k2), 
                                dec (R.R.redex_to_term r) c (R.R.d_red r c).
     Proof with eauto.
       intros;
@@ -786,11 +738,9 @@ discriminate Hc3. *)
 End RedRefSem.
 
 
-Module Red_Prop (R : RED_LANG) (RS : RED_REF_SEM(R)) : RED_PROP R RS.
+Module Red_Prop (R : RED_LANG) (RS : RED_REF_SEM(R)) : RED_PROP R RS.RS.
 
   Include RED_LANG_Facts R.
-
-  Module LP := Lang_Prop R.
 
 (* REFACTORING *)
 Ltac super_subst :=
@@ -810,8 +760,8 @@ Ltac super_subst :=
 
     (* induction H *)
     refine (RS.dec_Ind 
-       (fun t k1 k2 c d (H : @RS.RS.dec t k1 k2 c d) => 
-            forall d0 (DEC : RS.RS.dec t c d0), d = d0)
+       (fun t k1 k2 c d (H : @RS.dec t k1 k2 c d) => 
+            forall d0 (DEC : RS.dec t c d0), d = d0)
        (fun k2 v k1 c d (H : @RS.decctx k2 v k1 c d) => 
             forall d0 (DCTX : RS.decctx v c d0),  d = d0)
        _ _ _ _ _ _ _ t _ _ R.empty d H d0 H0);
@@ -821,7 +771,7 @@ Ltac super_subst :=
     (* automated cases *)
     match goal with
 
-    | [ RD : (RS.RS.dec ?t ?c ?d), DT : (RS.dec_term ?t ?k = _) |- _ ] => 
+    | [ RD : (RS.dec ?t ?c ?d), DT : (RS.dec_term ?t ?k = _) |- _ ] => 
              inversion RD; super_subst; 
              try match goal with DT2 : (RS.dec_term ?t ?k = _) |- _ => 
                      rewrite DT2 in DT; inversion DT end
@@ -890,21 +840,21 @@ Ltac super_subst :=
     - exists (R.d_val v); constructor; rewrite RS.dec_val_self; constructor...
     - exists (R.d_red r c); constructor; apply RS.RS.dec_plug_rev.
         { apply (proper_death2 _ _ R.empty r); apply (R.d_red r R.empty). }
-      rewrite <- LP.compose_empty; apply RS.RS.dec_redex_self.
+      rewrite <- compose_empty; apply RS.RS.dec_redex_self.
   Qed.
 
 
-  Lemma unique_decomposition : forall t k, ~ R.dead_ckind k ->
+  Lemma unique_decomposition : forall t k1, ~ R.dead_ckind k1 ->
 
-      (exists v : R.value k, t = R.value_to_term v) \/ 
+      (exists v : R.value k1, R.value_to_term v = t) \/ 
 
-      (exists k2 (r : R.redex k2) (c : R.context k k2),  R.plug (R.redex_to_term r) c = t /\ 
-	  forall k2' (r0 : R.redex k2') (c0 : R.context k k2'), 
+      (exists k2 (r : R.redex k2) (c : R.context k1 k2),  R.plug (R.redex_to_term r) c = t /\ 
+	  forall k2' (r0 : R.redex k2') (c0 : R.context k1 k2'), 
               R.plug (R.redex_to_term r0) c0 = t -> k2' = k2 /\ r ~= r0 /\ c ~= c0).
 
   Proof with eauto.
     intros.
-    destruct (RS.RS.decompose t k H) as [(v, H0) | (k', (r, (c, H0)))]; intros.
+    destruct (RS.RS.decompose t k1 H) as [(v, H0) | (k', (r, (c, H0)))]; intros.
     - left; exists v...
     - right; exists k' r; exists c; split. 
       * trivial.
@@ -914,7 +864,7 @@ Ltac super_subst :=
             constructor; [rewrite <- H0 | rewrite <- H1]; apply RS.RS.dec_plug_rev;
             try solve
             [ apply (proper_death2 _ _ R.empty); auto
-            | rewrite <- LP.compose_empty; apply RS.RS.dec_redex_self ]. }
+            | rewrite <- compose_empty; apply RS.RS.dec_redex_self ]. }
         destruct H2.
         assert (hh := dec_is_function _ _ _ _ H2 H3); dependent destruction hh.
         intuition.

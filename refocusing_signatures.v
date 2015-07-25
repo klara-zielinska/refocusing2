@@ -126,7 +126,7 @@ Module Type PE_REF_SEM (R : RED_LANG).
 End PE_REF_SEM.*)
 
 
-Module Type RED_PROP (R : RED_LANG) (RS : RED_SEM(R)).
+Module Type RED_SEM_PROPER (R : RED_LANG) (RS : RED_SEM R).
 
   Import R.
   Import RS.
@@ -141,7 +141,9 @@ Module Type RED_PROP (R : RED_LANG) (RS : RED_SEM(R)).
                                dec t c d -> decomp_to_term d = plug t c.
   Axiom dec_total        : forall t k, ~ dead_ckind k -> 
                                exists (d : decomp k), decempty t d.
+
   Axiom unique_decomposition : 
+
       forall t k1, ~ dead_ckind k1 ->  
 
          (exists v : R.value k1, value_to_term v = t) \/
@@ -150,4 +152,4 @@ Module Type RED_PROP (R : RED_LANG) (RS : RED_SEM(R)).
 	      forall k2' (r' : redex k2') (c' : context k1 k2'), 
                   plug r' c' = t -> k2' = k2 /\ r ~= r' /\ c ~= c').
 
-End RED_PROP.
+End RED_SEM_PROPER.

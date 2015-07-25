@@ -177,6 +177,19 @@ Definition JMeq_eq_depT :=
     end y H0.
 
 
+Ltac dep_subst :=
+    repeat
+        subst;
+        match goal with 
+        | G : existT _ _ _ = existT _ _ _ |- _ => dependent_destruction2 G
+        | G : ?x ~= ?y |- _                    => let tx := type of x in 
+                                                  let ty := type of y in 
+                                                  constr_eq tx ty;
+                                                  dependent_destruction2 G
+        | _ => idtac
+        end.
+
+
 Ltac discriminateJM H := 
     match type of H with ?x ~= ?y => 
     let H := fresh in 

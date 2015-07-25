@@ -26,10 +26,11 @@ Module Type RED_LANG.
   (** The values and redexes are sublanguages of terms *)
   Parameter value_to_term : forall {k}, value k -> term.
   Parameter redex_to_term : forall {k}, redex k -> term.
-  Axiom value_to_term_injective : forall k (v v' : value k),
-    value_to_term v = value_to_term v' -> v = v'.
-  Axiom redex_to_term_injective : forall k (r r' : redex k),
-    redex_to_term r = redex_to_term r' -> r = r'.
+
+  Axiom value_to_term_injective : 
+      forall {k} (v v' : value k), value_to_term v = value_to_term v' -> v = v'.
+  Axiom redex_to_term_injective : 
+      forall {k} (r r' : redex k), redex_to_term r = redex_to_term r' -> r = r'.
 
   Coercion value_to_term : value >-> term.
   Coercion redex_to_term : redex >-> term.
@@ -61,12 +62,12 @@ Module Type RED_LANG.
   (** The other main function of reduction semantics -- contraction of a redex into a term *)
   Parameter contract : forall {k}, redex k -> option term.
 
-  Definition only_empty (t : term) (k : ckind) : Prop := 
-      forall t' k' (c : context k k'), plug t' c = t -> ~ dead_ckind k' -> 
+  Definition only_empty t k := 
+      forall t' {k'} (c : context k k'), ~ dead_ckind k' -> plug t' c = t -> 
           k = k' /\ c ~= @empty k.
 
   Definition only_trivial (t : term) (k : ckind) : Prop := 
-      forall t' k' (c : context k k'), plug t' c = t -> 
+      forall t' {k'} (c : context k k'), plug t' c = t -> 
           k = k' /\ c ~= @empty k \/ exists (v : value k'), t' = value_to_term v.
 
   Axiom value_trivial : forall k (v : value k), only_trivial (value_to_term v) k.
@@ -95,10 +96,10 @@ Module Type RED_LANG.
   Arguments in_red {k} _. Arguments in_val {k} _. Arguments in_term {k} _ _.
 
   Definition decomp_to_term {k} (d : decomp k) : term :=
-  match d with
-    | d_val v => value_to_term v
-    | d_red _ r c0 => plug (redex_to_term r) c0
-  end.
+      match d with
+      | d_val v      => value_to_term v
+      | d_red _ r c0 => plug r c0
+      end.
   Coercion decomp_to_term : decomp >-> term.
 
   Axiom proper_death : forall k1, dead_ckind k1 -> 

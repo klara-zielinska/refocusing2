@@ -219,11 +219,11 @@ Module no_ECCa <: RED_LANG.
       end.
 
   Definition only_empty t k := 
-      forall t' {k'} (c : context k k'), ~ dead_ckind k' -> plug t' c = t -> 
+      forall t' {k'} (c : context k k'), plug t' c = t -> ~ dead_ckind k' -> 
           k = k' /\ c ~= @empty k.
 
   Definition only_trivial t k := 
-      forall t' { k'} (c : context k k'),  plug t' c = t -> 
+      forall t' { k'} (c : context k k'),  plug t' c = t -> ~ dead_ckind k' -> 
           k = k' /\ c ~= @empty k \/ exists (v : value k'), t' = v.
 
 
@@ -249,6 +249,7 @@ Qed.*)
     - intros.
       right.
       destruct IHc with v (atom_plug t ec0) as [(H1, H2) | (v0, H1)]; auto;
+          try solve [contradict H0; apply ckind_death_propagation; auto];
           dep_subst; simpl in *;
       match goal with 
       | [Hv : atom_plug ?t ?ec = _ ?v |- _] => 
@@ -264,15 +265,16 @@ Qed.*)
     - intuition.
     - intros.
       right.
-      destruct IHc with r (atom_plug t ec0) as [(H1, H2) | (v0, H1)];
-          try solve [intro; apply H; apply ckind_death_propagation; auto | auto];
-          subst; [ dependent destruction H2 | ]; simpl in *;
+      destruct IHc with r (atom_plug t ec0) as [(H1, H2) | (v0, H1)]; auto;
+          try solve [contradict H0; apply ckind_death_propagation; auto];
+          dep_subst; simpl in *;
       match goal with
       | [Hvr : atom_plug ?t ?a = _ ?r |- _] => 
             destruct a; destruct r; 
             dependent_destruction2 Hvr
       end; simpl in *; 
-      try solve [ exists (vECaLam v t1); auto 
+      try solve [ intuition
+                | exists (vECaLam v t1); auto 
                 | dependent destruction v; discriminate
                 | eexists; eauto
                 | apply L
@@ -288,17 +290,15 @@ Qed.*)
   Qed.
 
   Lemma ot_subt : 
-      forall t t0 ec k, (*~ dead_ckind (ckind_trans k ec) ->*)
-                        only_trivial t k -> atom_plug t0 ec = t -> 
-          exists v : value (ckind_trans k ec), t0 = value_to_term v.
-
+      forall t t0 ec k, only_trivial t k -> atom_plug t0 ec = t -> ~ dead_ckind (k+>ec) ->
+          exists v : value (k+>ec), t0 = value_to_term v.
   Proof with auto.
     intros.
     destruct (H t0 _ (ec0 =: [_])) as [(H2, H3) | (v, H2)]...
     - discriminateJM H3.
     - exists v; destruct k...
   Qed.
-
+(*
   Ltac ot_v t ec :=
   match goal with [Hot : (only_trivial ?H1) _ |- _] => 
       destruct (ot_subt _ t ec _ Hot) as (?v, HV); [auto | subst t]
@@ -313,7 +313,7 @@ Qed.*)
     | value ?k1 => destruct k1; left; exists rv
     | redex ?k1 => destruct k1; right; exists rv
     end; simpl; auto
-  end.
+  end.*)
 
 
   Lemma plug_compose : forall k1 k2 k3 (c : context k1 k2) (c' : context k3 k1) 
@@ -325,18 +325,19 @@ Qed.*)
     - apply IHc.
   Qed.
 
-Lemma L2 : forall t ec k, (*~ dead_ckind (ckind_trans k ec) ->*)
-               only_trivial (atom_plug t ec) k -> only_trivial t (ckind_trans k ec).
+Lemma L2 : forall t ec k, only_trivial (atom_plug t ec) k -> 
+                          only_trivial t (k+>ec).
 Proof with eauto.
 intros.
-intros t' k' c H1.
-destruct (H t' k' (c ~+ ec0 =: [_])) as [(H3, H4) | ?]... rewrite plug_compose... subst...
+intros t' k' c H1 H2.
+destruct (H t' k' (c ~+ ec0 =: [_])) as [(H3, H4) | ?]... 
+rewrite plug_compose... subst...
 contradict H4... revert H3; clear; intro. dependent induction c; intro H; discriminateJM H.
 Qed.
 
 
   Lemma trivial_val_red : 
-      forall k (t : term), only_trivial t k ->
+      forall k t, only_trivial t k ->
          (exists (v : value k), t = value_to_term v) \/
          (exists (r : redex k), t = redex_to_term r).
 
@@ -387,7 +388,7 @@ Qed.
   - intro H0; subst; dependent destruction r.
   - clear r; dependent induction c; auto.
     rewrite IHc; simpl; constructor.
-  Qed. Print RED_LANG.
+  Qed.
 
 End no_ECCa.
 
@@ -494,7 +495,7 @@ Module no_ECCa_Ref <: RED_REF_LANG.
         induction c;
             intros; simpl in *;
         [ intuition
-        | destruct (IHc _ H1 (context_tail_liveness _ _ H) _ H0) as (H2, H3);
+        | destruct (IHc _ H1 (context_tail_liveness _ _ H0) _ H) as (H2, H3);
           dep_subst;
           destruct k2, ec0; inversion H1 ]
     ).
@@ -518,29 +519,29 @@ Module no_ECCa_Ref <: RED_REF_LANG.
         induction c;
             intros; simpl in *;
         [ intuition
-        | destruct (IHc _ H1 (context_tail_liveness _ _ H) _ H0) as (H2, H3);
+        | destruct (IHc _ H1 (context_tail_liveness _ _ H0) _ H) as (H2, H3);
           dep_subst;
           destruct k2, ec0; inversion H1 ]
     ). 
 
     
         induction c;
-            intros; simpl in *. intuition. destruct (IHc _ H1 (context_tail_liveness _ _ H) _ H0) as (H2, H3);
-              subst; dependent destruction H3. destruct k2, ec0; inversion H0.
+            intros; simpl in *. intuition. destruct (IHc _ H1 (context_tail_liveness _ _ H0) _ H) as (H2, H3);
+              subst; dependent destruction H3. destruct k2, ec0; inversion H.
 
 destruct k; intros. Focus 2.
 dependent destruction c.
 intuition.
 destruct (context_snoc ec0 c) as (ec1, (c1, H2)).
-rewrite H2 in H0. clear H2.
-rewrite plug_compose in H0.
+rewrite H2 in H. clear H2.
+rewrite plug_compose in H.
 destruct ec1.
-contradict H; apply (dead_contex_dead c1); simpl...
-discriminate H0.
-discriminate H0.
+contradict H0; apply (dead_contex_dead c1); simpl...
+discriminate H.
+discriminate H.
 
 Focus 2.
-contradict H; apply (dead_contex_dead c); simpl...
+contradict H0; apply (dead_contex_dead c); simpl...
 
 Focus 1.
 discriminate.

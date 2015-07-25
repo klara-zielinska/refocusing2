@@ -58,17 +58,19 @@ Module Type RED_REF_SEM (R : RED_LANG).
       ~ dead_ckind (ckind_trans k ec0).*)
 
   Axiom dec_term_correct : forall t k, match dec_term t k with
-    | in_red r => redex_to_term r = t
-    | in_val v => value_to_term v = t
+    | in_red r       => redex_to_term r = t
+    | in_val v       => value_to_term v = t
     | in_term t0 ec0 => atom_plug t0 ec0 = t
-    | in_dead => dead_ckind k
+    | in_dead        => dead_ckind k
   end.
+
   Axiom dec_context_correct : forall ec k v, match dec_context ec k v with
-    | in_red r => redex_to_term r = atom_plug (value_to_term v) ec
-    | in_val v0 => value_to_term v0 = atom_plug (value_to_term v) ec
+    | in_red r      => redex_to_term r = atom_plug v ec
+    | in_val v0     => value_to_term v0 = atom_plug (value_to_term v) ec
     | in_term t ec0 => atom_plug t ec0 = atom_plug (value_to_term v) ec
-    | in_dead => dead_ckind (k+>ec) 
+    | in_dead       => dead_ckind (k+>ec) 
   end.
+
 
   (** A decomposition function specified in terms of the atomic functions above *)
   Inductive dec : term -> forall {k1 k2}, context k1 k2 -> decomp k1 -> Prop :=
@@ -101,13 +103,14 @@ Module Type RED_REF_SEM (R : RED_LANG).
                 dec t (ccons ec0 c) d ->
                 decctx v (ccons ec c) d.
 
+  Scheme dec_Ind := Induction for dec Sort Prop
+   with decctx_Ind := Induction for decctx Sort Prop.
+
+
   Axiom dec_val_self : forall {k2} (v : value k2) {k1} (c : context k1 k2) d, 
                            dec (value_to_term v) c d <-> decctx v c d.
 
   Declare Module RS : RED_SEM R with Definition dec := dec.
-
-  Scheme dec_Ind := Induction for dec Sort Prop
-  with decctx_Ind := Induction for decctx Sort Prop.
 
 End RED_REF_SEM.
 
@@ -141,7 +144,6 @@ Module Type RED_SEM_PROPER (R : RED_LANG) (RS : RED_SEM R).
                                dec t c d -> decomp_to_term d = plug t c.
   Axiom dec_total        : forall t k, ~ dead_ckind k -> 
                                exists (d : decomp k), decempty t d.
-
   Axiom unique_decomposition : 
 
       forall t k1, ~ dead_ckind k1 ->  

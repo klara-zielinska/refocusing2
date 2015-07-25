@@ -12,6 +12,8 @@ Module RedRefSem (R : RED_REF_LANG) <: RED_REF_SEM R.R.
   Import R.
   Module RRF := RED_LANG_Facts R.R.
   Import RRF.
+  Module RRF2 := RED_REF_LANG_Facts R.
+  Import RRF2.
 
 
   Inductive dec : term -> forall {k1 k2}, context k1 k2 -> decomp k1 -> Prop :=
@@ -124,8 +126,7 @@ Module RedRefSem (R : RED_REF_LANG) <: RED_REF_SEM R.R.
   Proof.
     intros.
     destruct (dec_context_term_next _ _ _ _ _ H0) as (H1, _).
-    destruct (ec_order_comp_fi _ _ _ H1) as (_, (H2, _)).
-    apply H2.
+    apply (ec_order_comp_fi _ _ _ _ H1).
   Qed.
 
 
@@ -203,7 +204,7 @@ Qed.
       + discriminateJM H3.
 
       + { clear H0; revert t0 H1 x hh H2.
-        induction ec using (well_founded_ind (wf_eco k2)); intros.
+        induction ec using (well_founded_ind (wf_eco k2 v)); intros.
 
         assert (decctx x (ec=:c) d).
           { apply (H t0)... do 2 econstructor... }
@@ -222,8 +223,8 @@ Qed.
 
         - assert (~ dead_ckind (k2+>ec1)).
           {
-              destruct ec_order_comp_fi with ec1 ec k2 as (?, (?, ?))...
-              - eapply dec_context_term_next; eassumption.
+              destruct ec_order_comp_fi with k2 v ec1 ec as (?, (?, (?, ?)))...
+              - rewrite <- hh; eapply dec_context_term_next...
           }
 
           destruct (value_trivial v t _ (ec1=:[_])); auto;
@@ -232,7 +233,7 @@ Qed.
               destruct H5.
           + discriminateJM H6.
           + eapply (H0 ec1); eauto.
-            * apply (dec_context_term_next _ _ _ _ _ H3).
+            * rewrite <- hh; apply (dec_context_term_next _ _ _ _ _ H3).
             * congruence.
         }
   Qed.
@@ -255,51 +256,50 @@ Qed.
     - apply (d_term _ _ _ _ _ Heqi).
 
       assert (~ dead_ckind (k2+>e)) as Hndk.
-        { eapply (dec_term_liveness)... }
+        { eapply dec_term_liveness... }
       destruct (value_trivial v t _ (e=:[_]));
           try solve [auto];
           destruct H1.
 
       + discriminateJM H2.
 
-      + { clear Heqi; revert e t hh Hndk x H1;
-        induction e using (well_founded_ind (wf_eco k2)); intros.
+      + { clear Heqi; revert e t hh Hndk x H1.
+        induction e using (well_founded_ind (wf_eco k2 v)); intros.
 
         apply (H t) with (v := x)...
+          { do 2 econstructor... }
+        remember (dec_context e _ x) as i.
+        assert (gg := dec_context_correct e _ x);
+        destruct i; rewrite <- Heqi in gg; subst;
+        symmetry in Heqi.
 
-        - do 2 econstructor...
+        - contradiction (value_redex v r); congruence.
 
-        - remember (dec_context e _ x) as i.
-          assert (gg := dec_context_correct e _ x);
-          destruct i; rewrite <- Heqi in gg; subst;
-          symmetry in Heqi.
+        - apply (dc_val v0)...
+          assert (v0 = v).
+          + apply (value_to_term_injective v0 v); congruence.
+          + subst...
 
-          + contradiction (value_redex v r); congruence.
+        - assert (~ dead_ckind (k2+>e0)).
+          {
+              destruct ec_order_comp_fi with k2 v e0 e as (?, (?, (?, ?)))...
+              - rewrite <- hh; eapply dec_context_term_next...
+          }
 
-          + apply (dc_val v0)...
-            assert (v0 = v).
-              * apply (value_to_term_injective v0 v); congruence.
-              * subst...
+          destruct (value_trivial v t0 _ (e0=:[_]));
+              try solve [simpl; congruence];
+              destruct H3.
 
-          + assert (~ dead_ckind (k2+>e0)).
-            {
-                destruct ec_order_comp_fi with e0 e k2 as (?, (?, ?))...
-                - eapply dec_context_term_next; eassumption.
-            }
+          + discriminateJM H4.
 
-            destruct (value_trivial v t0 _ (e0=:[_]));
-                try solve [simpl; congruence];
-                destruct H3.
+          + apply dc_term with e0 t0...
+            apply (H1 e0) with x0...
+            * rewrite <- hh; apply (dec_context_term_next _ _ _ _ _ Heqi).
+            * congruence.
+        - intuition.
+      }
 
-            * discriminateJM H4.
-
-            * apply dc_term with (ec0:=e0) (t:=t0)...
-              apply (H1 e0) with (x := x0)...
-                  destruct (dec_context_term_next _ _ _ _ _ Heqi)...
-                  congruence.
-          + intuition.
-        }
-    - contradiction (decctx_not_dead H0). 
+    - contradiction (decctx_not_dead H0).
   Qed.
 
 
@@ -327,8 +327,8 @@ Qed.
         * { subst t0.
           assert (~ dead_ckind (k1+>e)) as Hndk.
             { eapply dec_term_liveness... } 
-          clear Heqi; generalize dependent v. 
-          induction e using (well_founded_ind (wf_eco k1)); intros.
+          clear Heqi; generalize dependent v.
+          induction e using (well_founded_ind (wf_eco k1 t)); intros.
 
           remember (dec_context e _ v); assert (ht := dec_context_correct e _ v); 
           destruct i; rewrite <- Heqi in ht; try rewrite hh in ht.
@@ -347,6 +347,7 @@ Qed.
               subst t0.
               assert (~ dead_ckind (k1+>e0)) as Hndk2.
                 { eapply dec_context_not_dead... }
+              rewrite hh in H2.
               destruct (H1 e0 H2 Hndk2 v0 ht) as [(v1, Hv1) | (k2, (r, (c, Hrc)))].
               * left; exists v1...
               * right; exists k2; exists r; exists c...
@@ -390,7 +391,7 @@ Qed.
 
         * { subst t.
           clear H0 Heqi; generalize dependent v; generalize dependent e.
-          induction e using (well_founded_ind (wf_eco k)); intros.
+          induction e using (well_founded_ind (wf_eco k r)); intros.
 
           apply val_dec.
           remember (dec_context e _ v); assert (ht := dec_context_correct e _ v);
@@ -409,12 +410,14 @@ Qed.
             assert (~ dead_ckind (k+>e0)).
               { eapply dec_context_not_dead... }
             destruct (redex_trivial r t _ (e0=:[_]) ht) as [(H4, H5) | (v1, H4)]...
-            * discriminateJM H5.
-            * subst t.
+            + discriminateJM H5.
+            + subst t.
               destruct (dec_context_term_next _ _ _ _ _ Heqi). 
               apply H0...
+              * rewrite <- hh...
           - intuition. 
           }
+
       - intuition.
     Qed.
 
@@ -431,13 +434,13 @@ Qed.
       (P  := fun t k1' k2' c0 d (_ : dec t c0 d) => 
       match d with
         | d_val v => True
-        | d_red k' r' c1 => forall c : context k1 k1', dec t (c0~+c) (d_red r' (c1~+c))
+        | d_red k' r' c1 => forall (c : context k1 k1'), dec t (c0~+c) (d_red r' (c1~+c))
       end)
 
       (P0 := fun k2' v k1' c0 d (_ : decctx v c0 d) => 
       match d with
         | d_val v => True
-        | d_red k' r' c1 => forall c : context k1 k1', decctx v (c0~+c) (d_red r' (c1~+c))
+        | d_red k' r' c1 => forall (c : context k1 k1'), decctx v (c0~+c) (d_red r' (c1~+c))
       end)
 
       (d0 := hh);
@@ -509,36 +512,45 @@ Qed.
           discriminateJM H3.
 
         * dependent destruction H2.
-          destruct ec_order_comp_if with ec0 ec k2 as [H2 | [H2 | H2]].
+          destruct ec_order_comp_if with (atom_plug t ec) ec0 ec k2 as [H2 | [H2 | H2]].
               compute...
-              eapply dec_term_ec_most_transitable...
+              compute...
+              eapply dec_term_liveness...
               apply H.
 
           + contradiction (dec_term_term_top _ _ _ _ H6 ec).
           + symmetry in hh.
-            destruct (elem_context_det _ _ _ _ _ H2 hh) as (v, H3); subst t1.
+            destruct (elem_context_det2 _ _ _ _ H2 t1) as (v, H3)...
+            subst t1.
             {
                 clear H6; generalize dependent v; generalize dependent ec0.
-                induction ec0 using (well_founded_ind (wf_eco k2)); intros.
+                induction ec0 using (well_founded_ind (wf_eco k2 (atom_plug t ec))); 
+                    intros.
                 
                 assert (H3 := dec_val _ H7).
                 dependent destruction H3;
                 inversion_ccons x.
-                - contradiction (dec_context_red_bot _ _ _ _ H1 _ _ hh).
-                - contradiction (dec_context_val_bot _ _ _ _ H1 ec).
+                - rewrite hh in H2; 
+                  contradiction (dec_context_red_bot _ _ _ _ H1 _ H2).
+                - rewrite hh in H2; 
+                  contradiction (dec_context_val_bot _ _ _ _ H1 _ H2).
                 - assert (ht := dec_context_correct ec0 _ v).
                   rewrite H1 in ht. 
                   rewrite <- hh in ht.
                   destruct (dec_context_term_next _ _ _ _ _ H1).
-                  destruct ec_order_comp_if with ec2 ec k2 as [hq | [hq | hq]].
+                  destruct ec_order_comp_if with (atom_plug t ec) ec2 ec k2 
+                                              as [H6 | [H6 | H6]].
                       compute...
-                      assert (H6 := ec_order_comp_fi _ _ _ H4); intuition.
-                      assert (H6 := ec_order_comp_fi _ _ _ H2); intuition.
-                  
-                  * contradiction (H5 ec).
+                      compute...
+                      assert (H6 := ec_order_comp_fi _ _ _ _ H4); intuition.
+                      assert (H6 := ec_order_comp_fi _ _ _ _ H2); intuition.
+
+                  * contradiction (H5 ec); rewrite <- hh...
                   * symmetry in ht.
-                    destruct (elem_context_det _ _ _ _ _ hq ht) as (v1, h4); subst t0.
+                    destruct (elem_context_det2 _ _ _ _ H6 t0) as (v1, h4)...
+                    subst t0.
                     apply H0 with ec2 v1...
+                      { rewrite hh... }
                   * subst; assert (H8 := atom_plug_injective1 _ _ _ ht).
                     subst...
             }
@@ -557,31 +569,31 @@ Qed.
         eapply context_tail_liveness...
         remember (dec_term (atom_plug t ec) k2) as i.
         destruct i;
-          assert (hh := dec_term_correct (atom_plug t ec) k2);
-          rewrite <- Heqi in hh.
+        assert (hh := dec_term_correct (atom_plug t ec) k2);
+        rewrite <- Heqi in hh;
+        symmetry in Heqi.
 
-        * symmetry in Heqi.
-          destruct (dec_term_red_empty _ _ _ Heqi t _ (ec=:[_]))...
+        * destruct (dec_term_red_empty _ _ _ Heqi t _ (ec=:[_]))...
           discriminateJM H2.
 
-        * symmetry in Heqi.
-          destruct (dec_term_val_empty _ _ _ Heqi t _ (ec=:[_]))...
+        * destruct (dec_term_val_empty _ _ _ Heqi t _ (ec=:[_]))...
           discriminateJM H2.
 
-        * destruct (ec_order_comp_if e ec) with k2 as [H1 | [H1 | H1]].
-              unfold ec_siblings...
-              symmetry in Heqi; apply (dec_term_ec_most_transitable H Heqi).
-              apply H.
+        * destruct ec_order_comp_if with (atom_plug t ec) e ec k2 as [H1 | [H1 | H1]].
+              compute...
+              compute...
+              apply (dec_term_liveness Heqi).
+              assumption.
 
-          + symmetry in Heqi.
-            contradict (dec_term_term_top _ _ _ _ Heqi _ H1).
+          + contradict (dec_term_term_top _ _ _ _ Heqi _ H1).
 
           + symmetry in hh.
-            destruct (elem_context_det _ _ _ _ _ H1 hh) as (v, H2); subst t0.
+            destruct (elem_context_det2 _ _ _ _ H1 t0) as (v, H2)...
+            subst t0.
             econstructor 3; eauto.
             {
               clear H Heqi; generalize dependent v; generalize dependent e.
-              induction e using (well_founded_ind (wf_eco k2)); intros.
+              induction e using (well_founded_ind (wf_eco k2 (atom_plug t ec))); intros.
 
               apply val_dec.
               remember (dec_context e _ v).
@@ -590,20 +602,28 @@ Qed.
                   assert (ht := dec_context_correct e _ v); 
                   rewrite Heqi in ht.
 
-              - contradiction (dec_context_red_bot _ _ _ _ Heqi _ _ hh).
-              - contradiction (dec_context_val_bot _ _ _ _ Heqi ec).
+              - rewrite hh in H1;
+                contradiction (dec_context_red_bot _ _ _ _ Heqi _ H1).
+              - rewrite hh in H1;
+                contradiction (dec_context_val_bot _ _ _ _ Heqi _ H1).
               - destruct (dec_context_term_next _ _ _ _ _ Heqi) as (H3, H4).
                 econstructor 4...
                 rewrite <- hh in ht.
-                destruct ec_order_comp_if with e0 ec k2 as [H5 | [H5 | H5]].
+                destruct ec_order_comp_if with (atom_plug t ec) e0 ec k2 
+                                            as [H5 | [H5 | H5]].
                     compute...
-                    destruct ec_order_comp_fi with e0 e k2 as (?, (?, ?))...
-                    destruct ec_order_comp_fi with ec e k2 as (?, (?, ?))...
+                    compute...
+                    apply (ec_order_comp_fi _ _ _ _ H3).
+                    apply (ec_order_comp_fi _ _ _ _ H1).
 
-                * contradiction (H4 ec H1).
+                * rewrite hh in H1; 
+                  contradiction (H4 ec H1). 
+                  rewrite <- hh...
                 * symmetry in ht; clear H4. 
-                  destruct (elem_context_det _ _ _ _ _ H5 ht) as (v0, H6); subst t0.
+                  destruct (elem_context_det2 _ _ _ _ H5 t0) as (v0, H6)...
+                  subst t0.
                   apply H...
+                    { rewrite hh... }
                 * subst.
                   assert (H5 := atom_plug_injective1 _ _ _ ht).
                   subst...

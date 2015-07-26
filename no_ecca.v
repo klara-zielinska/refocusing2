@@ -143,12 +143,13 @@ Module no_ECCa <: RED_LANG.
   Infix "~+" := compose (at level 60, right associativity).
 
 
-  Definition atom_plug (t : term) (ec : elem_context) :=
+  Definition atom_plug (t : term) (ec : elem_context) : term :=
       match ec with
       | lam_c x => Lam x t
       | ap_r tr => App t tr
       | ap_l v  => App (v : term) t
       end.
+  Notation "ec :[ t ]" := (atom_plug t ec) (at level 0).
 
 
   Lemma atom_plug_injective1 : forall t0 t1 ec,
@@ -159,15 +160,16 @@ Module no_ECCa <: RED_LANG.
   Qed.
 
 
-  Fixpoint plug t {k1 k2} (c : context k1 k2) :=
+  Fixpoint plug t {k1 k2} (c : context k1 k2) : term :=
       match c with
       | [_]    => t 
       | ec=:c' => plug (atom_plug t ec) c'
       end.
+  Notation "c [ t ]" := (plug t c) (at level 0).
 
 
-  Definition transitable_from k ec := ~ dead_ckind (k+>ec).
-  Definition ec_siblings ec0 ec1   := exists t0 t1, atom_plug t0 ec0 = atom_plug t1 ec1.
+(*  Definition transitable_from k ec := ~ dead_ckind (k+>ec).
+  Definition ec_siblings ec0 ec1   := exists t0 t1, atom_plug t0 ec0 = atom_plug t1 ec1.*)
 
   Parameter subst : v_name -> expr -> expr -> expr.
 
@@ -200,7 +202,7 @@ Module no_ECCa <: RED_LANG.
   (** Datatype of decompositions -- either a value or a redex in a context (analogous to the decompose lemma) *)
   Inductive decomp (k : ckind) : Type :=
   | d_val : value k -> decomp k
-  | d_red : forall k' : ckind, redex k' -> context k k' -> decomp k.
+  | d_red : forall k', redex k' -> context k k' -> decomp k.
 
   Arguments d_val {k} _. Arguments d_red {k} {k'} _ _.
 
@@ -215,15 +217,15 @@ Module no_ECCa <: RED_LANG.
   Definition decomp_to_term {k} (d : decomp k) : term :=
       match d with
       | d_val v => value_to_term v
-      | d_red _ r c0 => plug r c0
+      | d_red _ r c0 => c0[r]
       end.
 
   Definition only_empty t k := 
-      forall t' {k'} (c : context k k'), plug t' c = t -> ~ dead_ckind k' -> 
+      forall t' {k'} (c : context k k'), c[t'] = t -> ~ dead_ckind k' -> 
           k = k' /\ c ~= @empty k.
 
   Definition only_trivial t k := 
-      forall t' { k'} (c : context k k'),  plug t' c = t -> ~ dead_ckind k' -> 
+      forall t' { k'} (c : context k k'),  c[t'] = t -> ~ dead_ckind k' -> 
           k = k' /\ c ~= @empty k \/ exists (v : value k'), t' = v.
 
 
@@ -252,13 +254,14 @@ Qed.*)
           try solve [contradict H0; apply ckind_death_propagation; auto];
           dep_subst; simpl in *;
       match goal with 
-      | [Hv : atom_plug ?t ?ec = _ ?v |- _] => 
+      | [Hv : ?ec :[ ?t ] = _ ?v |- _] => 
             destruct ec; destruct v; dependent_destruction2 Hv
       end;
       try solve [eexists; eauto | apply L | eexists (vCBot _); simpl; eauto ].
   Qed.
 
-  Lemma redex_trivial : forall k (r : redex k), only_trivial (redex_to_term r) k.
+
+  Lemma redex_trivial : forall k (r : redex k), only_trivial r k.
   Proof with auto.
     intros k1 r t k2 c; revert t.
     induction c.
@@ -269,8 +272,8 @@ Qed.*)
           try solve [contradict H0; apply ckind_death_propagation; auto];
           dep_subst; simpl in *;
       match goal with
-      | [Hvr : atom_plug ?t ?a = _ ?r |- _] => 
-            destruct a; destruct r; 
+      | [Hvr : ?ec :[ ?t ] = _ ?r |- _] => 
+            destruct ec; destruct r; 
             dependent_destruction2 Hvr
       end; simpl in *; 
       try solve [ intuition
@@ -281,6 +284,7 @@ Qed.*)
                 | eexists (vCBot _); simpl; eauto ].
   Qed.
 
+
   Lemma value_redex : forall k (v : value k) (r : redex k), 
                           value_to_term v <> redex_to_term r.
   Proof with auto.
@@ -289,9 +293,10 @@ Qed.*)
     intro H; discriminate H. 
   Qed.
 
+
   Lemma ot_subt : 
-      forall t t0 ec k, only_trivial t k -> atom_plug t0 ec = t -> ~ dead_ckind (k+>ec) ->
-          exists v : value (k+>ec), t0 = value_to_term v.
+      forall t t0 ec k, only_trivial t k -> ec:[t0] = t -> ~ dead_ckind (k+>ec) ->
+          exists v : value (k+>ec), t0 = v.
   Proof with auto.
     intros.
     destruct (H t0 _ (ec0 =: [_])) as [(H2, H3) | (v, H2)]...
@@ -318,14 +323,14 @@ Qed.*)
 
   Lemma plug_compose : forall k1 k2 k3 (c : context k1 k2) (c' : context k3 k1) 
                                (t : term), 
-                           plug t (compose c c') = plug (plug t c) c'.
+                           (c~+c')[t] = c'[c[t]].
   Proof.
     intros ? ? ?; induction c; intros.
     - auto.
     - apply IHc.
   Qed.
 
-Lemma L2 : forall t ec k, only_trivial (atom_plug t ec) k -> 
+Lemma L2 : forall t ec k, only_trivial ec:[t] k -> 
                           only_trivial t (k+>ec).
 Proof with eauto.
 intros.
@@ -338,9 +343,8 @@ Qed.
 
   Lemma trivial_val_red : 
       forall k t, only_trivial t k ->
-         (exists (v : value k), t = value_to_term v) \/
-         (exists (r : redex k), t = redex_to_term r).
-
+         (exists (v : value k), t = v) \/
+         (exists (r : redex k), t = r).
   Proof with auto.
     intros. revert k H.
     induction t; intros;
@@ -419,7 +423,7 @@ Module no_ECCa_Ref <: RED_REF_LANG.
 
   Definition dec_context ec k (v : value (k+>ec)) : interm_dec k :=
   match ec as ec0 return value (k+>ec0) -> interm_dec k with
-  | lam_c x  => match k as k0 return value (ckind_trans k0 (lam_c x)) -> interm_dec k0 with
+  | lam_c x  => match k as k0 return value (k0+>lam_c x) -> interm_dec k0 with
                 | C    => fun v => in_val (vCLam x v)
                 | ECa  => fun v => in_dead ECa (*val (vCBot (Lam x (value_to_term v)))*)
                 | CBot => fun v => in_dead CBot
@@ -451,7 +455,7 @@ Module no_ECCa_Ref <: RED_REF_LANG.
 
 
   Inductive subterm_one_step : term -> term -> Prop :=
-  | st_1 : forall t t0 ec, t = atom_plug t0 ec -> subterm_one_step t0 t.
+  | st_1 : forall t t0 ec, t = ec:[t0] -> subterm_one_step t0 t.
 
 
   Lemma wf_st1 : well_founded subterm_one_step.
@@ -467,7 +471,7 @@ Module no_ECCa_Ref <: RED_REF_LANG.
   Definition wf_sto : well_founded subterm_order := wf_clos_trans_l _ _ wf_st1.
 
 
-  Definition strict_ec ec t := exists t', atom_plug t' ec = t. 
+  Definition strict_ec ec t := exists t', ec:[t'] = t. 
 
   Definition ec_order (k : ckind) (t : term) (ec ec0 : elem_context) : Prop :=
       match k with
@@ -557,10 +561,10 @@ discriminate.
   Qed.
 
 
-  Lemma dec_term_correct : forall t k, match dec_term t k with
-    | in_red r      => redex_to_term r = t
-    | in_val v      => value_to_term v = t
-    | in_term t' ec => atom_plug t' ec = t
+  Lemma dec_term_correct : forall (t : term) k, match dec_term t k with
+    | in_red r      => t = r
+    | in_val v      => t = v
+    | in_term t' ec => t = ec:[t']
     | in_dead       => dead_ckind k 
     end.
   Proof.
@@ -569,9 +573,9 @@ discriminate.
 
 
   Lemma dec_context_correct : forall ec k v, match dec_context ec k v with
-    | in_red r      => redex_to_term r = atom_plug (value_to_term v) ec
-    | in_val v'     => value_to_term v' = atom_plug (value_to_term v) ec
-    | in_term t ec' => atom_plug t ec' = atom_plug (value_to_term v) ec
+    | in_red r      => ec:[v] = r
+    | in_val v'     => ec:[v] = v'
+    | in_term t ec' => ec:[v] = ec':[t]
     | in_dead       => dead_ckind (k+>ec)
     end.
   Proof.
@@ -613,7 +617,7 @@ discriminate.
 
   Lemma elem_context_det : 
       forall t k ec0 ec1,  k, t |~ ec0 << ec1 -> 
-          exists (v : value (k+>ec1)), t = atom_plug v ec1.
+          exists (v : value (k+>ec1)), t = ec1:[v].
   Proof.
     intros.
     destruct k, ec0, ec1; intuition;
@@ -630,7 +634,7 @@ discriminate.
 
   Lemma dec_context_red_bot : 
       forall k ec v r, dec_context ec k v = in_red r -> 
-          forall ec', ~ k, (atom_plug v ec) |~ ec' << ec.
+          forall ec', ~ k, ec:[v] |~ ec' << ec.
   Proof with auto.
     intros. destruct k, ec0; dependent destruction v; inversion H; intro G; destruct ec'; inversion G.
 
@@ -642,7 +646,7 @@ subst. simpl in *. inversion H0; destruct v0; discriminate.
 
   Lemma dec_context_val_bot : 
       forall k ec v v', dec_context ec k v = in_val v' -> 
-          forall ec', ~ k, (atom_plug v ec) |~ ec' << ec.
+          forall ec', ~ k, ec:[v] |~ ec' << ec.
   Proof.
     intros k ec v v' H ec' H0; 
     destruct k,ec; dependent destruction v; inversion H; destruct ec'; intuition.
@@ -666,7 +670,7 @@ subst. simpl in *. inversion H0; destruct v0; discriminate.
   Qed.
 
 
-  Lemma ec_order_antisym : forall k t (ec ec0 : elem_context), 
+  Lemma ec_order_antisym : forall k t ec ec0, 
       k, t |~ ec << ec0 -> ~ k, t |~ ec0 << ec.
   Proof.
     intros k t ec ec0 H.
@@ -705,9 +709,9 @@ subst. simpl in *. inversion H0; destruct v0; discriminate.
 
   Lemma dec_context_term_next : 
       forall ec0 k v t ec1, dec_context ec0 k v = in_term t ec1 -> 
-          k, (atom_plug v ec0) |~ ec1 << ec0 /\ 
-          forall ec,    k, (atom_plug v ec0) |~ ec  << ec0  ->  
-                      ~ k, (atom_plug v ec0) |~ ec1 << ec.
+          k, ec0:[v] |~ ec1 << ec0 /\ 
+          forall ec,    k, ec0:[v] |~ ec  << ec0  ->  
+                      ~ k, ec0:[v] |~ ec1 << ec.
   Proof with eauto.
     intros ec0 k v t ec1 H.
     destruct k, ec0, ec1; dependent destruction v; inversion H; subst;

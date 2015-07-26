@@ -26,7 +26,7 @@ Module RedRefSem (R : RED_REF_LANG) <: RED_REF_SEM R.R.
                dec t c d
   | d_term : forall t t0 {k1 k2} (c : context k1 k2) ec d,
                dec_term t k2 = in_term t0 ec ->
-               dec t0 (ccons ec c) d ->
+               dec t0 (ec=:c) d ->
                dec t c d
   with decctx : forall {k2}, value k2 -> forall {k1}, context k1 k2 -> decomp k1 -> Prop :=
   | dc_end  : forall {k} (v : value k), 
@@ -34,24 +34,25 @@ Module RedRefSem (R : RED_REF_LANG) <: RED_REF_SEM R.R.
                 decctx v [_] (d_val v)
   | dc_dec  : forall ec {k2} (v : value (k2+>ec)) {k1} (c : context k1 k2) r,
                 dec_context ec k2 v = in_red r ->
-                decctx v (ccons ec c) (d_red r c)
+                decctx v (ec=:c) (d_red r c)
   | dc_val  : forall {k2} (v0 : value k2) ec (v : value (k2+>ec)) 
                      {k1} (c  : context k1 k2) d,
                 dec_context ec k2 v = in_val v0 ->
                 decctx v0 c d ->
-                decctx v (ccons ec c) d
+                decctx v (ec=:c) d
   | dc_term : forall ec ec0 {k2} (v : value (k2+>ec)) 
                             {k1} (c : context k1 k2) t d,
                 dec_context ec k2 v = in_term t ec0 ->
-                dec t (ccons ec0 c) d ->
-                decctx v (ccons ec c) d.
+                dec t (ec0=:c) d ->
+                decctx v (ec=:c) d.
 
   Scheme dec_Ind := Induction for dec Sort Prop
-  with decctx_Ind := Induction for decctx Sort Prop.
+   with decctx_Ind := Induction for decctx Sort Prop.
 (*    
   Notation "a <| b" := (R.subterm_order a b) (at level 40, no associativity).
   Notation "k |~  a << b " := (R.ec_order k a b) (at level 40, no associativity).
 *)
+
 
   Lemma sto_trans : forall t t0 t1,  t <| t0  ->  t0 <| t1  ->  t <| t1.
   Proof with eauto.
@@ -62,16 +63,17 @@ Module RedRefSem (R : RED_REF_LANG) <: RED_REF_SEM R.R.
       + apply IHclos_trans_1n...
   Qed.
 
-  Lemma plug_le_eq : forall {k1 k2} (c : context k1 k2) t t0, plug t0 c = t -> 
+
+  Lemma plug_le_eq : forall {k1 k2} (c : context k1 k2) t t0, c[t0] = t -> 
                          t0 <| t \/ (c ~= @empty k1 /\ t = t0).
   Proof with eauto.
     intros k1 k2;
     induction c; intros.
     - simpl in H...
-    - left; simpl in H. 
-      destruct (IHc t (atom_plug t0 ec)). 
+    - left; simpl in H.
+      destruct (IHc t ec:[t0]). 
       + eauto.
-      + apply t1n_trans with (y := atom_plug t0 ec).
+      + apply t1n_trans with (y := ec:[t0]).
         * econstructor... 
         * assumption. 
       + destruct H0. 
@@ -81,7 +83,7 @@ Module RedRefSem (R : RED_REF_LANG) <: RED_REF_SEM R.R.
 
 
   Lemma st_c : forall t0 t1, t0 <| t1 -> 
-                   forall k1, exists k2 (c : context k1 k2), plug t0 c = t1.
+                   forall k1, exists k2 (c : context k1 k2), c[t0] = t1.
   Proof with eauto.
     intros t0 t1 H k1;
     induction H; intros.
@@ -193,9 +195,9 @@ Qed.
     dependent destruction H0;
         assert (hh := dec_term_correct v k2); rewrite H0 in hh.
 
-    - symmetry in hh; contradiction (value_redex _ _ hh).
+    - contradiction (value_redex _ _ hh).
 
-    - rewrite <- (value_to_term_injective _ _ hh)...
+    - rewrite (value_to_term_injective _ _ hh)...
 
     - destruct (value_trivial v t0 _ (ec=:[_])); auto;
           try solve [eapply dec_term_liveness; eassumption];
@@ -224,7 +226,7 @@ Qed.
         - assert (~ dead_ckind (k2+>ec1)).
           {
               destruct ec_order_comp_fi with k2 v ec1 ec as (?, (?, (?, ?)))...
-              - rewrite <- hh; eapply dec_context_term_next...
+              - rewrite hh; eapply dec_context_term_next...
           }
 
           destruct (value_trivial v t _ (ec1=:[_])); auto;
@@ -233,7 +235,7 @@ Qed.
               destruct H5.
           + discriminateJM H6.
           + eapply (H0 ec1); eauto.
-            * rewrite <- hh; apply (dec_context_term_next _ _ _ _ _ H3).
+            * rewrite hh; apply (dec_context_term_next _ _ _ _ _ H3).
             * congruence.
         }
   Qed.
@@ -249,7 +251,7 @@ Qed.
     assert (hh := dec_term_correct v k2);
     destruct i; rewrite <- Heqi in hh; symmetry in Heqi.
 
-    - symmetry in hh; contradict (value_redex _ _ hh).
+    - contradict (value_redex _ _ hh).
 
     - assert (H1 := value_to_term_injective _ _ hh); subst; econstructor...
 
@@ -283,7 +285,7 @@ Qed.
         - assert (~ dead_ckind (k2+>e0)).
           {
               destruct ec_order_comp_fi with k2 v e0 e as (?, (?, (?, ?)))...
-              - rewrite <- hh; eapply dec_context_term_next...
+              - rewrite hh; eapply dec_context_term_next...
           }
 
           destruct (value_trivial v t0 _ (e0=:[_]));
@@ -294,8 +296,9 @@ Qed.
 
           + apply dc_term with e0 t0...
             apply (H1 e0) with x0...
-            * rewrite <- hh; apply (dec_context_term_next _ _ _ _ _ Heqi).
+            * rewrite hh; apply (dec_context_term_next _ _ _ _ _ Heqi).
             * congruence.
+
         - intuition.
       }
 
@@ -305,10 +308,9 @@ Qed.
 
   Module RS : RED_SEM R.R with Definition dec := dec.
 
-    Lemma decompose : forall t k1, ~ dead_ckind k1 ->
-      (exists (v : value k1), t = value_to_term v) \/
-      (exists k2 (r : redex k2) (c : context k1 k2), plug r c = t).
-
+    Lemma decompose : forall (t : term) k1, ~ dead_ckind k1 ->
+      (exists (v : value k1), t = v) \/
+      (exists k2 (r : redex k2) (c : context k1 k2), c[r] = t).
     Proof with eauto.
       induction t using (well_founded_ind wf_sto); intros.
 
@@ -322,7 +324,7 @@ Qed.
 
       - destruct (H t0) with (k1 := k1+>e) as [(v, Hv) | (k2, (r, (c, Hrc)))].
             repeat econstructor...
-            eapply R.dec_term_liveness... 
+            eapply dec_term_liveness... 
 
         * { subst t0.
           assert (~ dead_ckind (k1+>e)) as Hndk.
@@ -331,7 +333,7 @@ Qed.
           induction e using (well_founded_ind (wf_eco k1 t)); intros.
 
           remember (dec_context e _ v); assert (ht := dec_context_correct e _ v); 
-          destruct i; rewrite <- Heqi in ht; try rewrite hh in ht.
+          destruct i; rewrite <- Heqi in ht; try rewrite <- hh in ht.
 
           - right; exists k1; exists r; eexists [_]...
 
@@ -347,7 +349,7 @@ Qed.
               subst t0.
               assert (~ dead_ckind (k1+>e0)) as Hndk2.
                 { eapply dec_context_not_dead... }
-              rewrite hh in H2.
+              rewrite <- hh in H2.
               destruct (H1 e0 H2 Hndk2 v0 ht) as [(v1, Hv1) | (k2, (r, (c, Hrc)))].
               * left; exists v1...
               * right; exists k2; exists r; exists c...
@@ -375,13 +377,13 @@ Qed.
       destruct i;
           assert (hh := dec_term_correct r k);
           rewrite <- Heqi in hh; 
-          simpl in hh.
+          simpl in hh; try symmetry in hh.
 
       - apply redex_to_term_injective in hh; subst; constructor...
 
       - contradict hh; apply value_redex.
 
-      - symmetry in Heqi; assert (H0 := dec_term_term_top _ _ _ _ Heqi).        
+      - symmetry in Heqi; assert (H0 := dec_term_term_top _ _ _ _ Heqi).
         assert (~ dead_ckind (k+>e)) as Hndk.
           { eapply dec_term_liveness... } 
         econstructor 3...
@@ -403,18 +405,19 @@ Qed.
             apply redex_to_term_injective in ht; subst.
             constructor...
 
-          - rewrite <- ht in hh; contradiction (value_redex _ _ hh).
+          - rewrite ht in hh; contradiction (value_redex _ _ hh).
 
           - econstructor 4...
-            rewrite hh in ht.
+            rewrite ht in hh.
             assert (~ dead_ckind (k+>e0)).
               { eapply dec_context_not_dead... }
-            destruct (redex_trivial r t _ (e0=:[_]) ht) as [(H4, H5) | (v1, H4)]...
+            destruct (redex_trivial r t _ (e0=:[_]) hh) as [(H4, H5) | (v1, H4)]...
             + discriminateJM H5.
             + subst t.
               destruct (dec_context_term_next _ _ _ _ _ Heqi). 
               apply H0...
-              * rewrite <- hh...
+              * congruence.
+
           - intuition. 
           }
 
@@ -462,8 +465,8 @@ Qed.
         forall t {k1 k2} (c : context k1 k2) d, dec t c d -> (d : term) = plug t c.
     Proof.
       induction 1 using dec_Ind with
-      (P := fun t _ _ c d (_ : dec t c d)     => (d : term) = plug t c)
-      (P0:= fun _ v _ c d (_ : decctx v c d)  => (d : term) = plug v c);
+      (P := fun t _ _ c d (_ : dec t c d)     => (d : term) = c[t])
+      (P0:= fun _ v _ c d (_ : decctx v c d)  => (d : term) = c[v]);
 
       simpl; auto;
       match goal with
@@ -472,7 +475,7 @@ Qed.
       end;
       rewrite e in hh;
       try rewrite IHdec;
-      rewrite <- hh;
+      rewrite hh;
       subst;
       reflexivity.
     Qed.
@@ -493,7 +496,7 @@ Qed.
 
 
     Lemma dec_plug : forall {k1 k2} (c : context k1 k2) {k3} (c0 : context k3 k1) t d, 
-                         ~ dead_ckind k2 -> dec (plug t c) c0 d -> dec t (c~+c0) d.
+                         ~ dead_ckind k2 -> dec c[t] c0 d -> dec t (c~+c0) d.
     Proof with eauto.
       induction c; intros; simpl.
       - trivial.
@@ -502,7 +505,7 @@ Qed.
         [ | apply (context_tail_liveness _ _ H) ].
         inversion H0; subst;
             clear H0;
-            assert (hh := dec_term_correct (atom_plug t ec) k2); 
+            assert (hh := dec_term_correct (ec:[t]) k2); 
             rewrite H6 in hh.
 
         * destruct (dec_term_red_empty _ _ _ H6 t _ (ec=:[_]))...
@@ -512,7 +515,7 @@ Qed.
           discriminateJM H3.
 
         * dependent destruction H2.
-          destruct ec_order_comp_if with (atom_plug t ec) ec0 ec k2 as [H2 | [H2 | H2]].
+          destruct ec_order_comp_if with ec:[t] ec0 ec k2 as [H2 | [H2 | H2]].
               compute...
               compute...
               eapply dec_term_liveness...
@@ -524,76 +527,76 @@ Qed.
             subst t1.
             {
                 clear H6; generalize dependent v; generalize dependent ec0.
-                induction ec0 using (well_founded_ind (wf_eco k2 (atom_plug t ec))); 
-                    intros.
+                induction ec0 using (well_founded_ind (wf_eco k2 ec:[t])); intros.
                 
                 assert (H3 := dec_val _ H7).
                 dependent destruction H3;
                 inversion_ccons x.
-                - rewrite hh in H2; 
+                - rewrite <- hh in H2; 
                   contradiction (dec_context_red_bot _ _ _ _ H1 _ H2).
-                - rewrite hh in H2; 
+                - rewrite <- hh in H2; 
                   contradiction (dec_context_val_bot _ _ _ _ H1 _ H2).
                 - assert (ht := dec_context_correct ec0 _ v).
-                  rewrite H1 in ht. 
-                  rewrite <- hh in ht.
+                  rewrite H1 in ht.
+                  rewrite hh in ht.
                   destruct (dec_context_term_next _ _ _ _ _ H1).
-                  destruct ec_order_comp_if with (atom_plug t ec) ec2 ec k2 
+                  destruct ec_order_comp_if with ec:[t] ec2 ec k2 
                                               as [H6 | [H6 | H6]].
                       compute...
                       compute...
                       assert (H6 := ec_order_comp_fi _ _ _ _ H4); intuition.
                       assert (H6 := ec_order_comp_fi _ _ _ _ H2); intuition.
 
-                  * contradiction (H5 ec); rewrite <- hh...
-                  * symmetry in ht.
+                  + contradiction (H5 ec); rewrite hh...
+                  + symmetry in ht.
                     destruct (elem_context_det2 _ _ _ _ H6 t0) as (v1, h4)...
                     subst t0.
                     apply H0 with ec2 v1...
-                      { rewrite hh... }
-                  * subst; assert (H8 := atom_plug_injective1 _ _ _ ht).
+                      { congruence. }
+                  + subst; assert (H8 := atom_plug_injective1 _ _ _ ht).
                     subst...
             }
+
           + subst; assert (H8 := atom_plug_injective1 _ _ _ hh).
             subst...
     Qed.
 
 
     Lemma dec_plug_rev : forall {k1 k2} (c : context k1 k2) {k3} (c0 : context k3 k1) t d, 
-                             ~ dead_ckind k2 -> dec t (c~+c0) d -> dec (plug t c) c0 d.
+                             ~ dead_ckind k2 -> dec t (c~+c0) d -> dec c[t] c0 d.
     Proof with eauto.
       induction c; intros; simpl.
       - trivial.
 
       - apply IHc; clear IHc.
         eapply context_tail_liveness...
-        remember (dec_term (atom_plug t ec) k2) as i.
+        remember (dec_term ec:[t] k2) as i.
         destruct i;
         assert (hh := dec_term_correct (atom_plug t ec) k2);
         rewrite <- Heqi in hh;
         symmetry in Heqi.
 
-        * destruct (dec_term_red_empty _ _ _ Heqi t _ (ec=:[_]))...
+        + destruct (dec_term_red_empty _ _ _ Heqi t _ (ec=:[_]))...
           discriminateJM H2.
 
-        * destruct (dec_term_val_empty _ _ _ Heqi t _ (ec=:[_]))...
+        + destruct (dec_term_val_empty _ _ _ Heqi t _ (ec=:[_]))...
           discriminateJM H2.
 
-        * destruct ec_order_comp_if with (atom_plug t ec) e ec k2 as [H1 | [H1 | H1]].
+        + destruct ec_order_comp_if with ec:[t] e ec k2 as [H1 | [H1 | H1]].
               compute...
               compute...
               apply (dec_term_liveness Heqi).
               assumption.
 
-          + contradict (dec_term_term_top _ _ _ _ Heqi _ H1).
+          * contradict (dec_term_term_top _ _ _ _ Heqi _ H1).
 
-          + symmetry in hh.
+          * symmetry in hh.
             destruct (elem_context_det2 _ _ _ _ H1 t0) as (v, H2)...
             subst t0.
             econstructor 3; eauto.
             {
               clear H Heqi; generalize dependent v; generalize dependent e.
-              induction e using (well_founded_ind (wf_eco k2 (atom_plug t ec))); intros.
+              induction e using (well_founded_ind (wf_eco k2 ec:[t])); intros.
 
               apply val_dec.
               remember (dec_context e _ v).
@@ -602,41 +605,44 @@ Qed.
                   assert (ht := dec_context_correct e _ v); 
                   rewrite Heqi in ht.
 
-              - rewrite hh in H1;
+              - rewrite <- hh in H1;
                 contradiction (dec_context_red_bot _ _ _ _ Heqi _ H1).
-              - rewrite hh in H1;
+              - rewrite <- hh in H1;
                 contradiction (dec_context_val_bot _ _ _ _ Heqi _ H1).
               - destruct (dec_context_term_next _ _ _ _ _ Heqi) as (H3, H4).
                 econstructor 4...
-                rewrite <- hh in ht.
-                destruct ec_order_comp_if with (atom_plug t ec) e0 ec k2 
-                                            as [H5 | [H5 | H5]].
+                rewrite hh in ht.
+                destruct ec_order_comp_if with ec:[t] e0 ec k2 as [H5 | [H5 | H5]].
                     compute...
                     compute...
                     apply (ec_order_comp_fi _ _ _ _ H3).
                     apply (ec_order_comp_fi _ _ _ _ H1).
 
-                * rewrite hh in H1; 
+                + rewrite <- hh in H1; 
                   contradiction (H4 ec H1). 
-                  rewrite <- hh...
-                * symmetry in ht; clear H4. 
+                  congruence.
+                + symmetry in ht; clear H4. 
                   destruct (elem_context_det2 _ _ _ _ H5 t0) as (v0, H6)...
                   subst t0.
                   apply H...
-                    { rewrite hh... }
-                * subst.
+                    { congruence. }
+                + subst.
                   assert (H5 := atom_plug_injective1 _ _ _ ht).
                   subst...
+
               - contradict ht.
                 eapply ec_order_comp_fi...
             }
-          + subst.
+
+          * subst.
             assert (H5 := atom_plug_injective1 _ _ _ hh).
             subst.
             econstructor 3...
-        * contradict H...
+
+        + contradict H...
           apply ckind_death_propagation...
     Qed.
+
 (*
 Lemma des_decctx : forall k2 v k1 c d P, @decctx k2 v k1 c d -> 
 
@@ -713,9 +719,7 @@ discriminate Hc3. *)
   Inductive iter : forall {k}, decomp k -> value k -> Prop :=
   | i_val : forall {k} (v : value k), iter (d_val v) v
   | i_red : forall {k} (r : redex k) t {k'} (c : context k' k) d v,
-                contract r = Some t -> 
-                decempty (plug t c) d -> 
-                iter d v ->
+                contract r = Some t -> decempty c[t] d -> iter d v ->
                 iter (d_red r c) v.
 
   Inductive eval : term -> forall {k}, value k -> Prop :=
@@ -810,13 +814,13 @@ Module Red_Sem_Proper (R : RED_LANG) (RS : RED_REF_SEM R) : RED_SEM_PROPER R RS.
 
 
   Lemma dec_correct : forall {t k1 k2} {c : context k1 k2} {d}, 
-                          dec t c d -> decomp_to_term d = plug t c.
+                          dec t c d -> decomp_to_term d = c[t].
   Proof.
     induction 1 using dec_Ind with
     (P := fun t _ _ c d (H : dec t c d) => 
-              decomp_to_term d = plug t c)
+              decomp_to_term d = c[t])
     (P0:= fun P_ v _ c d (H:RS.decctx v c d) => 
-              decomp_to_term d = plug v c);
+              decomp_to_term d = c[v]);
     simpl; auto;
 
     try solve 
@@ -825,7 +829,7 @@ Module Red_Sem_Proper (R : RED_LANG) (RS : RED_REF_SEM R) : RED_SEM_PROPER R RS.
     | assert (hh := dec_context_correct ec k2 v); rewrite e in hh; simpl in hh; 
       try rewrite IHdec;
       try (contradiction hh); 
-      rewrite <- hh; auto ].
+      rewrite hh; auto ].
   Qed.
 
 
@@ -845,9 +849,9 @@ Module Red_Sem_Proper (R : RED_LANG) (RS : RED_REF_SEM R) : RED_SEM_PROPER R RS.
 
       (exists v : value k1, value_to_term v = t) \/ 
 
-      (exists k2 (r : redex k2) (c : context k1 k2),  plug r c = t /\ 
+      (exists k2 (r : redex k2) (c : context k1 k2),  c[r] = t /\ 
 	  forall k2' (r0 : redex k2') (c0 : context k1 k2'), 
-              plug r0 c0 = t -> k2' = k2 /\ r ~= r0 /\ c ~= c0).
+              c0[r0] = t -> k2' = k2 /\ r ~= r0 /\ c ~= c0).
 
   Proof with eauto.
     intros.

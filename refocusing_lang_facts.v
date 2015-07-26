@@ -60,7 +60,7 @@ Module RED_LANG_Facts (R : RED_LANG).
       end.
 
 
-  Lemma plug_empty : forall t k, plug t (@empty k) = t.
+  Lemma plug_empty : forall t k, (@empty k)[t] = t.
   Proof.
     intuition.
   Qed.
@@ -76,7 +76,7 @@ Module RED_LANG_Facts (R : RED_LANG).
 
   Lemma plug_compose  : 
       forall {k1 k2 k3} (c0 : context k1 k2) (c1 : context k3 k1) t, 
-          plug t (c0 ~+ c1) = plug (plug t c0) c1.
+          (c0 ~+ c1)[t] = c1[c0[t]].
   Proof.
     induction c0; intros.
     - trivial.

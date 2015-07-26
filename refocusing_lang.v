@@ -11,8 +11,6 @@ Module Type RED_LANG.
   Notation "k +> ec" := (ckind_trans k ec) (at level 50, left associativity).
   Parameter  init_ckind : ckind.
   Parameter  dead_ckind : ckind -> Prop.
-(*  Definition ckind_L := { k : ckind | ~ dead_ckind k }.
-  Coercion ckind_L2any (kL : ckind_L) := proj1_sig kL.*)
 
   Axiom ckind_death_propagation : 
       forall k, dead_ckind k -> forall ec, dead_ckind (k+>ec).
@@ -51,6 +49,7 @@ Module Type RED_LANG.
 
 
   Parameter atom_plug : term -> elem_context -> term.
+  Notation "ec :[ t ]" := (atom_plug t ec) (at level 0).
 
   Axiom atom_plug_injective1 : forall t0 t1 ec,
       atom_plug t0 ec = atom_plug t1 ec -> t0 = t1.
@@ -58,25 +57,25 @@ Module Type RED_LANG.
   Fixpoint plug (t : term) {k1 k2} (c : context k1 k2) : term :=
       match c with
       | [_]    => t 
-      | ec=:c' => plug (atom_plug t ec) c'
+      | ec=:c' => plug ec:[t] c'
       end.
-
+  Notation "c [ t ]" := (plug t c) (at level 0).
 
   (** The other main function of reduction semantics -- contraction of a redex into a term *)
   Parameter contract : forall {k}, redex k -> option term.
 
 
-  Definition transitable_from k ec := ~ dead_ckind (k+>ec).
+(*  Definition transitable_from k ec := ~ dead_ckind (k+>ec).
   Definition ec_siblings ec0 ec1 := 
-      exists t0 t1, atom_plug t0 ec0 = atom_plug t1 ec1.
+      exists t0 t1, atom_plug t0 ec0 = atom_plug t1 ec1.*)
 
   Definition only_empty t k := 
-      forall t' {k'} (c : context k k'), plug t' c = t -> ~ dead_ckind k' -> 
+      forall t' {k'} (c : context k k'), c[t'] = t -> ~ dead_ckind k' -> 
           k = k' /\ c ~= @empty k.
 
   Definition only_trivial t k := 
-      forall t' {k'} (c : context k k'), plug t' c = t -> ~ dead_ckind k' -> 
-          k = k' /\ c ~= @empty k \/ exists (v : value k'), t' = value_to_term v.
+      forall t' {k'} (c : context k k'), c[t'] = t -> ~ dead_ckind k' -> 
+          k = k' /\ c ~= @empty k \/ exists (v : value k'), t' = v.
 
 
   Axiom value_trivial : forall {k} (v : value k), only_trivial v k.
@@ -85,8 +84,8 @@ Module Type RED_LANG.
                             value_to_term v <> redex_to_term r.
   Axiom trivial_val_red : 
       forall k t, only_trivial t k ->
-         (exists (v : value k), t = value_to_term v) \/
-         (exists (r : redex k), t = redex_to_term r).
+         (exists (v : value k), t = v) \/
+         (exists (r : redex k), t = r).
 
 
   (** Datatype of decompositions -- either a value or a redex in a context 
@@ -97,10 +96,10 @@ Module Type RED_LANG.
 
   Arguments d_val {k} _. Arguments d_red {k} {k'} _ _.
 
-  Definition decomp_to_term {k} (d : decomp k) : term :=
+  Definition decomp_to_term {k} (d : decomp k) :=
       match d with
       | d_val v      => value_to_term v
-      | d_red _ r c0 => plug r c0
+      | d_red _ r c0 => c0[r]
       end.
   Coercion decomp_to_term : decomp >-> term.
 
@@ -134,7 +133,7 @@ Module Type RED_REF_LANG.
 
 
   Inductive subterm_one_step : term -> term -> Prop :=
-  | st_1 : forall t t0 ec, t = atom_plug t0 ec -> subterm_one_step t0 t.
+  | st_1 : forall t t0 ec, t = ec:[t0] -> subterm_one_step t0 t.
   Axiom wf_st1 : well_founded subterm_one_step.
 
 
@@ -167,31 +166,31 @@ Module Type RED_REF_LANG.
             dec_term t k = in_term t' ec -> forall ec', ~ k, t |~ ec << ec'.
   Axiom dec_context_red_bot : 
       forall k ec v r, dec_context ec k v = in_red r -> 
-          forall ec', ~ k, (atom_plug v ec) |~ ec' << ec.
+          forall ec', ~ k, ec:[v] |~ ec' << ec.
   Axiom dec_context_val_bot : 
       forall k ec v v', dec_context ec k v = in_val v' -> 
-          forall ec', ~ k, (atom_plug v ec) |~ ec' << ec.
+          forall ec', ~ k, ec:[v] |~ ec' << ec.
   Axiom dec_context_term_next : 
       forall ec0 k v t ec1, dec_context ec0 k v = in_term t ec1 -> 
           k, (atom_plug v ec0) |~ ec1 << ec0 /\ 
-          forall ec,    k, (atom_plug v ec0) |~ ec  << ec0  ->  
-                      ~ k, (atom_plug v ec0) |~ ec1 << ec.
+          forall ec,    k, ec0:[v] |~ ec  << ec0  ->  
+                      ~ k, ec0:[v] |~ ec1 << ec.
   (*Axiom dec_term_ec_most_transitable : forall {t0 ec0 t1 ec1 k},
       transitable_from k ec1 ->
       dec_term (atom_plug t1 ec1) k = in_term t0 ec0 ->
       transitable_from k ec0.*)
 
   Axiom dec_term_correct : forall t k, match dec_term t k with
-      | in_red r      => redex_to_term r = t
-      | in_val v      => value_to_term v = t
-      | in_term t' ec => atom_plug t' ec = t
+      | in_red r      => t = r
+      | in_val v      => t = v
+      | in_term t' ec => t = ec:[t']
       | in_dead       => dead_ckind k 
       end.
 
   Axiom dec_context_correct : forall ec k v, match dec_context ec k v with
-      | in_red r      => redex_to_term r = atom_plug v ec
-      | in_val v'     => value_to_term v' = atom_plug v ec
-      | in_term t ec' => atom_plug t ec' = atom_plug v ec
+      | in_red r      => ec:[v] = r
+      | in_val v'     => ec:[v] = v'
+      | in_term t ec' => ec:[v] = ec':[t]
       | in_dead       => dead_ckind (k+>ec) 
       end.
 
@@ -201,7 +200,7 @@ Module Type RED_REF_LANG.
   Axiom dec_context_from_dead : 
       forall ec k v, dead_ckind (k+>ec) -> dec_context ec k v = in_dead k.
 
-  Definition strict_ec ec t := exists t', atom_plug t' ec = t. 
+  Definition strict_ec ec t := exists t', ec:[t'] = t. 
 
   Axiom ec_order_antisym : forall k t ec ec0, 
       k,t |~ ec << ec0 -> ~ k,t |~ ec0 << ec.

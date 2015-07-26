@@ -105,23 +105,3 @@ Module RED_LANG_Facts (R : RED_LANG).
   Qed.
 
 End RED_LANG_Facts.
-
-
-Module RED_REF_LANG_Facts (R : RED_REF_LANG).
-
-  Import R.R.
-  Import R.
-
-  Lemma elem_context_det2 : 
-      forall t k ec0 ec1,  k, t |~ ec0 << ec1 -> 
-          forall t1,  atom_plug t1 ec1 = t ->
-              exists (v : value (k+>ec1)), t1 = v.
-  Proof with eauto.
-    intros.    
-    destruct (elem_context_det _ _ _ _ H).
-    exists x.
-    eapply atom_plug_injective1.
-    etransitivity...
-  Qed.
-
-End RED_REF_LANG_Facts.

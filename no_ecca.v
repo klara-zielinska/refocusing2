@@ -152,8 +152,8 @@ Module no_ECCa <: RED_LANG.
   Notation "ec :[ t ]" := (atom_plug t ec) (at level 0).
 
 
-  Lemma atom_plug_injective1 : forall t0 t1 ec,
-      atom_plug t0 ec = atom_plug t1 ec -> t0 = t1.
+  Lemma atom_plug_injective1 : forall ec {t0 t1},
+      ec:[t0] = ec:[t1] -> t0 = t1.
   Proof.
     intros.
     destruct ec0; injection H; trivial.
@@ -166,6 +166,9 @@ Module no_ECCa <: RED_LANG.
       | ec=:c' => plug (atom_plug t ec) c'
       end.
   Notation "c [ t ]" := (plug t c) (at level 0).
+
+
+  Definition strict_ec ec t := exists t', ec:[t'] = t. 
 
 
 (*  Definition transitable_from k ec := ~ dead_ckind (k+>ec).
@@ -219,6 +222,7 @@ Module no_ECCa <: RED_LANG.
       | d_val v => value_to_term v
       | d_red _ r c0 => c0[r]
       end.
+  Coercion decomp_to_term : decomp >-> term.
 
   Definition only_empty t k := 
       forall t' {k'} (c : context k k'), c[t'] = t -> ~ dead_ckind k' -> 
@@ -471,8 +475,6 @@ Module no_ECCa_Ref <: RED_REF_LANG.
   Definition wf_sto : well_founded subterm_order := wf_clos_trans_l _ _ wf_st1.
 
 
-  Definition strict_ec ec t := exists t', ec:[t'] = t. 
-
   Definition ec_order (k : ckind) (t : term) (ec ec0 : elem_context) : Prop :=
       match k with
       | CBot => False
@@ -554,10 +556,10 @@ discriminate.
   Qed.
 
 
-  Lemma dec_term_term_top : forall t t' k ec, 
+  Lemma dec_term_term_top : forall t k {t' ec}, 
             dec_term t k = in_term t' ec -> forall ec', ~ k, t |~ ec << ec'.
   Proof.
-    intros t t' k ec H ec' H0; destruct k, t; inversion H; subst; destruct ec'; inversion H0.
+    intros t k t' ec H ec' H0; destruct k, t; inversion H; subst; destruct ec'; inversion H0.
   Qed.
 
 
@@ -616,18 +618,20 @@ discriminate.
 
 
   Lemma elem_context_det : 
-      forall t k ec0 ec1,  k, t |~ ec0 << ec1 -> 
-          exists (v : value (k+>ec1)), t = ec1:[v].
+      forall t ec {t'}, t = ec:[t'] -> 
+          forall k ec',  k, t |~ ec' << ec -> 
+              exists (v : value (k+>ec)), t' = v.
   Proof.
     intros.
-    destruct k, ec0, ec1; intuition;
+    destruct k, ec0, ec'; intuition;
     (
-        destruct H as ((t1, H1), (t2, H2));
+        destruct H0 as ((t1, H1), (t2, H2));
         destruct (L v) as (x, H0);
         exists x;
-        rewrite <- H1 in *;
-        inversion H2; subst;
-        simpl; f_equal; auto
+        subst;
+        inversion H1;
+        subst;
+        assumption
     ).
   Qed.
 
@@ -755,7 +759,7 @@ subst. simpl in *. inversion H0; destruct v0; discriminate.
   Qed.*)
 
 
-  Lemma dec_term_liveness : 
+  Lemma dec_term_next_alive : 
       forall t k t0 ec0, dec_term t k = in_term t0 ec0 -> ~ dead_ckind (k+>ec0).
   Proof.
     intros.
@@ -913,8 +917,8 @@ Module no_ECCa_Sem <: RED_SEM no_ECCa.
   Qed.
 
   Lemma decompose : forall (t : term) k1, ~ dead_ckind k1 ->
-      (exists (v : value k1), t = value_to_term v) \/
-      (exists k2 (r : redex k2) (c : context k1 k2), plug (redex_to_term r) c = t).
+      (exists (v : value k1), t = v) \/
+      (exists k2 (r : redex k2) (c : context k1 k2), t = c[r]).
   Proof with auto with no_ecca.
     induction t; intros.
     - destruct IHt1 with ECa as [(v1, H1) | (k2, (r1, (c1, H1)))]; auto;
@@ -963,12 +967,12 @@ Module no_ECCa_Sem <: RED_SEM no_ECCa.
     Qed.
 
   (** dec is left inverse of plug *)
-  Lemma dec_correct : forall t k1 k2 (c : context k1 k2) d, dec t c d -> 
-                          decomp_to_term d = plug t c.
+  Lemma dec_correct : forall {t k1 k2} {c : context k1 k2} {d}, 
+                          dec t c d -> c[t] = d.
   Proof.
     induction 1 using dec_Ind with
-    (P := fun t _ _ c d (H:dec t c d) => decomp_to_term d = plug t c)
-    (P0 := fun _ v _ c d (H:decctx v c d) => decomp_to_term d = plug (value_to_term v) c);
+    (P := fun t _ _ c d (H:dec t c d) => c[t] = d)
+    (P0 := fun _ v _ c d (H:decctx v c d) => c[v] = d);
     intros; simpl; auto.
   Qed.
 
@@ -1015,6 +1019,7 @@ Module no_ECCa_Sem <: RED_SEM no_ECCa.
   | e_intro : forall t {k} (d : decomp k) v, decempty t d -> iter d v -> eval t v.
 
 End no_ECCa_Sem.
+
 
 Lemma dec_sem_ref : forall t k1 k2 (c : no_ECCa.context k1 k2) d, 
                         no_ECCa_Sem.dec t c d -> no_ECCa_REF_SEM.dec t c d.

@@ -1153,3 +1153,125 @@ Module StagedAbstractMachine (R : RED_LANG) (RS : RED_REF_SEM R) <: STAGED_ABSTR
   Definition dec_context_correct := RS.dec_context_correct.
 
 End StagedAbstractMachine.
+
+
+
+Module EvalApplyMachine (R : RED_LANG) (RS : RED_REF_SEM R) <: EVAL_APPLY_MACHINE R.
+
+  Import R.
+  Import RS.
+
+  Module SAM := StagedAbstractMachine R RS.
+
+
+  Inductive dec : term -> forall {k1 k2}, context k1 k2 -> value k1 -> Prop :=
+  | d_d_r  : forall t {t0 k1 k2} {c : context k1 k2} {r v},
+               dec_term t k2 = in_red r -> contract r = Some t0 -> dec t0 c v ->
+               dec t c v
+  | d_v    : forall t {k1 k2} {c : context k1 k2} {v v0},
+               dec_term t k2 = in_val v -> decctx v c v0 ->
+               dec t c v0
+  | d_term : forall t {t0 ec k1 k2} {c : context k1 k2} {v},
+               dec_term t k2 = in_term t0 ec -> dec t0 (ec=:c) v ->
+               dec t c v
+
+  with decctx : forall {k2}, value k2 -> forall {k1}, context k1 k2 -> value k1 -> Prop :=
+  | dc_end : forall {k} (v : value k), 
+               ~ dead_ckind k ->
+               decctx v [_] v
+  | dc_red : forall ec {k2} (v : value (k2+>ec)) {k1} {c : context k1 k2} {r t v0},
+               dec_context ec k2 v = in_red r -> contract r = Some t -> dec t c v0 ->
+               decctx v (ec=:c) v0
+  | dc_rec : forall ec {k2} (v : value (k2+>ec)) {k1} {c : context k1 k2} {v0 v1},
+               dec_context ec k2 v = in_val v0 -> decctx v0 c v1 ->
+               decctx v (ec=:c) v1
+  | dc_trm : forall ec {k2} (v : value (k2+>ec)) {k1} {c : context k1 k2} {t ec0 v0},
+               dec_context ec k2 v = in_term t ec0 -> dec t (ec0=:c) v0 ->
+               decctx v (ec=:c) v0.
+
+  Scheme dec_Ind := Induction for dec Sort Prop
+    with decctx_Ind := Induction for decctx Sort Prop.
+
+
+  Inductive eval : term -> forall {k}, value k -> Prop :=
+  | e_intro : forall {t k} {v : value k}, dec t [_] v -> eval t v.
+
+
+  Lemma decSamEam : forall {t k1 k2} {c : context k1 k2} {v}, SAM.dec t c v -> dec t c v.
+  Proof with eauto.
+    induction 1 using SAM.dec_Ind with
+    (P := fun t _ _ c v  (_ : SAM.dec t c v)     => dec t c v)
+    (P0:= fun _ v _ c v' (_ : SAM.decctx v c v') => decctx v c v')
+    (P1:= fun k d v      (_ : SAM.iter d v)      => 
+              match d with
+              | d_val v'    => ~ dead_ckind k -> decctx v [_] v'
+              | d_red _ r c => forall t, contract r = Some t -> dec t c v
+              end);
+    simpl; intros.
+
+    (* Case 1 *)
+    dependent destruction i; subst; econstructor 1...
+    (* Case 2 *)
+    econstructor 2...
+    (* Case 3 *)
+    econstructor 3...
+    (* Case 4 *)
+    assert (IHdec' := IHdec n).
+    dependent destruction IHdec'; subst; constructor...
+    (* Case 5 *)
+    dependent destruction i; econstructor 2...
+    (* Case 6 *)
+    econstructor 3...
+    (* Case 7 *)
+    econstructor 4...
+    (* Case 8 *)
+    constructor...
+    (* Case 9 *)
+    rewrite e in H0; inversion H0; subst...
+  Qed.
+
+
+  Lemma evalSamEam : forall {t k} {v : value k}, SAM.eval t v -> eval t v.
+  Proof.
+    intros; dependent destruction H; constructor; apply decSamEam; auto.
+  Qed.
+  Hint Resolve evalSamEam.
+
+
+  Lemma decEamSam : forall {t k1 k2} {c : context k1 k2} {v}, dec t c v -> SAM.dec t c v.
+  Proof with eauto.
+    induction 1 using dec_Ind with
+    (P := fun t _ _ c v  (_ : dec t c v)     => SAM.dec t c v)
+    (P0:= fun _ v _ c v' (_ : decctx v c v') => SAM.decctx v c v'); 
+    intros; simpl.
+
+    econstructor 1; try econstructor...
+    econstructor 2...
+    econstructor 3...
+    repeat constructor...
+    econstructor 2; try econstructor 2...
+    econstructor 3...
+    econstructor 4...
+  Qed.
+
+
+  Lemma evalEamSam : forall {t k} {v : value k}, eval t v -> SAM.eval t v.
+  Proof.
+    intros; dependent destruction H; constructor; apply decEamSam; auto.
+  Qed.
+  Hint Resolve evalEamSam.
+
+
+  Theorem evalEam : forall {t k} {v : value k}, RS.RS.eval t v <-> eval t v.
+  Proof with auto.
+    intros; rewrite SAM.evalSam; split...
+  Qed.
+
+
+  Definition dec_term    := RS.dec_term.
+  Definition dec_context := RS.dec_context.
+
+  Definition dec_term_correct    := RS.dec_term_correct.
+  Definition dec_context_correct := RS.dec_context_correct.
+
+End EvalApplyMachine.

@@ -733,6 +733,7 @@ discriminate Hc3. *)
 
   Definition dec_term_correct    := R.dec_term_correct.
   Definition dec_context_correct := R.dec_context_correct.
+  Definition dec_term_next_alive := R.dec_term_next_alive.
 
 End RedRefSem.
 
@@ -1011,3 +1012,144 @@ Module PreAbstractMachine (R : RED_LANG) (RS : RED_REF_SEM R) <: PRE_ABSTRACT_MA
   Definition dec_context_correct := RS.dec_context_correct.
 
 End PreAbstractMachine.
+
+
+
+Module StagedAbstractMachine (R : RED_LANG) (RS : RED_REF_SEM R) <: STAGED_ABSTRACT_MACHINE R.
+
+  Import R.
+  Import RS.
+  Module RF := RED_LANG_Facts R.
+  Import RF.
+
+  Module PAM := PreAbstractMachine R RS.
+
+
+  Inductive dec : term -> forall {k1 k2}, context k1 k2 -> value k1 -> Prop :=
+  | d_dec  : forall t {k1 k2} {c : context k1 k2} {r v},
+               dec_term t k2 = in_red r -> iter (d_red r c) v ->
+               dec t c v
+  | d_v    : forall t {k1 k2} {c : context k1 k2} {v v0},
+               dec_term t k2 = in_val v -> decctx v c v0 ->
+               dec t c v0
+  | d_many : forall t {t0 ec k1 k2} {c : context k1 k2} {v},
+               dec_term t k2 = in_term t0 ec -> dec t0 (ec=:c) v ->
+               dec t c v
+
+  with decctx : forall {k2}, value k2 -> forall {k1}, context k1 k2 -> value k1 -> Prop :=
+  | dc_end  : forall {k} {v v0 : value k},
+               ~ dead_ckind k ->
+               iter (d_val v) v0 ->
+               decctx v [_] v0
+  | dc_dec  : forall ec {k2} (v : value (k2+>ec)) {k1} {c : context k1 k2} {r v0},
+               dec_context ec k2 v = in_red r -> iter (d_red r c) v0 ->
+               decctx v (ec=:c) v0
+  | dc_val  : forall ec {k2} (v : value (k2+>ec)) {v0 k1} {c : context k1 k2} {v1},
+               dec_context ec k2 v = in_val v0 -> decctx v0 c v1 ->
+               decctx v (ec=:c) v1
+  | dc_term : forall ec {k2} (v : value (k2+>ec)) {t ec0 k1} {c : context k1 k2} {v0},
+               dec_context ec k2 v = in_term t ec0 -> dec t (ec0=:c) v0 ->
+               decctx v (ec=:c) v0
+
+  with iter : forall {k}, decomp k -> value k -> Prop :=
+  | i_val : forall {k} (v : value k), 
+               iter (d_val v) v
+  | i_red : forall {k2} (r : redex k2) {k1} {c : context k1 k2} {t v},
+               contract r = Some t -> dec t c v -> 
+               iter (d_red r c) v.
+
+  Scheme dec_Ind    := Induction for dec Sort Prop
+    with decctx_Ind := Induction for decctx Sort Prop
+    with iter_Ind   := Induction for iter Sort Prop.
+
+  Inductive eval : term -> forall {k}, value k -> Prop :=
+  | e_intro : forall {t k} {v : value k}, dec t [_] v -> eval t v.
+
+
+  Lemma decPamSam : forall {t k1 k2} {c : context k1 k2} {d},
+                        PAM.dec t c d -> forall {v}, iter d v -> dec t c v.
+  Proof with eauto.
+    induction 1 using PAM.dec_Ind with
+    (P  := fun t _ _ c d (_ : PAM.dec t c d)    => forall v,  iter d v -> dec t c v)
+    (P0 := fun _ v _ c d (_ : PAM.decctx v c d) => forall v', iter d v' -> decctx v c v');
+    intros; simpl; solve 
+    [ econstructor; eauto
+    | eapply d_v; eauto
+    | eapply d_many; eauto 
+    | eapply dc_val; eauto
+    | eapply dc_term; eauto ].
+  Qed.
+  Hint Resolve decPamSam.
+
+
+  Lemma iterPamSam : forall {k} {d : decomp k} {v}, PAM.iter d v -> iter d v.
+  Proof with eauto.
+    induction 1; [constructor | econstructor 2]...
+  Qed.
+  Hint Resolve iterPamSam.
+
+
+  Lemma evalPamSam : forall {t k} {v : value k}, PAM.eval t v -> eval t v.
+  Proof with eauto.
+    intros; dependent destruction H; constructor...
+  Qed.
+  Hint Resolve evalPamSam.
+
+
+  Module RSP := Red_Sem_Proper R RS.
+  Import RSP.
+
+
+  Lemma decSamPam : forall {t k1 k2} {c : context k1 k2} {v}, dec t c v -> 
+                        forall {d}, PAM.dec t c d -> PAM.iter d v.
+  Proof with eauto.
+    induction 1 using dec_Ind with
+    (P  := fun t _ _ c v  (_ : dec t c v)     => forall d, PAM.dec t c d -> PAM.iter d v)
+    (P0 := fun _ v _ c v' (_ : decctx v c v') => forall d, PAM.decctx v c d -> PAM.iter d v')
+    (P1 := fun _ d v      (_ : iter d v)      => PAM.iter d v); 
+    try (intros d0 G; dependent destruction G; try inversion_ccons x);
+    try solve 
+    [ rewrite H in e; inversion e; subst; eauto
+    | rewrite H0 in e; inversion e; subst; eauto 
+    | eauto
+    | constructor ].
+
+    - destruct (dec_total c[t] k1) as [d H0].
+        { eapply proper_death2... }
+      dependent destruction H0.
+      apply RS.RS.dec_plug in H0;
+          try solve [eapply proper_death2; eauto; exact [_] ].
+      rewrite <- compose_empty in H0.
+      econstructor...
+  Qed.
+  Hint Resolve decSamPam.
+
+
+  Lemma evalSamPam : forall {t k} {v : value k}, eval t v -> PAM.eval t v.
+  Proof with eauto.
+    intros.
+    dependent destruction H.
+    destruct (dec_total t k) as [d H0].
+      { dependent destruction H. eapply proper_death2... exact [_]. 
+        dependent destruction H0...
+        eapply context_tail_liveness.
+        eapply dec_term_next_alive... }
+    dependent destruction H0;
+    econstructor...
+  Qed.
+  Hint Resolve evalSamPam.
+
+
+  Theorem evalSam : forall {t k} {v : value k}, RS.RS.eval t v <-> eval t v.
+  Proof with auto.
+    intros; rewrite PAM.evalPam; split; intros...
+  Qed.
+
+
+  Definition dec_term := RS.dec_term.
+  Definition dec_context := RS.dec_context.
+
+  Definition dec_term_correct := RS.dec_term_correct.
+  Definition dec_context_correct := RS.dec_context_correct.
+
+End StagedAbstractMachine.

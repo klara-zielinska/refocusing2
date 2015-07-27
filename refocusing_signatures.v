@@ -70,6 +70,10 @@ Module Type RED_REF_SEM (R : RED_LANG).
       end.
 
 
+  Axiom dec_term_next_alive : 
+      forall t k {t0 ec0}, dec_term t k = in_term t0 ec0 -> ~ dead_ckind (k+>ec0).
+
+
   (** A decomposition function specified in terms of the atomic functions above *)
   Inductive dec : term -> forall {k1 k2}, context k1 k2 -> decomp k1 -> Prop :=
   | d_dec  : forall t {k1 k2} (c : context k1 k2) {r},
@@ -271,6 +275,7 @@ Module Type STAGED_ABSTRACT_MACHINE (R : RED_LANG).
 
   with decctx : forall {k2}, value k2 -> forall {k1}, context k1 k2 -> value k1 -> Prop :=
   | dc_end  : forall {k} {v v0 : value k},
+               ~ dead_ckind k ->
                iter (d_val v) v0 ->
                decctx v [_] v0
   | dc_dec  : forall ec {k2} (v : value (k2+>ec)) {k1} {c : context k1 k2} {r v0},

@@ -713,8 +713,9 @@ discriminate Hc3. *)
               contract r = Some t -> decempty c[t] d -> iter d v ->
               iter (d_red r c) v.
 
-  Inductive eval : term -> forall {k}, value k -> Prop :=
-  | e_intro : forall {t k} {d : decomp k} {v}, decempty t d -> iter d v -> eval t v.
+  Inductive eval : term -> value init_ckind -> Prop :=
+  | e_intro : forall {t} {d : decomp init_ckind} {v : value init_ckind}, 
+                decempty t d -> iter d v -> eval t v.
 
 
   Definition dec := dec.
@@ -734,6 +735,8 @@ discriminate Hc3. *)
   Definition dec_term_correct    := R.dec_term_correct.
   Definition dec_context_correct := R.dec_context_correct.
   Definition dec_term_next_alive := R.dec_term_next_alive.
+  Definition dec_term_from_dead  := R.dec_term_from_dead.
+  Definition dec_context_from_dead := R.dec_context_from_dead.
 
 End RedRefSem.
 
@@ -797,12 +800,13 @@ Module Red_Sem_Proper (R : RED_LANG) (RS : RED_REF_SEM R) : RED_SEM_PROPER R RS.
   Hint Resolve iter_is_function : prop.
 
 
-  Lemma eval_is_function : forall {t k} {v v0 : value k}, 
+  Lemma eval_is_function : forall {t} {v v0 : value init_ckind}, 
                               eval t v -> eval t v0 -> v = v0.
   Proof with eauto with prop.
-    induction 1; intros.
-    - dependent destruction H1.
-      cutrewrite (d = d0) in H0...
+    intros.
+    dependent destruction H.
+    dependent destruction H1.
+    cutrewrite (d = d0) in H0...
   Qed.
 
 
@@ -922,8 +926,8 @@ Module PreAbstractMachine (R : RED_LANG) (RS : RED_REF_SEM R) <: PRE_ABSTRACT_MA
               contract r = Some t -> dec t c d -> iter d v ->
               iter (d_red r c) v.
 
-  Inductive eval : term -> forall {k}, value k -> Prop :=
-  | e_intro : forall {t k} {d : decomp k} {v},
+  Inductive eval : term -> value init_ckind -> Prop :=
+  | e_intro : forall {t} {d : decomp init_ckind} {v : value init_ckind},
                 dec t [_] d -> iter d v -> eval t v.
 
 
@@ -966,7 +970,7 @@ Module PreAbstractMachine (R : RED_LANG) (RS : RED_REF_SEM R) <: PRE_ABSTRACT_MA
   Qed.
 
 
-  Lemma evalRedPam : forall {t k} {v : value k},  RS.RS.eval t v -> eval t v.
+  Lemma evalRedPam : forall {t} {v : value init_ckind},  RS.RS.eval t v -> eval t v.
   Proof with eauto.
     intros.
     dependent destruction H;
@@ -989,7 +993,7 @@ Module PreAbstractMachine (R : RED_LANG) (RS : RED_REF_SEM R) <: PRE_ABSTRACT_MA
   Qed.
 
 
-  Lemma evalPamRed : forall {t k} {v : value k}, eval t v -> RS.RS.eval t v.
+  Lemma evalPamRed : forall {t} {v : value init_ckind}, eval t v -> RS.RS.eval t v.
   Proof with eauto.
     intros.
     dependent destruction H.
@@ -1000,14 +1004,15 @@ Module PreAbstractMachine (R : RED_LANG) (RS : RED_REF_SEM R) <: PRE_ABSTRACT_MA
   Hint Resolve evalPamRed.
 
 
-  Theorem evalPam : forall {t k} {v : value k}, RS.RS.eval t v <-> eval t v.
+  Theorem evalPam : forall {t} {v : value init_ckind}, RS.RS.eval t v <-> eval t v.
   Proof with auto.
     split...
   Qed.
 
 
-  Definition dec_term            := RS.dec_term.
-  Definition dec_context         := RS.dec_context.
+  Definition dec_term    := RS.dec_term.
+  Definition dec_context := RS.dec_context.
+
   Definition dec_term_correct    := RS.dec_term_correct.
   Definition dec_context_correct := RS.dec_context_correct.
 
@@ -1062,8 +1067,9 @@ Module StagedAbstractMachine (R : RED_LANG) (RS : RED_REF_SEM R) <: STAGED_ABSTR
     with decctx_Ind := Induction for decctx Sort Prop
     with iter_Ind   := Induction for iter Sort Prop.
 
-  Inductive eval : term -> forall {k}, value k -> Prop :=
-  | e_intro : forall {t k} {v : value k}, dec t [_] v -> eval t v.
+
+  Inductive eval : term -> value init_ckind -> Prop :=
+  | e_intro : forall {t} {v : value init_ckind}, dec t [_] v -> eval t v.
 
 
   Lemma decPamSam : forall {t k1 k2} {c : context k1 k2} {d},
@@ -1089,7 +1095,7 @@ Module StagedAbstractMachine (R : RED_LANG) (RS : RED_REF_SEM R) <: STAGED_ABSTR
   Hint Resolve iterPamSam.
 
 
-  Lemma evalPamSam : forall {t k} {v : value k}, PAM.eval t v -> eval t v.
+  Lemma evalPamSam : forall {t} {v : value init_ckind}, PAM.eval t v -> eval t v.
   Proof with eauto.
     intros; dependent destruction H; constructor...
   Qed.
@@ -1125,31 +1131,30 @@ Module StagedAbstractMachine (R : RED_LANG) (RS : RED_REF_SEM R) <: STAGED_ABSTR
   Hint Resolve decSamPam.
 
 
-  Lemma evalSamPam : forall {t k} {v : value k}, eval t v -> PAM.eval t v.
+  Lemma evalSamPam : forall {t} {v : value init_ckind}, eval t v -> PAM.eval t v.
   Proof with eauto.
     intros.
     dependent destruction H.
-    destruct (dec_total t k) as [d H0].
-      { dependent destruction H. eapply proper_death2... exact [_]. 
-        dependent destruction H0...
-        eapply context_tail_liveness.
-        eapply dec_term_next_alive... }
+    destruct (dec_total t init_ckind) as [d H0].
+      { dependent destruction H. eapply proper_death2... exact [_].
+        dependent destruction H0; try discriminateJM x...
+        eapply context_tail_liveness; eapply dec_term_next_alive... }
     dependent destruction H0;
     econstructor...
   Qed.
   Hint Resolve evalSamPam.
 
 
-  Theorem evalSam : forall {t k} {v : value k}, RS.RS.eval t v <-> eval t v.
+  Theorem evalSam : forall {t} {v : value init_ckind}, RS.RS.eval t v <-> eval t v.
   Proof with auto.
     intros; rewrite PAM.evalPam; split; intros...
   Qed.
 
 
-  Definition dec_term := RS.dec_term.
+  Definition dec_term    := RS.dec_term.
   Definition dec_context := RS.dec_context.
 
-  Definition dec_term_correct := RS.dec_term_correct.
+  Definition dec_term_correct    := RS.dec_term_correct.
   Definition dec_context_correct := RS.dec_context_correct.
 
 End StagedAbstractMachine.
@@ -1193,8 +1198,8 @@ Module EvalApplyMachine (R : RED_LANG) (RS : RED_REF_SEM R) <: EVAL_APPLY_MACHIN
     with decctx_Ind := Induction for decctx Sort Prop.
 
 
-  Inductive eval : term -> forall {k}, value k -> Prop :=
-  | e_intro : forall {t k} {v : value k}, dec t [_] v -> eval t v.
+  Inductive eval : term -> value init_ckind -> Prop :=
+  | e_intro : forall {t} {v : value init_ckind}, dec t [_] v -> eval t v.
 
 
   Lemma decSamEam : forall {t k1 k2} {c : context k1 k2} {v}, SAM.dec t c v -> dec t c v.
@@ -1231,7 +1236,7 @@ Module EvalApplyMachine (R : RED_LANG) (RS : RED_REF_SEM R) <: EVAL_APPLY_MACHIN
   Qed.
 
 
-  Lemma evalSamEam : forall {t k} {v : value k}, SAM.eval t v -> eval t v.
+  Lemma evalSamEam : forall {t} {v : value init_ckind}, SAM.eval t v -> eval t v.
   Proof.
     intros; dependent destruction H; constructor; apply decSamEam; auto.
   Qed.
@@ -1255,14 +1260,14 @@ Module EvalApplyMachine (R : RED_LANG) (RS : RED_REF_SEM R) <: EVAL_APPLY_MACHIN
   Qed.
 
 
-  Lemma evalEamSam : forall {t k} {v : value k}, eval t v -> SAM.eval t v.
+  Lemma evalEamSam : forall {t} {v : value init_ckind}, eval t v -> SAM.eval t v.
   Proof.
     intros; dependent destruction H; constructor; apply decEamSam; auto.
   Qed.
   Hint Resolve evalEamSam.
 
 
-  Theorem evalEam : forall {t k} {v : value k}, RS.RS.eval t v <-> eval t v.
+  Theorem evalEam : forall {t} {v : value init_ckind}, RS.RS.eval t v <-> eval t v.
   Proof with auto.
     intros; rewrite SAM.evalSam; split...
   Qed.
@@ -1275,3 +1280,168 @@ Module EvalApplyMachine (R : RED_LANG) (RS : RED_REF_SEM R) <: EVAL_APPLY_MACHIN
   Definition dec_context_correct := RS.dec_context_correct.
 
 End EvalApplyMachine.
+
+
+
+Module ProperEAMachine (R : RED_LANG) (RS : RED_REF_SEM R) <: PROPER_EA_MACHINE R.
+
+  Import R.
+  Import RS.
+
+  Module EAM := EvalApplyMachine R RS.
+
+
+  Inductive configuration : Set :=
+  | c_eval  : term -> forall {k1 k2}, context k1 k2 -> configuration
+  | c_apply : forall {k1 k2}, context k1 k2 -> value k2 -> configuration.
+
+
+  Definition c_init t := c_eval t (@empty init_ckind).
+  Definition c_final (v : value init_ckind) := c_apply [_] v.
+
+
+  Reserved Notation " a → b " (at level 40, no associativity).
+  
+
+  Inductive transition : configuration -> configuration -> Prop :=
+(*  | t_init : forall t, 
+               c_init t → c_eval t (@empty init_ckind)*)
+  | t_red  : forall t {k1 k2} (c : context k1 k2) {r t0},
+               dec_term t k2 = in_red r -> contract r = Some t0 ->
+               c_eval t c → c_eval t0 c
+  | t_val  : forall t {k1 k2} (c : context k1 k2) {v},
+      	       dec_term t k2 = in_val v ->
+               c_eval t c → c_apply c v
+  | t_term : forall t {k1 k2} (c : context k1 k2) {t0 ec},
+               dec_term t k2 = in_term t0 ec ->
+               c_eval t c → c_eval t0 (ec=:c)
+(*  | t_cfin : forall {k} (v : value k),
+               ~ dead_ckind k -> 
+               c_apply [_] v → c_apply [_] v*)
+  | t_cred : forall ec {k2} (v : value (k2+>ec)) {k1} (c : context k1 k2) {r t},
+               dec_context ec k2 v = in_red r -> contract r = Some t ->
+               c_apply (ec=:c) v → c_eval t c
+  | t_cval : forall ec {k2} (v : value (k2+>ec)) {k1} (c : context k1 k2) {v0},
+               dec_context ec k2 v = in_val v0 ->
+               c_apply (ec=:c) v → c_apply c v0
+  | t_cterm: forall ec {k2} (v : value (k2+>ec)) {k1} (c : context k1 k2) {t ec0},
+               dec_context ec k2 v = in_term t ec0 ->
+               c_apply (ec=:c) v → c_eval t (ec0=:c)
+  where " a → b " := (transition a b).
+
+
+  Module AM : ABSTRACT_MACHINE
+    with Definition term := term
+    with Definition value := value init_ckind
+    with Definition configuration := configuration
+    with Definition transition := transition
+    with Definition c_init := c_init
+    with Definition c_final := c_final.
+
+    Definition term := term.
+    Definition value := value init_ckind.
+    Definition configuration := configuration.
+    Definition transition := transition.
+    Definition c_init := c_init.
+    Definition c_final := c_final.
+
+    Inductive trans_close : configuration -> configuration -> Prop :=
+    | one_step   : forall (c0 c1 : configuration), 
+                       transition c0 c1 -> trans_close c0 c1
+    | multi_step : forall (c0 c1 c2 : configuration), 
+                       transition c0 c1 -> trans_close c1 c2 -> trans_close c0 c2.
+
+    Inductive eval : term -> value -> Prop :=
+    | e_intro : forall t v, trans_close (c_init t) (c_final v) -> eval t v.
+
+  End AM.
+
+  Notation " a →+ b " := (AM.trans_close a b) (at level 40, no associativity).
+
+
+  Lemma decEamTrans : forall {t k1 k2} (c : context k1 k2) {v}, 
+                          EAM.dec t c v -> c_eval t c →+ c_apply [_] v.
+  Proof with eauto.
+    (*cut (forall (t : term) (k1 k2 : ckind) (c : context k1 k2) (v : value k1), 
+             EAM.dec t c v -> k1 = init_ckind -> 
+                 forall v0, v ~= v0 -> c_eval t c →+ c_final v0)...*)
+    induction 1 using EAM.dec_Ind with
+    (P := fun t _ _ c v  (_ : EAM.dec t c v)     => 
+              c_eval t c  →+ c_apply [_] v)
+    (P0:= fun k2 v k1 c v' (_ : EAM.decctx v c v') => 
+              c_apply c v →+ c_apply [_] v' \/ k1 = k2 /\ @empty k1 ~= c /\ v ~=v');
+    (*intros; dep_subst.*)
+    intuition;
+    try solve
+    [ (try apply or_introl); econstructor 2; eauto; econstructor; eauto 
+    | dep_subst; constructor 1; constructor; auto].
+
+    - dep_subst; left; constructor 1; econstructor...
+  Qed.
+  Hint Resolve decEamTrans.
+
+
+  Lemma evalEamMachine : forall {t v}, 
+                             EAM.eval t v -> AM.eval t v.
+  Proof with eauto.
+    intros.
+    dependent destruction H.
+    constructor.
+    apply decEamTrans...
+  Qed.
+  Hint Resolve evalEamMachine.
+
+
+  Lemma transDecEam : forall {t k1 k2} {c : context k1 k2} {v : value k1}, 
+                          c_eval t c →+ c_apply [_] v -> EAM.dec t c v.
+  Proof with eauto.
+    intros t k1 k2 c v; revert t k2 c.
+    cut (forall co, co →+ c_apply [_] v -> 
+         match co with 
+         | c_eval t k1' _ c   => k1 = k1' -> forall v', v ~= v' -> EAM.dec t c v'
+         | c_apply k1' _ c v0 => k1 = k1' -> forall v', v ~= v' -> EAM.decctx v0 c v'
+         end); intros.
+    apply (H _ H0)...
+
+    dependent induction H;
+
+    let rec rc := first 
+        [ econstructor 1; eauto; rc 
+        | econstructor 2; eauto; rc 
+        | econstructor 3; eauto; rc 
+        | econstructor 4; eauto; rc
+        | intro; assert (dec_term t k1 = in_dead k1); 
+          [ eapply dec_term_from_dead; eauto | congruence] 
+        | intro; assert (dec_context ec k1 v0 = in_dead k1); 
+          [ eapply dec_context_from_dead; eauto; apply ckind_death_propagation; auto 
+          | congruence ] ]
+    in 
+    dependent destruction H; intros; dep_subst; try solve [rc].
+  Qed.
+  Hint Resolve transDecEam.
+
+
+  Lemma evalMachineEam : forall {t v}, AM.eval t v -> EAM.eval t v.
+  Proof with eauto.
+    intros.
+    dependent destruction H.
+    constructor.
+    apply transDecEam...
+  Qed.
+  Hint Resolve evalMachineEam.
+
+
+  Theorem eval_apply_correct : forall {t} {v : value init_ckind}, 
+                                   RS.RS.eval t v <-> AM.eval t v.
+  Proof with auto.
+    intros t v; rewrite EAM.evalEam; split...
+  Qed.
+
+
+  Definition dec_term    := RS.dec_term.
+  Definition dec_context := RS.dec_context.
+
+  Definition dec_term_correct    := RS.dec_term_correct.
+  Definition dec_context_correct := RS.dec_context_correct.
+
+End ProperEAMachine.

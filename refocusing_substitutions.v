@@ -773,7 +773,7 @@ Module Red_Sem_Proper (R : RED_LANG) (RS : RED_REF_SEM R) : RED_SEM_PROPER R RS.
                      rewrite DT2 in DT; inversion DT end
 
     | [ RC : (decctx ?v (?ec=:?c) ?d), DC : (dec_context ?ec ?k ?v = _) |- _ ] => 
-             dependent_destruction2 RC; inversion_ccons x; do 2 dep_subst;
+             dependent_destruction2 RC; inversion_ccons x2; do 2 dep_subst;
              try match goal with DC2 : (dec_context ?ec' ?k' ?v' = _) |- _ => 
                      rewrite DC2 in DC; inversion DC end
 
@@ -1301,7 +1301,7 @@ Module ProperEAMachine (R : RED_LANG) (RS : RED_REF_SEM R) <: PROPER_EA_MACHINE 
 
 
   Reserved Notation " a → b " (at level 40, no associativity).
-  
+
 
   Inductive transition : configuration -> configuration -> Prop :=
 (*  | t_init : forall t, 
@@ -1445,3 +1445,262 @@ Module ProperEAMachine (R : RED_LANG) (RS : RED_REF_SEM R) <: PROPER_EA_MACHINE 
   Definition dec_context_correct := RS.dec_context_correct.
 
 End ProperEAMachine.
+
+
+
+Module PushEnterMachine (R : RED_LANG) (PRS : PE_REF_SEM R) <: PUSH_ENTER_MACHINE R.
+
+  Import R.
+  Import PRS.Red_Sem.
+  Import PRS.
+
+  Module EAM := EvalApplyMachine R PRS.Red_Sem.
+  Module PR := Red_Sem_Proper R PRS.Red_Sem.
+
+  Inductive dec : term -> forall {k1 k2}, context k1 k2 -> value k1 -> Prop :=
+  | dec_r    : forall t {t0 k1 k2} {c : context k1 k2} {r v},
+                 dec_term t k2 = in_red r -> contract r = Some t0 -> dec t0 c v ->
+                 dec t c v
+  | dec_val  : forall t {k} {v : value k},
+                 dec_term t k = in_val v ->
+                 dec t [_] v
+  | dec_v_t  : forall t ec {t0 ec0} {k1 k2} {c : context k1 k2} {v v0},
+                 dec_term t (k2+>ec) = in_val v -> 
+                 dec_context ec k2 v = in_term t0 ec0 -> 
+                 dec t0 (ec0=:c) v0 ->
+                 dec t (ec=:c) v0
+  | dec_red  : forall t ec {t0} {k1 k2} {c : context k1 k2} {v v0 r},
+                 dec_term t (k2+>ec) = in_val v ->
+                 dec_context ec k2 v = in_red r -> 
+                 contract r = Some t0 -> 
+                 dec t0 c v0 ->
+                 dec t (ec=:c) v0
+  | dec_rec  : forall t {t0 ec} {k1 k2} {c : context k1 k2} {v},
+                 dec_term t k2 = in_term t0 ec ->
+                 dec t0 (ec=:c) v ->
+                 dec t c v.
+
+  (*Scheme dec_Ind := Induction for dec Sort Prop.*)
+
+  Inductive eval : term -> value init_ckind -> Prop :=
+  | e_intro : forall {t} {v : value init_ckind}, dec t [_] v -> eval t v.
+
+
+  Lemma decEamPem : forall {t k1 k2} {c : context k1 k2} {v}, EAM.dec t c v -> dec t c v.
+  Proof with eauto.
+    induction 1 using EAM.dec_Ind with
+    (P := fun t _ _ c v  (_ : EAM.dec t c v) => dec t c v)
+    (P0:= fun _ v _ c v0 (_ : EAM.decctx v c v0) =>
+      match c in context k1' k2' return value k2' -> value k1' -> Prop with
+      | [_] => fun v v0 => dec v [_] v0
+      | ccons ec _ _ c => fun v v0 => forall d, dec_context ec _ v = d ->
+        match d with
+        | in_red r => forall t, contract r = Some t -> dec t c v0
+        | in_term t ec0 => dec t (ec0=:c) v0
+        | in_val v => False
+        | in_dead => False
+        end
+      end v v0); intros; simpl.
+    (* Case 1 *)
+    econstructor...
+    (* Case 2 *)
+    dependent destruction d; subst.
+    (* Case 2.1 *)
+    constructor...
+    (* Case 2.2 *)
+    econstructor 4...
+    apply (IHdec (in_red r))...
+    (* Case 2.3 *)
+    contradict (dec_context_not_val _ _ _ _ H).
+    (* Case 2.4 *)
+    econstructor 3...
+    apply (IHdec (in_term t0 ec0))...
+    (* Case 3 *)
+    econstructor 5...
+    (* Case 4 *)
+    constructor; apply dec_term_value...
+    (* Case 5 *)
+    rewrite e in H0; inversion H0; subst; intros.
+    rewrite e0 in H0; inversion H0; subst...
+    (* Case 7 *)
+    contradict (dec_context_not_val _ _ _ _ e).
+    (* Case 8 *)
+    rewrite e in H0; subst...
+  Qed.
+
+
+  Lemma evalEamPem : forall {t v}, EAM.eval t v -> eval t v.
+  Proof.
+    intros t v H; dependent destruction H; constructor; apply decEamPem; auto.
+  Qed.
+  Hint Resolve evalEamPem.
+
+
+  Lemma decPemEam : forall {t k1 k2} {c : context k1 k2} {v}, dec t c v -> EAM.dec t c v.
+  Proof with eauto.
+    induction 1; intros; simpl; auto.
+    econstructor 1...
+    econstructor 2... econstructor... 
+        intro H0; rewrite (dec_term_from_dead t _ H0) in H; discriminate.
+    econstructor 2... econstructor 4...
+    econstructor 2... econstructor 2...
+    econstructor 3...
+  Qed.
+
+
+  Lemma evalPemEam : forall {t v}, eval t v -> EAM.eval t v.
+  Proof.
+    intros t v H; dependent destruction H; constructor; apply decPemEam; auto.
+  Qed.
+  Hint Resolve evalPemEam.
+
+
+  Theorem evalPem : forall {t v}, PRS.Red_Sem.RS.eval t v <-> eval t v.
+  Proof.
+    intros t v; rewrite EAM.evalEam; split; auto.
+  Qed.
+
+
+  Definition dec_term := PRS.Red_Sem.dec_term.
+  Definition dec_context := PRS.Red_Sem.dec_context.
+  Definition dec_context_not_val := PRS.dec_context_not_val.
+  Definition dec_context_correct := PRS.Red_Sem.dec_context_correct.
+  Definition dec_term_correct := PRS.Red_Sem.dec_term_correct.
+  Definition dec_term_value := PRS.dec_term_value.
+
+End PushEnterMachine.
+
+
+
+Module ProperPEMachine (R : RED_LANG) (PRS : PE_REF_SEM R) <: PROPER_PE_MACHINE R.
+
+  Import R.
+  Import PRS.Red_Sem.
+  Import PRS.
+
+  Module PEM := PushEnterMachine R PRS.
+
+
+  Inductive configuration : Set :=
+  | c_eval  : term -> forall {k1 k2}, context k1 k2 -> configuration
+  | c_final : forall {k}, value k                   -> configuration.
+
+  Definition c_init t := c_eval t (@empty init_ckind).
+
+  Reserved Notation " a → b " (at level 40, no associativity).
+
+
+  Inductive transition : configuration -> configuration -> Prop :=
+  | t_red  : forall t {k1 k2} (c : context k1 k2) {t0 r},
+               dec_term t k2 = in_red r -> contract r = Some t0 ->
+               c_eval t c → c_eval t0 c
+  | t_cval : forall t {k} {v : value k},
+               dec_term t k = in_val v ->
+               c_eval t (@empty k) → c_final v
+  | t_cred : forall t ec {t0} {k1 k2} (c : context k1 k2) {v r},
+               dec_term t (k2+>ec) = in_val v ->
+               dec_context ec k2 v = in_red r ->
+               contract r = Some t0 ->
+               c_eval t (ec=:c) → c_eval t0 c
+  | t_crec : forall t ec {t0 ec0 k1 k2} (c : context k1 k2) {v},
+               dec_term t (k2+>ec) = in_val v ->
+               dec_context ec k2 v = in_term t0 ec0 ->
+               c_eval t (ec=:c) → c_eval t0 (ec0=:c)
+  | t_rec  : forall t {t0 ec k1 k2} (c : context k1 k2),
+               dec_term t k2 = in_term t0 ec ->
+               c_eval t c → c_eval t0 (ec=:c)
+  where " a →  b " := (transition a b).
+
+
+  Module AM : ABSTRACT_MACHINE
+    with Definition term  := term
+    with Definition value := value init_ckind
+    with Definition configuration := configuration
+    with Definition transition    := transition
+    with Definition c_init  := c_init
+    with Definition c_final := @c_final init_ckind.
+
+    Definition term  := term.
+    Definition value := value init_ckind.
+    Definition configuration := configuration.
+    Definition transition    := transition.
+    Definition c_init  := c_init.
+    Definition c_final := @c_final init_ckind .
+
+
+    Inductive trans_close : configuration -> configuration -> Prop :=
+    | one_step   : forall {c0 c1},    transition c0 c1 -> trans_close c0 c1
+    | multi_step : forall {c0 c1 c2}, transition c0 c1 -> 
+                                          trans_close c1 c2 -> trans_close c0 c2.
+
+    Inductive eval : term -> value -> Prop :=
+    | e_intro : forall {t v}, trans_close (c_init t) (c_final v) -> eval t v.
+
+  End AM.
+
+  Notation " a →+ b " := (AM.trans_close a b) (at level 40, no associativity).
+
+
+  Lemma decPemTrans : forall {t} {k1 k2} {c : context k1 k2} {v}, 
+                          PEM.dec t c v -> c_eval t c →+ c_final v.
+  Proof with eauto.
+    induction 1; intros;
+    solve 
+    [ do 2 constructor; auto
+    | econstructor 2; eauto; econstructor; eauto ].
+  Qed.
+  Hint Resolve decPemTrans.
+
+
+  Lemma evalPemMachine : forall {t v}, PEM.eval t v -> AM.eval t v.
+  Proof with eauto.
+    intros.
+    dependent destruction H.
+    constructor.
+    apply decPemTrans...
+  Qed.
+  Hint Resolve evalPemMachine.
+
+
+  Lemma transDecPem : forall {t k1 k2} {c : context k1 k2} {v}, 
+                          c_eval t c →+ c_final v -> PEM.dec t c v.
+  Proof with eauto.
+    intros.
+    dependent induction H;
+
+    dependent destruction H.
+
+    apply PEM.dec_val...
+    eapply PEM.dec_r...
+    do 2 dependent destruction H0.
+    eapply PEM.dec_red...
+    eapply PEM.dec_v_t...
+    eapply PEM.dec_rec...
+  Qed.
+  Hint Resolve transDecPem.
+
+
+  Lemma evalMachinePem : forall {t v}, AM.eval t v -> PEM.eval t v.
+  Proof with auto.
+    intros.
+    constructor.
+    destruct H.
+    apply transDecPem...
+  Qed.
+  Hint Resolve evalMachinePem.
+
+
+  Theorem push_enter_correct : forall {t v}, PRS.Red_Sem.RS.eval t v <-> AM.eval t v.
+  Proof.
+    intros t v; rewrite (PEM.evalPem); split; auto.
+  Qed.
+
+
+  Definition dec_term    := dec_term.
+  Definition dec_context := dec_context.
+  Definition dec_term_value      := dec_term_value.
+  Definition dec_context_not_val := dec_context_not_val.
+  Definition dec_context_correct := dec_context_correct.
+  Definition dec_term_correct    := dec_term_correct.
+
+End ProperPEMachine.

@@ -128,19 +128,19 @@ Module Type RED_REF_SEM (R : RED_LANG).
 
 End RED_REF_SEM.
 
-(*
+
+
 Module Type PE_REF_SEM (R : RED_LANG).
 
   Import R.
 
   Declare Module Red_Sem : RED_REF_SEM R.
 
-  Axiom dec_context_not_val : forall k v0 ec v, 
-            Red_Sem.dec_context ec k v <> in_val v0.
-  Axiom dec_term_value : forall k v, 
-                             Red_Sem.dec_term (value_to_term v) k = in_val v.
+  Axiom dec_context_not_val : forall ec k v v0, Red_Sem.dec_context ec k v <> in_val v0.
+  Axiom dec_term_value : forall k (v : value k), Red_Sem.dec_term v k = in_val v.
 
-End PE_REF_SEM.*)
+End PE_REF_SEM.
+
 
 
 Module Type RED_SEM_PROPER (R : RED_LANG) (RS : RED_SEM R).
@@ -450,3 +450,135 @@ Module Type PROPER_EA_MACHINE (R : RED_LANG).
     with Definition c_final := c_final.
 
 End PROPER_EA_MACHINE.
+
+
+
+Module Type PUSH_ENTER_MACHINE (R : RED_LANG).
+
+  Import R.
+
+
+  (** Functions specifying atomic steps of induction on terms and contexts -- needed to avoid explicit induction on terms and contexts in construction of the AM *)
+  Parameter dec_term : term -> forall k, interm_dec k.
+  Parameter dec_context : forall ec k, value (k+>ec) -> interm_dec k.
+
+  Axiom dec_term_value : forall {k} (v : value k), dec_term v k = in_val v.
+  Axiom dec_context_not_val : forall ec k v v0, ~(dec_context ec k v = in_val v0).
+
+  Axiom dec_term_correct : 
+      forall t k, match dec_term t k with
+      | in_red r       => t = r
+      | in_val v       => t = v
+      | in_term t0 ec0 => t = ec0:[t0]
+      | in_dead        => dead_ckind k
+      end.
+
+  Axiom dec_context_correct : 
+      forall ec k v, match dec_context ec k v with
+      | in_red r      => ec:[v] = r
+      | in_val v0     => ec:[v] = v0
+      | in_term t ec0 => ec:[v] = ec0:[t]
+      | in_dead       => dead_ckind (k+>ec) 
+      end.
+
+  Inductive dec : term -> forall {k1 k2}, context k1 k2 -> value k1 -> Prop :=
+  | dec_r    : forall t {t0 k1 k2} {c : context k1 k2} {r v},
+                 dec_term t k2 = in_red r -> contract r = Some t0 -> dec t0 c v ->
+                 dec t c v
+  | dec_val  : forall t {k} {v : value k},
+                 dec_term t k = in_val v ->
+                 dec t [_] v
+  | dec_v_t  : forall t ec {t0 ec0} {k1 k2} {c : context k1 k2} {v v0},
+                 dec_term t (k2+>ec) = in_val v -> 
+                 dec_context ec k2 v = in_term t0 ec0 -> 
+                 dec t0 (ec0=:c) v0 ->
+                 dec t (ec=:c) v0
+  | dec_red  : forall t ec {t0} {k1 k2} {c : context k1 k2} {v v0 r},
+                 dec_term t (k2+>ec) = in_val v ->
+                 dec_context ec k2 v = in_red r -> 
+                 contract r = Some t0 -> 
+                 dec t0 c v0 ->
+                 dec t (ec=:c) v0
+  | dec_rec  : forall t {t0 ec} {k1 k2} {c : context k1 k2} {v},
+                 dec_term t k2 = in_term t0 ec ->
+                 dec t0 (ec=:c) v ->
+                 dec t c v.
+
+  (*Scheme dec_Ind := Induction for dec Sort Prop.*)
+
+  Inductive eval : term -> value init_ckind -> Prop :=
+  | e_intro : forall {t} {v : value init_ckind}, dec t [_] v -> eval t v.
+
+End PUSH_ENTER_MACHINE.
+
+
+
+Module Type PROPER_PE_MACHINE (R : RED_LANG).
+
+  Import R.
+
+
+  (** Functions specifying atomic steps of induction on terms and contexts -- needed to avoid explicit induction on terms and contexts in construction of the AM *)
+  Parameter dec_term : term -> forall k, interm_dec k.
+  Parameter dec_context : forall ec k, value (k+>ec) -> interm_dec k.
+
+  Axiom dec_term_value : forall {k} (v : value k), dec_term v k = in_val v.
+  Axiom dec_context_not_val : forall ec k v v0, ~(dec_context ec k v = in_val v0).
+
+  Axiom dec_term_correct : 
+      forall t k, match dec_term t k with
+      | in_red r       => t = r
+      | in_val v       => t = v
+      | in_term t0 ec0 => t = ec0:[t0]
+      | in_dead        => dead_ckind k
+      end.
+
+  Axiom dec_context_correct : 
+      forall ec k v, match dec_context ec k v with
+      | in_red r      => ec:[v] = r
+      | in_val v0     => ec:[v] = v0
+      | in_term t ec0 => ec:[v] = ec0:[t]
+      | in_dead       => dead_ckind (k+>ec) 
+      end.
+
+
+  Inductive configuration : Set :=
+  | c_eval  : term -> forall {k1 k2}, context k1 k2 -> configuration
+  | c_final : forall {k}, value k                   -> configuration.
+
+  Definition c_init   t := c_eval t (@empty init_ckind).
+
+  Reserved Notation " a → b " (at level 40, no associativity).
+
+
+  Inductive transition : configuration -> configuration -> Prop :=
+  | t_red  : forall t {k1 k2} (c : context k1 k2) {t0 r},
+               dec_term t k2 = in_red r -> contract r = Some t0 ->
+               c_eval t c → c_eval t0 c
+  | t_cval : forall t {k} {v : value k},
+               dec_term t k = in_val v ->
+               c_eval t (@empty k) → c_final v
+  | t_cred : forall t ec {t0} {k1 k2} (c : context k1 k2) {v r},
+               dec_term t (k2+>ec) = in_val v ->
+               dec_context ec k2 v = in_red r ->
+               contract r = Some t0 ->
+               c_eval t (ec=:c) → c_eval t0 c
+  | t_crec : forall t ec {t0 ec0 k1 k2} (c : context k1 k2) {v},
+               dec_term t (k2+>ec) = in_val v ->
+               dec_context ec k2 v = in_term t0 ec0 ->
+               c_eval t (ec=:c) → c_eval t0 (ec0=:c)
+  | t_rec  : forall t {t0 ec k1 k2} (c : context k1 k2),
+               dec_term t k2 = in_term t0 ec ->
+               c_eval t c → c_eval t0 (ec=:c)
+  where " a →  b " := (transition a b).
+
+
+  Declare Module AM : ABSTRACT_MACHINE
+    with Definition term := term
+    with Definition value := value init_ckind
+    with Definition configuration := configuration
+    with Definition transition := transition
+    with Definition c_init := c_init
+    with Definition c_final := @c_final init_ckind.
+
+End PROPER_PE_MACHINE.

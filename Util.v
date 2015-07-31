@@ -137,10 +137,15 @@ Ltac join H L R := first [ assert (H := conj L R); clear L R
                          | idtac ].
 
 
+Ltac clean_eqs := repeat match goal with H : ?x = ?x |- _ => clear H end.
+
+
 Ltac dependent_destruction2 H :=
-    let tmp := fresh in assert (tmp := H); 
-    clear H; 
-    dependent destruction tmp. 
+    let i := fresh in 
+    remember H as i in *;
+    dependent destruction i;
+    try subst H;
+    clean_eqs. 
 
 
 Ltac rec_subst H := 

@@ -2,6 +2,7 @@ Require Import refocusing_substitutions.
 Require Import refocusing_lang_facts.
 Require Import Program.
 
+
 Module no_ECCa <: RED_LANG.
 
   Definition v_name := nat.
@@ -55,7 +56,7 @@ Module no_ECCa <: RED_LANG.
   Definition init_ckind : ckind := C.
   Definition dead_ckind (k : ckind) := match k with CBot => True | _ => False end.
   
-  Lemma ckind_death_propagation : 
+  Lemma death_propagation : 
       forall k, dead_ckind k -> forall ec, dead_ckind (k+>ec).
   Proof.
     intuition.
@@ -65,10 +66,12 @@ Module no_ECCa <: RED_LANG.
   Qed.
   
   
-  Inductive context : ckind -> ckind -> Set :=
-  | empty : forall {k}, context k k
-  | ccons : forall (ec : elem_context) {k1 k2}, context k1 k2 -> context k1 (k2+>ec).
-  Notation "[_]" := empty.
+  Inductive context (k1 : ckind) : ckind -> Set :=
+  | empty : context k1 k1
+  | ccons : forall (ec : elem_context) {k2}, context k1 k2 -> context k1 (k2+>ec).
+  Arguments empty {k1}. Arguments ccons {k1} _ {k2} _.
+  Notation "[.]" := empty.
+  Notation "[.]( k )" := (@empty k).
   Infix "=:" := ccons (at level 60, right associativity).
   
   
@@ -135,24 +138,25 @@ Module no_ECCa <: RED_LANG.
 
   (** The main functions of reduction semantics, defining plugging terms into contexts and
       composing contexts, effectively defining reduction semantics, and some properties. *)
-  Fixpoint compose {k1 k2} (c0 : context k1 k2) {k3} (c1 : context k3 k1) : context k3 k2 := 
-      match c0 in context k1' k2' return context k3 k1' -> context k3 k2' with
-      | [_]     => fun c1' => c1'
-      | ec=:c0' => fun c1' => ec =: compose c0' c1'
-      end c1.
+  Fixpoint compose {k1 k2} (c0 : context k1 k2) 
+                      {k3} (c1 : context k3 k1) : context k3 k2 := 
+      match c0 in context _ k2' return context k3 k2' with
+      | [.]     => c1
+      | ec=:c0' => ec =: compose c0' c1
+      end.
   Infix "~+" := compose (at level 60, right associativity).
 
 
-  Definition atom_plug (t : term) (ec : elem_context) : term :=
+  Definition elem_plug (t : term) (ec : elem_context) : term :=
       match ec with
       | lam_c x => Lam x t
       | ap_r tr => App t tr
       | ap_l v  => App (v : term) t
       end.
-  Notation "ec :[ t ]" := (atom_plug t ec) (at level 0).
+  Notation "ec :[ t ]" := (elem_plug t ec) (at level 0).
 
 
-  Lemma atom_plug_injective1 : forall ec {t0 t1},
+  Lemma elem_plug_injective1 : forall ec {t0 t1},
       ec:[t0] = ec:[t1] -> t0 = t1.
   Proof.
     intros.
@@ -162,13 +166,13 @@ Module no_ECCa <: RED_LANG.
 
   Fixpoint plug t {k1 k2} (c : context k1 k2) : term :=
       match c with
-      | [_]    => t 
-      | ec=:c' => plug (atom_plug t ec) c'
+      | [.]    => t 
+      | ec=:c' => plug (elem_plug t ec) c'
       end.
   Notation "c [ t ]" := (plug t c) (at level 0).
 
 
-  Definition strict_ec ec t := exists t', ec:[t'] = t. 
+  Definition immediate_ec ec t := exists t', ec:[t'] = t. 
 
 
 (*  Definition transitable_from k ec := ~ dead_ckind (k+>ec).
@@ -204,18 +208,10 @@ Module no_ECCa <: RED_LANG.
 
   (** Datatype of decompositions -- either a value or a redex in a context (analogous to the decompose lemma) *)
   Inductive decomp (k : ckind) : Type :=
-  | d_val : value k -> decomp k
-  | d_red : forall k', redex k' -> context k k' -> decomp k.
+  | d_red : forall k', redex k' -> context k k' -> decomp k
+  | d_val : value k -> decomp k.
 
   Arguments d_val {k} _. Arguments d_red {k} {k'} _ _.
-
-  Inductive interm_dec k : Type :=
-  | in_red  : redex k  -> interm_dec k
-  | in_val  : value k -> interm_dec k
-  | in_term : term -> elem_context -> interm_dec k
-  | in_dead : interm_dec k.
-
-  Arguments in_red {k} _. Arguments in_val {k} _. Arguments in_term {k} _ _.
 
   Definition decomp_to_term {k} (d : decomp k) : term :=
       match d with
@@ -254,38 +250,14 @@ Qed.*)
     - intuition.
     - intros.
       right.
-      destruct IHc with v (atom_plug t ec0) as [(H1, H2) | (v0, H1)]; auto;
-          try solve [contradict H0; apply ckind_death_propagation; auto];
+      destruct IHc with (ec0:[t]) as [(H1, H2) | (v0, H1)]; auto;
+          try solve [contradict H0; apply death_propagation; auto];
           dep_subst; simpl in *;
       match goal with 
       | [Hv : ?ec :[ ?t ] = _ ?v |- _] => 
             destruct ec; destruct v; dependent_destruction2 Hv
       end;
       try solve [eexists; eauto | apply L | eexists (vCBot _); simpl; eauto ].
-  Qed.
-
-
-  Lemma redex_trivial : forall k (r : redex k), only_trivial r k.
-  Proof with auto.
-    intros k1 r t k2 c; revert t.
-    induction c.
-    - intuition.
-    - intros.
-      right.
-      destruct IHc with r (atom_plug t ec0) as [(H1, H2) | (v0, H1)]; auto;
-          try solve [contradict H0; apply ckind_death_propagation; auto];
-          dep_subst; simpl in *;
-      match goal with
-      | [Hvr : ?ec :[ ?t ] = _ ?r |- _] => 
-            destruct ec; destruct r; 
-            dependent_destruction2 Hvr
-      end; simpl in *; 
-      try solve [ intuition
-                | exists (vECaLam v t1); auto 
-                | dependent destruction v; discriminate
-                | eexists; eauto
-                | apply L
-                | eexists (vCBot _); simpl; eauto ].
   Qed.
 
 
@@ -303,7 +275,7 @@ Qed.*)
           exists v : value (k+>ec), t0 = v.
   Proof with auto.
     intros.
-    destruct (H t0 _ (ec0 =: [_])) as [(H2, H3) | (v, H2)]...
+    destruct (H t0 _ (ec0 =: [.])) as [(H2, H3) | (v, H2)]...
     - discriminateJM H3.
     - exists v; destruct k...
   Qed.
@@ -339,7 +311,7 @@ Lemma L2 : forall t ec k, only_trivial ec:[t] k ->
 Proof with eauto.
 intros.
 intros t' k' c H1 H2.
-destruct (H t' k' (c ~+ ec0 =: [_])) as [(H3, H4) | ?]... 
+destruct (H t' k' (c ~+ ec0 =: [.])) as [(H3, H4) | ?]... 
 rewrite plug_compose... subst...
 contradict H4... revert H3; clear; intro. dependent induction c; intro H; discriminateJM H.
 Qed.
@@ -409,53 +381,154 @@ Module no_ECCa_Ref <: RED_REF_LANG.
   Import RF.
 
 
-  Definition dec_term t k : interm_dec k :=
-  match k as k0 return interm_dec k0 with 
-  | R.C => match t with
-           | App t1 t2 => in_term t1 (ap_r t2)
-           | Var x     => in_val (vCVar x)
-           | Lam x t1  => in_term t1 (lam_c x)
-           end
-  | ECa => match t with
-           | App t1 t2 => in_term t1 (ap_r t2)
-           | Var x     => in_val (vECaVar x)
-           | Lam x t1  => in_val (vECaLam x t1)
-           end
-  | CBot => in_dead CBot
-  end.
+  Module DEC <: DEC_STEP R.
+
+    Inductive interm_dec k : Set :=
+    | in_red  : redex k -> interm_dec k
+    | in_term : term -> elem_context -> interm_dec k
+    | in_val  : value k -> interm_dec k
+    | in_dead : interm_dec k.
+    Arguments in_red {k} _.    Arguments in_val {k} _.
+    Arguments in_term {k} _ _. Arguments in_dead {k}.
 
 
-  Definition dec_context ec k (v : value (k+>ec)) : interm_dec k :=
-  match ec as ec0 return value (k+>ec0) -> interm_dec k with
-  | lam_c x  => match k as k0 return value (k0+>lam_c x) -> interm_dec k0 with
-                | C    => fun v => in_val (vCLam x v)
-                | ECa  => fun v => in_dead ECa (*val (vCBot (Lam x (value_to_term v)))*)
-                | CBot => fun v => in_dead CBot
-                end
-  | ap_r t   => match k as k0 return value (k0+>(ap_r t)) -> interm_dec k0 with
-                | CBot => fun v => in_dead CBot
-                | C    => fun v => 
-                              match v with
-                              | vECaLam x t0  => in_red (rCApp x t0 t)
-                              | vECaVar x     => in_term t (ap_l (vCaVar x))
-                              | vECaApp v1 v2 => in_term t (ap_l (vCaApp v1 v2))
-                              | _ => in_dead C
-                              end
-                | ECa  => fun v => 
-                              match v with
-                              | vECaLam x t0  => in_red (rECaApp x t0 t)
-                              | vECaVar x     => in_term t (ap_l (vCaVar x))
-                              | vECaApp v1 v2 => in_term t (ap_l (vCaApp v1 v2))
-                              | _ => in_dead ECa
-                              end
-                end
-  | ap_l v0  => match k as k0 return value (k0+>(ap_l v0)) -> interm_dec k0 with
-                | CBot => fun v => in_dead CBot
-                | C    => fun v => in_val (vCApp v0 v)
-                | ECa  => fun v => in_val (vECaApp v0 v)
-                end
-  end
-  v.
+    Definition dec_term t k : interm_dec k :=
+    match k as k0 return interm_dec k0 with 
+    | R.C => match t with
+             | App t1 t2 => in_term t1 (ap_r t2)
+             | Var x     => in_val (vCVar x)
+             | Lam x t1  => in_term t1 (lam_c x)
+             end
+    | ECa => match t with
+             | App t1 t2 => in_term t1 (ap_r t2)
+             | Var x     => in_val (vECaVar x)
+             | Lam x t1  => in_val (vECaLam x t1)
+             end
+    | CBot => in_dead
+    end.
+
+
+    Definition dec_context ec k (v : value (k+>ec)) : interm_dec k :=
+    match ec as ec0 return value (k+>ec0) -> interm_dec k with
+    | lam_c x  => match k as k0 return value (k0+>lam_c x) -> interm_dec k0 with
+                  | C    => fun v => in_val (vCLam x v)
+                  | ECa  => fun v => in_dead
+                  | CBot => fun v => in_dead
+                  end
+    | ap_r t   => match k as k0 return value (k0+>(ap_r t)) -> interm_dec k0 with
+                  | CBot => fun v => in_dead
+                  | C    => fun v => 
+                                match v with
+                                | vECaLam x t0  => in_red (rCApp x t0 t)
+                                | vECaVar x     => in_term t (ap_l (vCaVar x))
+                                | vECaApp v1 v2 => in_term t (ap_l (vCaApp v1 v2))
+                                | _ => @in_dead C
+                                end
+                  | ECa  => fun v => 
+                                match v with
+                                | vECaLam x t0  => in_red (rECaApp x t0 t)
+                                | vECaVar x     => in_term t (ap_l (vCaVar x))
+                                | vECaApp v1 v2 => in_term t (ap_l (vCaApp v1 v2))
+                                | _ => @in_dead ECa
+                                end
+                  end
+    | ap_l v0  => match k as k0 return value (k0+>(ap_l v0)) -> interm_dec k0 with
+                  | CBot => fun v => in_dead
+                  | C    => fun v => in_val (vCApp v0 v)
+                  | ECa  => fun v => in_val (vECaApp v0 v)
+                  end
+    end
+    v.
+
+
+    Lemma dec_term_correct : 
+        forall (t : term) k, match dec_term t k with
+        | in_red r      => t = r
+        | in_val v      => t = v
+        | in_term t' ec => t = ec:[t']
+        | in_dead       => dead_ckind k 
+        end.
+    Proof.
+      destruct k, t; simpl; auto.
+    Qed.
+
+
+    Lemma dec_term_from_dead : forall t k, dead_ckind k -> dec_term t k = in_dead.
+    Proof.
+      intros.
+      destruct k; simpl; intuition.
+    Qed.
+
+
+    Lemma dec_term_next_alive : 
+        forall t k t0 ec0, dec_term t k = in_term t0 ec0 -> ~ dead_ckind (k+>ec0).
+    Proof.
+      intros.
+      destruct t, k; inversion H; subst;
+      auto.
+    Qed.
+
+
+    Lemma dec_context_correct : 
+        forall ec k v, match dec_context ec k v with
+        | in_red r      => ec:[v] = r
+        | in_val v'     => ec:[v] = v'
+        | in_term t ec' => ec:[v] = ec':[t]
+        | in_dead       => dead_ckind (k+>ec)
+        end.
+    Proof.
+      destruct k, ec0; dependent destruction v; simpl; auto.
+    Qed.
+
+
+    Lemma dec_context_from_dead : 
+        forall ec k v, dead_ckind (k+>ec) -> dec_context ec k v = in_dead.
+    Proof.
+      intros.
+      destruct ec0, k; simpl in *; intuition.
+    Qed.
+
+
+    Lemma dec_context_next_alive :
+        forall ec k v {t ec0}, dec_context ec k v = in_term t ec0 -> ~ dead_ckind (k+>ec0).
+    Proof.
+      intros.
+      destruct ec0, ec1, k;
+      (
+          dependent destruction v; 
+          simpl in *; 
+          try discriminate;
+          intuition
+      ).
+    Qed.
+
+  End DEC.
+
+  Export DEC.
+
+
+  Lemma redex_trivial : forall k (r : redex k), only_trivial r k.
+  Proof with auto.
+    intros k1 r t k2 c; revert t.
+    induction c.
+    - intuition.
+    - intros.
+      right.
+      destruct IHc with (ec0:[t]) as [(H1, H2) | (v0, H1)]; auto;
+          try solve [contradict H0; apply death_propagation; auto];
+          dep_subst; simpl in *;
+      match goal with
+      | [Hvr : ?ec :[ ?t ] = _ ?r |- _] => 
+            destruct ec; destruct r; 
+            dependent_destruction2 Hvr
+      end; simpl in *; 
+      try solve [ intuition
+                | exists (vECaLam v t1); auto 
+                | dependent destruction v; discriminate
+                | eexists; eauto
+                | apply L
+                | eexists (vCBot _); simpl; eauto ].
+  Qed.
 
 
   Inductive subterm_one_step : term -> term -> Prop :=
@@ -464,14 +537,12 @@ Module no_ECCa_Ref <: RED_REF_LANG.
 
   Lemma wf_st1 : well_founded subterm_one_step.
   Proof.
-    prove_st_wf.
+    RED_REF_LANG_Help.prove_st_wf.
   Qed.
 
 
   Definition subterm_order := clos_trans_1n term subterm_one_step.
   Notation " a <| b " := (subterm_order a b) (at level 40, no associativity).
-
-
   Definition wf_sto : well_founded subterm_order := wf_clos_trans_l _ _ wf_st1.
 
 
@@ -479,7 +550,7 @@ Module no_ECCa_Ref <: RED_REF_LANG.
       match k with
       | CBot => False
       | _      => match ec, ec0 with 
-                  | ap_l _, ap_r _ => strict_ec ec t /\ strict_ec ec0 t 
+                  | ap_l _, ap_r _ => immediate_ec ec t /\ immediate_ec ec0 t 
                   | _, _           => False
                   end
       end.
@@ -488,12 +559,12 @@ Module no_ECCa_Ref <: RED_REF_LANG.
 
   Lemma wf_eco : forall k t, well_founded (ec_order k t).
   Proof.
-    prove_ec_wf.
+    RED_REF_LANG_Help.prove_ec_wf.
   Qed.
 
 
-  Lemma dec_term_red_empty : forall t k (r : redex k), 
-                                 dec_term t k = in_red r -> only_empty t k.
+  Lemma dec_term_red_empty : 
+      forall t k (r : redex k), dec_term t k = in_red r -> only_empty t k.
   Proof with auto.
     intros t k r H.
     destruct t; inversion H; subst; clear H;
@@ -503,18 +574,15 @@ Module no_ECCa_Ref <: RED_REF_LANG.
         induction c;
             intros; simpl in *;
         [ intuition
-        | destruct (IHc _ H1 (context_tail_liveness _ _ H0) _ H) as (H2, H3);
+        | destruct (IHc (death_propagation2 _ _ H0) _ H) as (H2, H3);
           dep_subst;
-          destruct k2, ec0; inversion H1 ]
+          destruct k2, ec0;
+          inversion H1;
+          simpl in *; intuition ]
     ).
   Qed.
 
 
-  Lemma dec_term_from_dead : forall t k, dead_ckind k -> dec_term t k = in_dead k.
-  Proof.
-    intros.
-    destruct k; simpl; intuition.
-  Qed.
 
 
   Lemma dec_term_val_empty : forall t k (v : value k), 
@@ -527,15 +595,16 @@ Module no_ECCa_Ref <: RED_REF_LANG.
         induction c;
             intros; simpl in *;
         [ intuition
-        | destruct (IHc _ H1 (context_tail_liveness _ _ H0) _ H) as (H2, H3);
+        | destruct (IHc (death_propagation2 _ _ H0) _ H) as (H2, H3);
           dep_subst;
           destruct k2, ec0; inversion H1 ]
     ). 
 
     
         induction c;
-            intros; simpl in *. intuition. destruct (IHc _ H1 (context_tail_liveness _ _ H0) _ H) as (H2, H3);
-              subst; dependent destruction H3. destruct k2, ec0; inversion H.
+            intros; simpl in *. intuition. 
+            destruct (IHc (death_propagation2 _ _ H0) _ H) as (H2, H3);
+            subst; dependent destruction H3. destruct k2, ec0; inversion H.
 
 destruct k; intros. Focus 2.
 dependent destruction c.
@@ -563,34 +632,6 @@ discriminate.
   Qed.
 
 
-  Lemma dec_term_correct : forall (t : term) k, match dec_term t k with
-    | in_red r      => t = r
-    | in_val v      => t = v
-    | in_term t' ec => t = ec:[t']
-    | in_dead       => dead_ckind k 
-    end.
-  Proof.
-    destruct k, t; simpl; auto.
-  Qed.
-
-
-  Lemma dec_context_correct : forall ec k v, match dec_context ec k v with
-    | in_red r      => ec:[v] = r
-    | in_val v'     => ec:[v] = v'
-    | in_term t ec' => ec:[v] = ec':[t]
-    | in_dead       => dead_ckind (k+>ec)
-    end.
-  Proof.
-    destruct k, ec0; dependent destruction v; simpl; auto.
-  Qed.
-
-
-  Lemma dec_context_from_dead : 
-      forall ec k v, dead_ckind (k+>ec) -> dec_context ec k v = in_dead k.
-  Proof.
-    intros.
-    destruct ec0, k; simpl in *; intuition.
-  Qed.
 (*
   Lemma ec_siblings_uni_strong : 
      forall ec1 ec2, ec_siblings ec1 ec2 -> 
@@ -607,7 +648,7 @@ discriminate.
 
   Lemma ec_order_comp_fi :
       forall k t ec0 ec1,  k, t |~ ec0 << ec1 ->
-          strict_ec ec0 t /\ strict_ec ec1 t /\ 
+          immediate_ec ec0 t /\ immediate_ec ec1 t /\ 
           ~ dead_ckind (k+>ec0) /\ ~ dead_ckind (k+>ec1).
   Proof with auto.
     intros.
@@ -728,7 +769,7 @@ subst. simpl in *. inversion H0; destruct v0; discriminate.
 
 
   Lemma ec_order_comp_if :
-      forall t ec0 ec1, strict_ec ec0 t -> strict_ec ec1 t -> 
+      forall t ec0 ec1, immediate_ec ec0 t -> immediate_ec ec1 t -> 
           forall k, ~ dead_ckind (k+>ec0) -> ~ dead_ckind (k+>ec1) ->
               k,t |~ ec0 << ec1 \/ k,t |~ ec1 << ec0 \/ ec0 = ec1.
   Proof with eauto.
@@ -757,15 +798,6 @@ subst. simpl in *. inversion H0; destruct v0; discriminate.
     - intro; intuition.
     - intro; intuition.
   Qed.*)
-
-
-  Lemma dec_term_next_alive : 
-      forall t k t0 ec0, dec_term t k = in_term t0 ec0 -> ~ dead_ckind (k+>ec0).
-  Proof.
-    intros.
-    destruct t, k; inversion H; subst;
-    auto.
-  Qed.
 
 End no_ECCa_Ref.
 
@@ -800,7 +832,7 @@ Module no_ECCa_Sem <: RED_SEM no_ECCa.
   with decctx : forall {k2}, value k2 -> forall {k1}, context k1 k2 -> decomp k1 -> Prop :=
   | dc_em       : forall {k} (v : value k),
                    ~ dead_ckind k ->
-                   decctx v [_] (d_val v)
+                   decctx v [.] (d_val v)
   | dc_CAp_r1   : forall x t0 t {k1} (c : context k1 C),
                    decctx (vECaLam x t0) (ap_r t =: c) (d_red (rCApp x t0 t) c)
   | dc_CAp_r2   : forall x t {k1} (c : context k1 C) d
@@ -928,8 +960,8 @@ Module no_ECCa_Sem <: RED_SEM no_ECCa.
       subst.
       + dependent destruction v1; subst.
         * right. exists k1. destruct k1; simpl in H; try tauto; clear H;
-          [ eexists (rCApp _ _ _), [_]
-          | eexists (rECaApp _ _ _), [_] ];
+          [ eexists (rCApp _ _ _), [.]
+          | eexists (rECaApp _ _ _), [.] ];
           reflexivity.
         *{
           destruct G as [(v2, H1) | (k2, (r2, (c2, H1)))]; subst.
@@ -984,7 +1016,7 @@ Module no_ECCa_Sem <: RED_SEM no_ECCa.
                           dec t (c ~+ c0) d.
   Proof.
     induction c; simpl; auto; destruct ec0;
-    intros ? c0 t0 d H DEC; assert (hh := IHc _ _ _ _ (context_tail_liveness _ _ H) DEC);
+    intros ? c0 t0 d H DEC; assert (hh := IHc _ _ _ _ (death_propagation2 _ _ H) DEC);
     dependent destruction hh; subst; auto; simpl in H; try tauto;
       destruct (L v);
       rewrite H0 in hh; rewrite dec_val_self in hh;
@@ -1153,9 +1185,12 @@ Reserved Notation " a →+ b " (at level 40, no associativity).
 
 Lemma trans_eam_mlm : forall c0 c1, c0 >> c1 -> c0 → c1.
 Proof with auto.
-  intros c0 c1 T; inversion T; subst; match goal with
-  | [ DT : no_ECCa_REF_SEM.dec_term ?t ?k2 = ?int |- _ ] => destruct t, k2; inversion DT
-  | [ DC : no_ECCa_REF_SEM.dec_context ?ec ?k2 ?v = ?int |- _ ] => destruct ec, k2; dependent_destruction2 v; inversion DC
+  intros c0 c1 T; inversion T; subst;
+  let dec_term    := no_ECCa_REF_SEM.RefLang.DEC.dec_term in
+  let dec_context := no_ECCa_REF_SEM.RefLang.DEC.dec_context in
+  match goal with
+  | [ DT : dec_term ?t ?k2 = ?int |- _ ] => destruct t, k2; inversion DT
+  | [ DC : dec_context ?ec ?k2 ?v = ?int |- _ ] => destruct ec, k2; dependent_destruction2 v; inversion DC
   | [ |- _ ] => idtac
   end; subst; try constructor; auto.
 Qed.
@@ -1202,11 +1237,11 @@ Qed.
 
 
 
-Definition term := no_ECCa.term.
-Definition value := no_ECCa.value init_ckind.
+Definition term  := term.
+Definition value := value init_ckind.
 
-Definition configuration := ECCa_EAM.configuration.
-Definition c_init := ECCa_EAM.c_init.
-Definition c_final := ECCa_EAM.c_final.
+Definition configuration := configuration.
+Definition c_init  := c_init.
+Definition c_final := c_final.
 
 End ECCa_Machine.

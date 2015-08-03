@@ -16,18 +16,17 @@ Module RED_LANG_Facts (R : RED_LANG).
     assert (H1 := JMeq_eq_depT _ _ _ _ _ _ H H0).
     assert (H2 := eq_dep_eq_sigT _ _ _ _ _ _ H1). 
     inversion H2; subst.
-    assert (H7' := inj_pair2 _ _ _ _ _ H7); subst; clear H7.
-    assert (H7'' := inj_pair2 _ _ _ _ _ H7'); subst; clear H7'.
+    dep_subst.
     auto.
   Qed.
 
 
-  Lemma context_tail_liveness : 
+  Lemma death_propagation2 : 
       forall k ec, ~ dead_ckind (k+>ec) -> ~ dead_ckind k.
   Proof.
     intuition.
     apply H.
-    apply ckind_death_propagation.
+    apply death_propagation.
     assumption.
   Qed.
 
@@ -66,7 +65,7 @@ Module RED_LANG_Facts (R : RED_LANG).
   Qed.
 
 
-  Lemma compose_empty : forall {k1 k2} (c : context k1 k2), c = c ~+ [_].
+  Lemma compose_empty : forall {k1 k2} (c : context k1 k2), c = c ~+ [.].
   Proof.
     induction c.
     - trivial.
@@ -85,11 +84,11 @@ Module RED_LANG_Facts (R : RED_LANG).
 
 
   Lemma context_snoc : forall ec0 {k1 k2} (c0 : context k1 k2),
-                           exists ec1 c1, (ec0=:c0) = (c1~+ec1=:[_]).
+                           exists ec1 c1, (ec0=:c0) = (c1~+ec1=:[.]).
   Proof.
     intros; revert ec0.
     induction c0; intros.
-    - exists ec0; eexists [_]; trivial.
+    - exists ec0; eexists [.]; trivial.
     - destruct IHc0 with ec as (ec1, (c1, IH)).
       exists ec1; eexists (ec0=:c1); rewrite IH; trivial.
   Qed.
@@ -101,7 +100,7 @@ Module RED_LANG_Facts (R : RED_LANG).
     intros ? ? c H; revert c.
     induction 1.
     - trivial.
-    - apply ckind_death_propagation...
+    - apply death_propagation...
   Qed.
 
 End RED_LANG_Facts.

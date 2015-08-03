@@ -6,6 +6,7 @@ Module Type RED_SEM (R : RED_LANG).
 
   Import R.
 
+
   Parameter dec : term -> forall {k1 k2}, context k1 k2 -> decomp k1 -> Prop.
 
   (** A redex in context will only ever be reduced to itself *)
@@ -30,7 +31,7 @@ Module Type RED_SEM (R : RED_LANG).
 
 
   Inductive decempty : term -> forall {k}, decomp k -> Prop :=
-  | d_intro : forall {t k} {d : decomp k}, dec t [_] d -> decempty t d.
+  | d_intro : forall {t k} {d : decomp k}, dec t [.] d -> decempty t d.
 
   Inductive iter : forall {k}, decomp k -> value k -> Prop :=
   | i_val : forall {k} (v : value k), iter (d_val v) v
@@ -48,39 +49,9 @@ End RED_SEM.
 
 Module Type RED_REF_SEM (R : RED_LANG).
 
-  Import R. 
+  Declare Module RefLang : RED_REF_LANG with Module R := R.
+  Import RefLang.
 
-  (** Functions specifying atomic steps of induction on terms and contexts -- needed to avoid explicit induction on terms and contexts in construction of the AM *)
-  Parameter dec_term    : term -> forall k, interm_dec k.
-  Parameter dec_context : forall ec k, value (k+>ec) -> interm_dec k.
-
-
-  Axiom dec_term_correct : 
-      forall t k, match dec_term t k with
-      | in_red r       => t = r
-      | in_val v       => t = v
-      | in_term t0 ec0 => t = ec0:[t0]
-      | in_dead        => dead_ckind k
-      end.
-
-  Axiom dec_context_correct : 
-      forall ec k v, match dec_context ec k v with
-      | in_red r      => ec:[v] = r
-      | in_val v0     => ec:[v] = v0
-      | in_term t ec0 => ec:[v] = ec0:[t]
-      | in_dead       => dead_ckind (k+>ec) 
-      end.
-
-
-  Axiom dec_term_next_alive : 
-      forall t k {t0 ec0}, dec_term t k = in_term t0 ec0 -> ~ dead_ckind (k+>ec0).
-
-  Axiom dec_term_from_dead : 
-      forall t k, dead_ckind k -> dec_term t k = in_dead k.
-
-  Axiom dec_context_from_dead : 
-      forall ec k (v : value (k+>ec)), 
-          dead_ckind (k+>ec) -> dec_context ec k v = in_dead k.
 
   (** A decomposition function specified in terms of the atomic functions above *)
   Inductive dec : term -> forall {k1 k2}, context k1 k2 -> decomp k1 -> Prop :=
@@ -99,7 +70,7 @@ Module Type RED_REF_SEM (R : RED_LANG).
   with decctx : forall {k2}, value k2 -> forall {k1}, context k1 k2 -> decomp k1 -> Prop :=
   | dc_end  : forall {k} (v : value k), 
                 ~ dead_ckind k ->
-                decctx v [_] (d_val v)
+                decctx v [.] (d_val v)
   | dc_dec  : forall ec {k2} (v : value (k2+>ec)) {k1} (c : context k1 k2) {r},
                 dec_context ec k2 v = in_red r ->
                 decctx v (ec=:c) (d_red r c)
@@ -124,7 +95,9 @@ Module Type RED_REF_SEM (R : RED_LANG).
   Axiom dec_not_dead : forall {t k1 k2} {c : context k1 k2} {d},
                            dec t c d -> ~ dead_ckind k2.
 
+
   Declare Module RS : RED_SEM R with Definition dec := dec.
+  Export RS.
 
 End RED_REF_SEM.
 
@@ -132,12 +105,14 @@ End RED_REF_SEM.
 
 Module Type PE_REF_SEM (R : RED_LANG).
 
-  Import R.
+  Declare Module RefSem : RED_REF_SEM R.
+  Export RefSem.
+  Import RefLang.
 
-  Declare Module Red_Sem : RED_REF_SEM R.
-
-  Axiom dec_context_not_val : forall ec k v v0, Red_Sem.dec_context ec k v <> in_val v0.
-  Axiom dec_term_value : forall k (v : value k), Red_Sem.dec_term v k = in_val v.
+  Axiom dec_context_not_val : 
+      forall ec {k} v (v0 : value k), dec_context ec k v <> in_val v0.
+  Axiom dec_term_value : 
+      forall {k} (v : value k), dec_term v k = in_val v.
 
 End PE_REF_SEM.
 
@@ -147,6 +122,7 @@ Module Type RED_SEM_PROPER (R : RED_LANG) (RS : RED_SEM R).
 
   Import R.
   Import RS.
+
 
   Axiom dec_is_function  : forall {t k} {d d0 : decomp k}, 
                                decempty t d -> decempty t d0 -> d = d0.
@@ -175,27 +151,10 @@ End RED_SEM_PROPER.
 Module Type PRE_ABSTRACT_MACHINE (R : RED_LANG).
 
   Import R.
+  Declare Module DEC : DEC_STEP R.
+  Export DEC.
 
-  (** Functions specifying atomic steps of induction on terms and contexts -- needed to avoid explicit induction on terms and contexts in construction of the AM *)
-  Parameter dec_term    : term -> forall k, interm_dec k.
-  Parameter dec_context : forall ec k, value (k+>ec) -> interm_dec k.
 
-  Axiom dec_term_correct : 
-      forall t k, match dec_term t k with
-      | in_red r       => t = r
-      | in_val v       => t = v
-      | in_term t0 ec0 => t = ec0:[t0]
-      | in_dead        => dead_ckind k
-      end.
-
-  Axiom dec_context_correct : 
-      forall ec k v, match dec_context ec k v with
-      | in_red r      => ec:[v] = r
-      | in_val v0     => ec:[v] = v0
-      | in_term t ec0 => ec:[v] = ec0:[t]
-      | in_dead       => dead_ckind (k+>ec) 
-      end.
-  
   (** A decomposition function specified in terms of the atomic functions above *)
   Inductive dec : term -> forall {k1 k2}, context k1 k2 -> decomp k1 -> Prop :=
   | d_dec  : forall t {k1 k2} (c : context k1 k2) {r},
@@ -213,7 +172,7 @@ Module Type PRE_ABSTRACT_MACHINE (R : RED_LANG).
   with decctx : forall {k2}, value k2 -> forall {k1}, context k1 k2 -> decomp k1 -> Prop :=
   | dc_end  : forall {k} (v : value k), 
                 ~ dead_ckind k ->
-                decctx v [_] (d_val v)
+                decctx v [.] (d_val v)
   | dc_dec  : forall ec {k2} (v : value (k2+>ec)) {k1} (c : context k1 k2) {r},
                 dec_context ec k2 v = in_red r ->
                 decctx v (ec=:c) (d_red r c)
@@ -240,7 +199,7 @@ Module Type PRE_ABSTRACT_MACHINE (R : RED_LANG).
 
   Inductive eval : term -> value init_ckind -> Prop :=
   | e_intro : forall {t} {d : decomp init_ckind} {v : value init_ckind},
-                dec t [_] d -> iter d v -> eval t v.
+                dec t [.] d -> iter d v -> eval t v.
 
 End PRE_ABSTRACT_MACHINE.
 
@@ -249,26 +208,8 @@ End PRE_ABSTRACT_MACHINE.
 Module Type STAGED_ABSTRACT_MACHINE (R : RED_LANG).
 
   Import R.
-
-  (** Functions specifying atomic steps of induction on terms and contexts -- needed to avoid explicit induction on terms and contexts in construction of the AM *)
-  Parameter dec_term    : term -> forall k, interm_dec k.
-  Parameter dec_context : forall ec k, value (k+>ec) -> interm_dec k.
-
-  Axiom dec_term_correct : 
-      forall t k, match dec_term t k with
-      | in_red r       => t = r
-      | in_val v       => t = v
-      | in_term t0 ec0 => t = ec0:[t0]
-      | in_dead        => dead_ckind k
-      end.
-
-  Axiom dec_context_correct : 
-      forall ec k v, match dec_context ec k v with
-      | in_red r      => ec:[v] = r
-      | in_val v0     => ec:[v] = v0
-      | in_term t ec0 => ec:[v] = ec0:[t]
-      | in_dead       => dead_ckind (k+>ec) 
-      end.
+  Declare Module DEC : DEC_STEP R.
+  Export DEC.
 
 
   Inductive dec : term -> forall {k1 k2}, context k1 k2 -> value k1 -> Prop :=
@@ -286,7 +227,7 @@ Module Type STAGED_ABSTRACT_MACHINE (R : RED_LANG).
   | dc_end  : forall {k} {v v0 : value k},
                 ~ dead_ckind k ->
                 iter (d_val v) v0 ->
-                decctx v [_] v0
+                decctx v [.] v0
   | dc_dec  : forall ec {k2} (v : value (k2+>ec)) {k1} {c : context k1 k2} {r v0},
                 dec_context ec k2 v = in_red r -> iter (d_red r c) v0 ->
                 decctx v (ec=:c) v0
@@ -310,7 +251,7 @@ Module Type STAGED_ABSTRACT_MACHINE (R : RED_LANG).
 
 
   Inductive eval : term -> value init_ckind -> Prop :=
-  | e_intro : forall {t} {v : value init_ckind}, dec t [_] v -> eval t v.
+  | e_intro : forall {t} {v : value init_ckind}, dec t [.] v -> eval t v.
 
 End STAGED_ABSTRACT_MACHINE.
 
@@ -319,30 +260,12 @@ End STAGED_ABSTRACT_MACHINE.
 Module Type EVAL_APPLY_MACHINE (R : RED_LANG).
 
   Import R.
-
-  (** Functions specifying atomic steps of induction on terms and contexts -- needed to avoid explicit induction on terms and contexts in construction of the AM *)
-  Parameter dec_term    : term -> forall k, interm_dec k.
-  Parameter dec_context : forall ec k, value (k+>ec) -> interm_dec k.
-
-  Axiom dec_term_correct : 
-      forall t k, match dec_term t k with
-      | in_red r       => t = r
-      | in_val v       => t = v
-      | in_term t0 ec0 => t = ec0:[t0]
-      | in_dead        => dead_ckind k
-      end.
-
-  Axiom dec_context_correct : 
-      forall ec k v, match dec_context ec k v with
-      | in_red r      => ec:[v] = r
-      | in_val v0     => ec:[v] = v0
-      | in_term t ec0 => ec:[v] = ec0:[t]
-      | in_dead       => dead_ckind (k+>ec) 
-      end.
+  Declare Module DEC : DEC_STEP R.
+  Export DEC.
 
 
   Inductive dec : term -> forall {k1 k2}, context k1 k2 -> value k1 -> Prop :=
-  | d_d_r  : forall t {t0 k1 k2} {c : context k1 k2} {r v},
+  | d_d_r  : forall t {t0 k1 k2} {c : context k1 k2} {r : redex k2} {v},
                dec_term t k2 = in_red r -> contract r = Some t0 -> dec t0 c v ->
                dec t c v
   | d_v    : forall t {k1 k2} {c : context k1 k2} {v v0},
@@ -355,8 +278,8 @@ Module Type EVAL_APPLY_MACHINE (R : RED_LANG).
   with decctx : forall {k2}, value k2 -> forall {k1}, context k1 k2 -> value k1 -> Prop :=
   | dc_end : forall {k} (v : value k), 
                ~ dead_ckind k ->
-               decctx v [_] v
-  | dc_red : forall ec {k2} (v : value (k2+>ec)) {k1} {c : context k1 k2} {r t v0},
+               decctx v [.] v
+  | dc_red : forall ec {k2} (v : value (k2+>ec)) {k1} {c : context k1 k2} {r : redex k2} {t v0},
                dec_context ec k2 v = in_red r -> contract r = Some t -> dec t c v0 ->
                decctx v (ec=:c) v0
   | dc_rec : forall ec {k2} (v : value (k2+>ec)) {k1} {c : context k1 k2} {v0 v1},
@@ -372,7 +295,7 @@ Module Type EVAL_APPLY_MACHINE (R : RED_LANG).
 
 
   Inductive eval : term -> value init_ckind -> Prop :=
-  | e_intro : forall {t} {v : value init_ckind}, dec t [_] v -> eval t v.
+  | e_intro : forall {t} {v : value init_ckind}, dec t [.] v -> eval t v.
 
 End EVAL_APPLY_MACHINE.
 
@@ -381,26 +304,9 @@ End EVAL_APPLY_MACHINE.
 Module Type PROPER_EA_MACHINE (R : RED_LANG).
 
   Import R.
+  Declare Module DEC : DEC_STEP R.
+  Export DEC.
 
-  (** Functions specifying atomic steps of induction on terms and contexts -- needed to avoid explicit induction on terms and contexts in construction of the AM *)
-  Parameter dec_term    : term -> forall k, interm_dec k.
-  Parameter dec_context : forall ec k, value (k+>ec) -> interm_dec k.
-
-  Axiom dec_term_correct : 
-      forall t k, match dec_term t k with
-      | in_red r       => t = r
-      | in_val v       => t = v
-      | in_term t0 ec0 => t = ec0:[t0]
-      | in_dead        => dead_ckind k
-      end.
-
-  Axiom dec_context_correct : 
-      forall ec k v, match dec_context ec k v with
-      | in_red r      => ec:[v] = r
-      | in_val v0     => ec:[v] = v0
-      | in_term t ec0 => ec:[v] = ec0:[t]
-      | in_dead       => dead_ckind (k+>ec) 
-      end.
 
   Inductive configuration : Set :=
   | c_eval  : term -> forall {k1 k2}, context k1 k2 -> configuration
@@ -408,7 +314,7 @@ Module Type PROPER_EA_MACHINE (R : RED_LANG).
 (*  | c_final : value init_ckind -> configuration.*)
 
   Definition c_init t                       := c_eval t (@empty init_ckind).
-  Definition c_final (v : value init_ckind) := c_apply [_] v.
+  Definition c_final (v : value init_ckind) := c_apply [.] v.
 
 
   Reserved Notation " a → b " (at level 40, no associativity).
@@ -417,7 +323,7 @@ Module Type PROPER_EA_MACHINE (R : RED_LANG).
   Inductive transition : configuration -> configuration -> Prop :=
 (*  | t_init : forall t, 
                c_init t → c_eval t (@empty init_ckind)*)
-  | t_red  : forall t {k1 k2} (c : context k1 k2) {r t0},
+  | t_red  : forall t {k1 k2} (c : context k1 k2) {r : redex k2} { t0},
                dec_term t k2 = in_red r -> contract r = Some t0 ->
                c_eval t c → c_eval t0 c
   | t_val  : forall t {k1 k2} (c : context k1 k2) {v},
@@ -429,7 +335,7 @@ Module Type PROPER_EA_MACHINE (R : RED_LANG).
 (*  | t_cfin : forall (v : value init_ckind),
                ~ dead_ckind init_ckind ->
                c_apply [_] v → c_final v*)
-  | t_cred : forall ec {k2} (v : value (k2+>ec)) {k1} (c : context k1 k2) {r t},
+  | t_cred : forall ec {k2} (v : value (k2+>ec)) {k1} (c : context k1 k2) {r : redex k2} { t},
                dec_context ec k2 v = in_red r -> contract r = Some t ->
                c_apply (ec=:c) v → c_eval t c
   | t_cval : forall ec {k2} (v : value (k2+>ec)) {k1} (c : context k1 k2) {v0},
@@ -456,38 +362,24 @@ End PROPER_EA_MACHINE.
 Module Type PUSH_ENTER_MACHINE (R : RED_LANG).
 
   Import R.
+  Declare Module DEC : DEC_STEP R.
+  Export DEC.
 
 
-  (** Functions specifying atomic steps of induction on terms and contexts -- needed to avoid explicit induction on terms and contexts in construction of the AM *)
-  Parameter dec_term : term -> forall k, interm_dec k.
-  Parameter dec_context : forall ec k, value (k+>ec) -> interm_dec k.
+  Axiom dec_context_not_val : 
+      forall ec {k} v (v0 : value k), dec_context ec k v <> in_val v0.
 
-  Axiom dec_term_value : forall {k} (v : value k), dec_term v k = in_val v.
-  Axiom dec_context_not_val : forall ec k v v0, ~(dec_context ec k v = in_val v0).
+  Axiom dec_term_value : 
+      forall {k} (v : value k), dec_term v k = in_val v.
 
-  Axiom dec_term_correct : 
-      forall t k, match dec_term t k with
-      | in_red r       => t = r
-      | in_val v       => t = v
-      | in_term t0 ec0 => t = ec0:[t0]
-      | in_dead        => dead_ckind k
-      end.
-
-  Axiom dec_context_correct : 
-      forall ec k v, match dec_context ec k v with
-      | in_red r      => ec:[v] = r
-      | in_val v0     => ec:[v] = v0
-      | in_term t ec0 => ec:[v] = ec0:[t]
-      | in_dead       => dead_ckind (k+>ec) 
-      end.
 
   Inductive dec : term -> forall {k1 k2}, context k1 k2 -> value k1 -> Prop :=
-  | dec_r    : forall t {t0 k1 k2} {c : context k1 k2} {r v},
+  | dec_r    : forall t {t0 k1 k2} {c : context k1 k2} {r  v},
                  dec_term t k2 = in_red r -> contract r = Some t0 -> dec t0 c v ->
                  dec t c v
   | dec_val  : forall t {k} {v : value k},
                  dec_term t k = in_val v ->
-                 dec t [_] v
+                 dec t [.] v
   | dec_v_t  : forall t ec {t0 ec0} {k1 k2} {c : context k1 k2} {v v0},
                  dec_term t (k2+>ec) = in_val v -> 
                  dec_context ec k2 v = in_term t0 ec0 -> 
@@ -507,7 +399,7 @@ Module Type PUSH_ENTER_MACHINE (R : RED_LANG).
   (*Scheme dec_Ind := Induction for dec Sort Prop.*)
 
   Inductive eval : term -> value init_ckind -> Prop :=
-  | e_intro : forall {t} {v : value init_ckind}, dec t [_] v -> eval t v.
+  | e_intro : forall {t} {v : value init_ckind}, dec t [.] v -> eval t v.
 
 End PUSH_ENTER_MACHINE.
 
@@ -516,30 +408,14 @@ End PUSH_ENTER_MACHINE.
 Module Type PROPER_PE_MACHINE (R : RED_LANG).
 
   Import R.
+  Declare Module DEC : DEC_STEP R.
+  Export DEC.
 
 
-  (** Functions specifying atomic steps of induction on terms and contexts -- needed to avoid explicit induction on terms and contexts in construction of the AM *)
-  Parameter dec_term : term -> forall k, interm_dec k.
-  Parameter dec_context : forall ec k, value (k+>ec) -> interm_dec k.
-
-  Axiom dec_term_value : forall {k} (v : value k), dec_term v k = in_val v.
-  Axiom dec_context_not_val : forall ec k v v0, ~(dec_context ec k v = in_val v0).
-
-  Axiom dec_term_correct : 
-      forall t k, match dec_term t k with
-      | in_red r       => t = r
-      | in_val v       => t = v
-      | in_term t0 ec0 => t = ec0:[t0]
-      | in_dead        => dead_ckind k
-      end.
-
-  Axiom dec_context_correct : 
-      forall ec k v, match dec_context ec k v with
-      | in_red r      => ec:[v] = r
-      | in_val v0     => ec:[v] = v0
-      | in_term t ec0 => ec:[v] = ec0:[t]
-      | in_dead       => dead_ckind (k+>ec) 
-      end.
+  Axiom dec_context_not_val : 
+      forall ec {k} v (v0 : value k), dec_context ec k v <> in_val v0.
+  Axiom dec_term_value : 
+      forall {k} (v : value k), dec_term v k = in_val v.
 
 
   Inductive configuration : Set :=

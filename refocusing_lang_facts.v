@@ -48,18 +48,18 @@ Module RED_LANG_Facts (R : RED_LANG).
 
       [ apply JMeq_eq_depT; eauto
 
-      | inversion H0; subst; 
+      | inversion H0; dep_subst; clear H0 (*; 
         match goal with H1 : existT _ _ _ = existT _ _ _ |- _ => 
         let tmp := fresh in 
         assert (tmp := H1); clear H1;
         dependent destruction tmp
         end;
-        clear H0 ]
+        clear H0*) ]
 
       end.
 
 
-  Lemma plug_empty : forall t k, (@empty k)[t] = t.
+  Lemma plug_empty : forall t k, [.](k)[t] = t.
   Proof.
     intuition.
   Qed.

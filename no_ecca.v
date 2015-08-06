@@ -370,6 +370,31 @@ Qed.
     rewrite IHc; simpl; constructor.
   Qed.
 
+
+
+  Lemma redex_trivial : forall k (r : redex k), only_trivial r k.
+  Proof with auto.
+    intros k1 r t k2 c; revert t.
+    induction c.
+    - intuition.
+    - intros.
+      right.
+      destruct IHc with (ec0:[t]) as [(H1, H2) | (v0, H1)]; auto;
+          try solve [contradict H0; apply death_propagation; auto];
+          dep_subst; simpl in *;
+      match goal with
+      | [Hvr : ?ec :[ ?t ] = _ ?r |- _] => 
+            destruct ec; destruct r; 
+            dependent_destruction2 Hvr
+      end; simpl in *; 
+      try solve [ intuition
+                | exists (vECaLam v t1); auto 
+                | dependent destruction v; discriminate
+                | eexists; eauto
+                | apply L
+                | eexists (vCBot _); simpl; eauto ].
+  Qed.
+
 End no_ECCa.
 
 
@@ -505,30 +530,6 @@ Module no_ECCa_Ref <: RED_REF_LANG.
   End DEC.
 
   Export DEC.
-
-
-  Lemma redex_trivial : forall k (r : redex k), only_trivial r k.
-  Proof with auto.
-    intros k1 r t k2 c; revert t.
-    induction c.
-    - intuition.
-    - intros.
-      right.
-      destruct IHc with (ec0:[t]) as [(H1, H2) | (v0, H1)]; auto;
-          try solve [contradict H0; apply death_propagation; auto];
-          dep_subst; simpl in *;
-      match goal with
-      | [Hvr : ?ec :[ ?t ] = _ ?r |- _] => 
-            destruct ec; destruct r; 
-            dependent_destruction2 Hvr
-      end; simpl in *; 
-      try solve [ intuition
-                | exists (vECaLam v t1); auto 
-                | dependent destruction v; discriminate
-                | eexists; eauto
-                | apply L
-                | eexists (vCBot _); simpl; eauto ].
-  Qed.
 
 
   Inductive subterm_one_step : term -> term -> Prop :=
@@ -1051,6 +1052,31 @@ Module no_ECCa_Sem <: RED_SEM no_ECCa.
   Inductive eval : term -> value init_ckind -> Prop :=
   | e_intro : forall {t d v}, decempty t d -> iter d v -> eval t v.
 
+
+
+  Lemma redex_trivial : forall k (r : redex k), only_trivial r k.
+  Proof with auto.
+    intros k1 r t k2 c; revert t.
+    induction c.
+    - intuition.
+    - intros.
+      right.
+      destruct IHc with (ec0:[t]) as [(H1, H2) | (v0, H1)]; auto;
+          try solve [contradict H0; apply death_propagation; auto];
+          dep_subst; simpl in *;
+      match goal with
+      | [Hvr : ?ec :[ ?t ] = _ ?r |- _] => 
+            destruct ec; destruct r; 
+            dependent_destruction2 Hvr
+      end; simpl in *; 
+      try solve [ intuition
+                | exists (vECaLam v t1); auto 
+                | dependent destruction v; discriminate
+                | eexists; eauto
+                | apply L
+                | eexists (vCBot _); simpl; eauto ].
+  Qed.
+
 End no_ECCa_Sem.
 
 
@@ -1186,8 +1212,8 @@ Reserved Notation " a →+ b " (at level 40, no associativity).
 Lemma trans_eam_mlm : forall c0 c1, c0 >> c1 -> c0 → c1.
 Proof with auto.
   intros c0 c1 T; inversion T; subst;
-  let dec_term    := no_ECCa_REF_SEM.RefLang.DEC.dec_term in
-  let dec_context := no_ECCa_REF_SEM.RefLang.DEC.dec_context in
+  let dec_term    := no_ECCa_REF_SEM.DEC.dec_term in
+  let dec_context := no_ECCa_REF_SEM.DEC.dec_context in
   match goal with
   | [ DT : dec_term ?t ?k2 = ?int |- _ ] => destruct t, k2; inversion DT
   | [ DC : dec_context ?ec ?k2 ?v = ?int |- _ ] => destruct ec, k2; dependent_destruction2 v; inversion DC

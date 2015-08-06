@@ -2,76 +2,90 @@ Require Export Util.
 Require Import Program.
 
 
+(* Note: The only grammar mentioned in this formalization is a grammar of evaluation
+   contexts, thus any reference to a grammar means the grammar of contexts of 
+   the formalized language.
+   
+   In this formalisation we represent evaluation contexts in terms of elementary
+   contexts (if you do not understand this go to the paper). To find the elem.
+   contexts and the grammar of eval. contexts given in terms of elem. contexts, first 
+   translate the original grammar to a form where each right side of a production is 
+   a hole or it has a context non-terminal, then take each non-hole right side and 
+   replace the context symbol by a hole. The result is a context pattern - we will
+   use EC markings for them.
+
+   E.g., if k1, k2 are context symbols and there is a production  k1 -> a b k2 c  ,
+   then the result context pattern is  a b [] c  .
+
+   Contexts that match the patterns are elem. contexts. However, not every grmmar is
+   proper for our formalisation, so you may still need to refine it both with the set 
+   of elem. contexts.
+
+   First of all, for any context symbol k and elem. context ec there needs to at most
+   one k' such that there exists a production  k -> EC[k']  and ec matches EC. Let us
+   call such grammar a >deterministic grammar of contexts<. 
+
+   You may achive this form by spliting the context patterns and determinizing 
+   the grammar. E.g., suppose you have a grammar with two productions form k1:  
+   k1 -> a k2 a,  k1 -> ab k3 ab,  where L(ab) = L(a) U L(b) and languages L(a), L(b) 
+   are disjoint. Then you may split the second pattern  ab [] ab  to:  a [] a,  b [] ab,  
+   ab [] b. So now, the second production is replaced by three: k1 -> a k3 a,  
+   k -> b k3 ab,  k -> ab k3 b. Then, you may determinize the grammar. This will cause 
+   an introduction of a new context symbol {k2,k3}, replacing the two productions:  
+   k1 -> a k2 a,  k1 -> a k3 a,  with  k1 -> a {k2,k3} a  and derivating the missing 
+   part of the grammar from the symbol {k2,k3}. 
+
+   Second of all, the production  k -> []  must be present in the grammar for any k.
+   You may just add the missing ones. This does not break any generality in our case,
+   because in our formalisation you may define a set of redexes per each kind of
+   a hole. So, if there was no production  k -> [],  then you may just set up 
+   an empty set of redexes for k.
+
+   Definition: If a derivation of a context ends with a production k -> [], then
+   we say that the context has a >hole of the kind k<. *)
+
+
 
 (* Signature for languages with reduction semantics and multiple kinds of contextes. *)
 
 Module Type RED_LANG.
 
-
-  (* Note: (This describes only the simples use case.)
-     The only grammar mentioned in this formalization is a grammar of contexts,
-     thus any reference to a grammar means the grammar of contexts of the formalized
-     language.
-
-     In this formalisation we do not have a represenation for usual terminal 
-     symbols in the grammar. Instead, we take whole right sides of productions that 
-     contain non-terminals with non-terminals replaced by holes as terminals. Such 
-     right sides are called elementary contexts.
-
-     E.g., if k1, k2 are non-terminals and a, b, c are terminals, then the production 
-     k1 -> a b k2 c  may be represented as  k1 -> (a b [] c) k2  , where  a b [] c  
-     is an elementary context.
-
-     Now, if we require all right sides that do not contain non-terminals to be 
-     holes and existance of a production  k -> []  for any k, we can represent whole
-     grammar only in terms of elementary contexts and non-terminals.
-
-     We will call a hole generated from a symbol k >a hole of kind k< .
-
-     Because each production has at most one non-terminal symbol this procedure 
-     simplifies grammars of contexts to regular grammars on words. Let us call these 
-     grammars >linearized grammars< .
-
-     The requirement of productions  k -> []  does not break generality in our case,
-     because we will later fix redexes that can occur in each kind of holes. So
-     if we do not have a production  k -> []  in the original grammar, then we can 
-     equvalently fix redexes for k as an empty set. *)
-
-
-
-  (* Preconditions: To instaniate this module you need to linearize and determinize 
-     the grammar of contextes of your language. If the result grammar is not total, 
-     you need to include a sink non-terminal and totalize the grammar. *)
-
+  (* Preconditions: To instaniate this module you need to determinizethe grammar of 
+     contextes. *)
 
 
   Parameters term  elem_context : Set.
-  Parameter  ckind : Set. (* kinds of contexts, that is, non-terminal symbols in 
-                             the grammar *)
+  Parameter  ckind : Set. (* kinds of contexts, that is, non-terminal context symbols 
+                             in the grammar *)
 
 
-  Parameter  init_ckind : ckind. (* start symbol in the grammar *)
-  Parameter  dead_ckind : ckind -> Prop. (* set of sink symbols *)
+  Parameter  init_ckind : ckind.         (* start symbol in the grammar *)
+  Parameter  dead_ckind : ckind -> Prop. (* set of sink symbols; if your grammar
+                                            is not total you need to introduce at least
+                                            one *)
 
 
-  (* ckind_trans - function that determinates the productions in the grammar, or 
-                   in other words, a transition function of a finit automaton 
-                   representing the grammar. *)
+  (* ckind_trans - function that determinates the productions in the grammar, that is,
+                   if ckind_trans k1 ec = k2, then k1 -> EC[k2] where ec matches EC or
+                   there is no such production and k2 is a sink. 
+                   In other words, it is the transition function of a finit automaton 
+                   representing the totalized grammar. *)
   Parameter  ckind_trans : ckind -> elem_context -> ckind.
   Infix "+>" := ckind_trans (at level 50, left associativity).
 
 
+  (* The sink property: *)
   Axiom death_propagation : 
       forall k, dead_ckind k -> forall ec, dead_ckind (k+>ec).
 
 
 
-  (* context k1 k2 - contexts of kind k1 (derivated from k1) with the hole of kind k2. 
-                     Contexts are represented by reversed derivations from the grammar.
+  (* context k1 k2 - contexts of kind k1 (derivated from k1) with a hole of kind k2. 
+                     Contexts are represented by reversed derivations in the grammar.
                      E.g., if a context is derivated by a sequence of productions
                      k1 -> ec1 k2, k2 -> ec2 k3, k3 -> ec3 k4, k4 -> [], then it is 
-                     represented by the list  (ec3, k4)=:(ec2, k3)=:(ec1, k2)  and the
-                     type of it is  context k1 k4  .
+                     represented by the list  (ec3, k4), (ec2, k3), (ec1, k2)  ot 
+                     the type  context k1 k4.
                      The second elements in the pairs are implicite. *)
   Inductive context (k1 : ckind) : ckind -> Set :=
   | empty : context k1 k1
@@ -84,7 +98,9 @@ Module Type RED_LANG.
   (* Note: Contexts are reversed, because during evaluation by refocusing we always 
      access the elem. context nearest to the hole of a context. *)
 
+
   (* Definition: The hole of a context is >dead< if its kind is a sink symbol. *)
+
   (* Definition: A context is >proper< if its hole is not dead. 
      (Context with dead holes are contexts that cannot be generated in the orginal
      grammar.) *)
@@ -104,19 +120,20 @@ Module Type RED_LANG.
       end.
   Notation "c [ t ]" := (plug t c) (at level 0, t at level 99).
 
-  (* The following axiom somehow relates our representation of contexts to real
-     contexts, but generally we can instantiate the module with elem. contexts
-     that do not represent real elem. contexts. *)
-  Axiom elem_plug_injective1 : forall ec {t0 t1},
-      ec:[t0] = ec:[t1] -> t0 = t1.
+  (* The following axiom, somehow, relates our representation of contexts to the 
+     real eval. contexts, but generally we can instantiate the module with 
+     elem. contexts that do not represent real elem. contexts and so not
+     every module of this signature is a proper. *)
+  Axiom elem_plug_injective1 : forall ec {t0 t1}, ec:[t0] = ec:[t1] -> t0 = t1.
 
 
+  (* An intuitive definition: *)
   Definition immediate_ec ec t := exists t', ec:[t'] = t.
 
 
 
   (* redex k - representations of redexes that may occur in a hole of the kind k. 
-     value k (where k is not a sink)
+     value k where k is not a sink
              - (almost) normal forms of kind k, that is, representations of terms
                that cannot be decomposed to a context k k' and a redex k'.  value k
                where k is a sink may be anything. *)
@@ -143,7 +160,7 @@ Module Type RED_LANG.
   (* Definition: A decomposition c[t] is proper if c is proper. *)
 
   (* only_empty t k   - the term t has only empty or improper decompositions from 
-                        the non-terminal k.
+                        the symbol k.
      only_trivial t k - each proper decomposition of the term t from the symbol k is 
                         either empty or the component term is a value. *)
   Definition only_empty t k :=
@@ -163,8 +180,12 @@ Module Type RED_LANG.
          (exists (v : value k), t = v) \/ (exists (r : redex k), t = r).
 
 
+  (* A property of deterministic reduction semantics: *)
+  Axiom redex_trivial : forall {k} (r : redex k), only_trivial r k.
 
-  (* Reduction of a redex (which may get stuck): *)
+
+
+  (* Reduction of a redex (it may get stuck): *)
   Parameter contract : forall {k}, redex k -> option term.
 
 
@@ -238,11 +259,8 @@ Module Type DEC_STEP (R : RED_LANG).
       | in_dead       => dead_ckind k 
       end.
 
-  Axiom dec_term_from_dead : 
-      forall t k, dead_ckind k -> dec_term t k = in_dead.
-
-  Axiom dec_term_next_alive : 
-      forall t k {t0 ec0}, dec_term t k = in_term t0 ec0 -> ~ dead_ckind (k+>ec0).
+  Axiom dec_term_from_dead : forall t k, 
+      dead_ckind k -> dec_term t k = in_dead.
 
 
   Axiom dec_context_correct : 
@@ -253,11 +271,17 @@ Module Type DEC_STEP (R : RED_LANG).
       | in_dead       => dead_ckind (k+>ec) 
       end.
 
-  Axiom dec_context_from_dead : 
-      forall ec k (v : value (k+>ec)), dead_ckind (k+>ec) -> dec_context ec k v = in_dead.
+  Axiom dec_context_from_dead : forall ec k (v : value (k+>ec)), 
+      dead_ckind (k+>ec) -> dec_context ec k v = in_dead.
 
-  Axiom dec_context_next_alive : 
-      forall ec k v {t0 ec0}, dec_context ec k v = in_term t0 ec0 -> ~ dead_ckind (k+>ec0).
+
+  (* Any decomposition build by applying dec_term and dec_context needs to be 
+     proper. *)
+  Axiom dec_term_next_alive : forall t k {t0 ec0}, 
+      dec_term t k = in_term t0 ec0 -> ~ dead_ckind (k+>ec0).
+
+  Axiom dec_context_next_alive : forall ec k v {t0 ec0}, 
+      dec_context ec k v = in_term t0 ec0 -> ~ dead_ckind (k+>ec0).
 
 End DEC_STEP.
 
@@ -269,10 +293,6 @@ Module Type RED_REF_LANG.
   Declare Module DEC : DEC_STEP R.
   Export R.
   Export DEC.
-
-
-  (* Additional requirement on redexes: *)
-  Axiom redex_trivial : forall {k} (r : redex k), only_trivial r k.
 
 
   Inductive subterm_one_step : term -> term -> Prop :=

@@ -7,21 +7,23 @@ Module Type RED_SEM (R : RED_LANG).
   Import R.
 
 
-  Parameter dec : term -> forall {k1 k2}, context k1 k2 -> decomp k1 -> Prop.
-
-  (** A redex in context will only ever be reduced to itself *)
-  Axiom dec_redex_self : forall {k2} (r : redex k2) {k1} (c : context k1 k2), 
-                             dec r c (d_red r c).
-
+  (* This is a property of a language and should be in RED_LANG, but doing so
+     overcomplicate the library, thus we leave it here for now. *)
   Axiom decompose : forall (t : term) k1, ~ dead_ckind k1 ->
       (exists (v : value k1), t = v) \/
       (exists k2 (r : redex k2) (c : context k1 k2), t = c[r]).
 
-  (** dec is left inverse of plug *)
+
+  (* Decomposition relation 
+     dec t c d - the term c[t] can be decomposed to d. *)
+  Parameter dec : 
+      term -> forall {k1 k2}, context k1 k2 -> decomp k1 -> Prop.
+
   Axiom dec_correct  : forall {t k1 k2} {c : context k1 k2} {d}, 
                            dec t c d -> c[t] = d.
 
 
+  (* dec t c d  is equivalnet to  dec c[t] [.] d. *)
   Axiom dec_plug : 
       forall {k1 k2} (c : context k1 k2) {k3} {c0 : context k3 k1} {t d}, 
           ~ dead_ckind k2 -> dec c[t] c0 d -> dec t (c ~+ c0) d.
@@ -29,6 +31,13 @@ Module Type RED_SEM (R : RED_LANG).
   Axiom dec_plug_rev : 
       forall {k1 k2} (c : context k1 k2) {k3} {c0 : context k3 k1} {t d}, 
           ~ dead_ckind k2 -> dec t (c ~+ c0) d -> dec c[t] c0 d.
+
+
+
+  (** A redex in a context will only ever be decomposed to itself. *)
+  Axiom dec_redex_self : forall {k2} (r : redex k2) {k1} (c : context k1 k2), 
+                             dec r c (d_red r c).
+
 
 
   Inductive decempty : term -> forall {k}, decomp k -> Prop :=

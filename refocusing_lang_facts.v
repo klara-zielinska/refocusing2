@@ -23,6 +23,7 @@ Module RED_LANG_Facts (R : RED_LANG).
 
   Lemma death_propagation2 : 
       forall k ec, ~ dead_ckind (k+>ec) -> ~ dead_ckind k.
+
   Proof.
     intuition.
     apply H.
@@ -48,13 +49,7 @@ Module RED_LANG_Facts (R : RED_LANG).
 
       [ apply JMeq_eq_depT; eauto
 
-      | inversion H0; dep_subst; clear H0 (*; 
-        match goal with H1 : existT _ _ _ = existT _ _ _ |- _ => 
-        let tmp := fresh in 
-        assert (tmp := H1); clear H1;
-        dependent destruction tmp
-        end;
-        clear H0*) ]
+      | inversion H0; dep_subst; clear H0 ]
 
       end.
 
@@ -78,13 +73,13 @@ Module RED_LANG_Facts (R : RED_LANG).
           (c0 ~+ c1)[t] = c1[c0[t]].
   Proof.
     induction c0; intros.
-    - trivial.
-    - simpl; rewrite IHc0; trivial.
+    - auto.
+    - apply IHc0.
   Qed.
 
 
-  Lemma context_snoc : forall ec0 {k1 k2} (c0 : context k1 k2),
-                           exists ec1 c1, (ec0=:c0) = (c1~+ec1=:[.]).
+  Lemma context_cons_snoc : forall ec0 {k1 k2} (c0 : context k1 k2),
+                                exists ec1 c1, (ec0=:c0) = (c1~+ec1=:[.]).
   Proof.
     intros; revert ec0.
     induction c0; intros.
@@ -94,8 +89,9 @@ Module RED_LANG_Facts (R : RED_LANG).
   Qed.
 
 
-  Lemma dead_contex_dead : 
+  Lemma dead_context_dead : 
       forall {k1 k2}, context k1 k2 -> dead_ckind k1 -> dead_ckind k2.
+
   Proof with auto.
     intros ? ? c H; revert c.
     induction 1.

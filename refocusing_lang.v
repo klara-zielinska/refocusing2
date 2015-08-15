@@ -91,6 +91,7 @@ Module Type RED_LANG.
   | empty : context k1 k1
   | ccons : forall (ec : elem_context) {k2}, context k1 k2 -> context k1 (k2+>ec).
   Arguments empty {k1}. Arguments ccons {k1} _ {k2} _.
+
   Notation "[.]"      := empty.
   Notation "[.]( k )" := (@empty k).
   Infix    "=:"       := ccons (at level 60, right associativity).
@@ -178,10 +179,6 @@ Module Type RED_LANG.
   Axiom trivial_val_red : 
       forall k t, only_trivial t k ->
          (exists (v : value k), t = v) \/ (exists (r : redex k), t = r).
-
-
-  (* A property of deterministic reduction semantics: *)
-  Axiom redex_trivial : forall {k} (r : redex k), only_trivial r k.
 
 
 
@@ -293,6 +290,10 @@ Module Type RED_REF_LANG.
   Declare Module DEC : DEC_STEP R.
   Export R.
   Export DEC.
+
+
+  (* A property of deterministic reduction semantics: *)
+  Axiom redex_trivial : forall {k} (r : redex k), only_trivial r k.
 
 
   Inductive subterm_one_step : term -> term -> Prop :=

@@ -64,6 +64,8 @@ Module no_ECCa <: RED_LANG.
   Definition init_ckind : ckind     :=  C.
   Definition dead_ckind (k : ckind) :=  k = CBot.
 
+  Hint Unfold dead_ckind.
+
 
   Lemma death_propagation : 
       forall k, dead_ckind k -> forall ec, dead_ckind (k+>ec).
@@ -256,7 +258,7 @@ Module no_ECCa <: RED_LANG.
     - exists (vECaApp v1 v)...
   Qed.
 
-
+  Hint Constructors no_ECCa.ck.
   Lemma value_trivial : forall {k} (v : value k), only_trivial v k.
   Proof.
     intros k1 v t k2 c; revert t.
@@ -270,7 +272,7 @@ Module no_ECCa <: RED_LANG.
       [ destruct ec0; destruct v;  dependent destruction H
       | destruct ec0; destruct v0; dependent destruction H1 ];
       solve
-      [ compute in H0; intuition | apply valCa_is_valECa | eauto ].
+      [ intuition | apply valCa_is_valECa | eauto ].
   Qed.
 
 
@@ -331,9 +333,7 @@ Module no_ECCa <: RED_LANG.
     induction t; intros;
     destruct k.
     
-    - destruct (ot_subterm_val _ t1 (ap_r t2) _ H) as (v, H0).
-          trivial.
-          unfold dead_ckind; discriminate.
+    - destruct (ot_subterm_val _ t1 (ap_r t2) _ H) as (v, H0)...
       subst.
       simpl in v; dependent destruction v.
       + right. exists (rCApp v t t2)...
@@ -495,25 +495,27 @@ Module no_ECCa_Ref <: RED_REF_LANG.
         | in_term t' ec => t = ec:[t']
         | in_dead       => dead_ckind k 
         end.
+
     Proof.
-      destruct k, t; compute; auto.
+      destruct k, t; simpl; auto.
     Qed.
 
 
     Lemma dec_term_from_dead : forall t k, dead_ckind k -> dec_term t k = in_dead.
     Proof.
       intros.
-      destruct k; 
-      solve [discriminate H | auto].
+      destruct k;
+      solve [autof].
     Qed.
 
 
     Lemma dec_term_next_alive : 
         forall t k t0 ec0, dec_term t k = in_term t0 ec0 -> ~ dead_ckind (k+>ec0).
+
     Proof.
       intros.
-      destruct t, k; inversion H; subst;
-      discriminate.
+      destruct t, k;
+      solve [inversion H; subst; auto].
     Qed.
 
 
@@ -524,38 +526,39 @@ Module no_ECCa_Ref <: RED_REF_LANG.
         | in_term t ec' => ec:[v] = ec':[t]
         | in_dead       => dead_ckind (k+>ec)
         end.
+
     Proof.
       intros.
       destruct k, ec0; dependent destruction v;
-      simpl; auto.
+      simpl;
+      solve [auto].
     Qed.
 
 
     Lemma dec_context_from_dead : 
         forall ec k v, dead_ckind (k+>ec) -> dec_context ec k v = in_dead.
+
     Proof.
       intros.
-      destruct ec0, k; simpl in *; 
-      solve [discriminate H | trivial].
+      destruct ec0, k;
+      solve [autof].
     Qed.
 
 
     Lemma dec_context_next_alive :
         forall ec k v {t ec0}, dec_context ec k v = in_term t ec0 -> ~ dead_ckind (k+>ec0).
+
     Proof.
       intros.
       destruct ec0, ec1, k;
-      (
-          dependent destruction v; 
-          simpl in *; 
-          try discriminate;
-          intuition
-      ).
+      solve[ dependent destruction v;  
+             autof ].
     Qed.
 
   End DEC.
 
   Export DEC.
+
 
 
   Lemma redex_trivial : forall k (r : redex k), only_trivial r k.
@@ -566,7 +569,7 @@ Module no_ECCa_Ref <: RED_REF_LANG.
     - intros.
       right.
       destruct IHc with (ec0:[t]) as [(H1, H2) | (v0, H1)];
-          try solve [auto | contradict H0; apply death_propagation; auto];
+          try solve [auto using death_propagation];
       dep_subst; simpl in *;
       match goal with
       | [Hvr : ?ec :[ ?t ] = _ ?r |- _] => 
@@ -617,98 +620,63 @@ Module no_ECCa_Ref <: RED_REF_LANG.
 
   Lemma dec_term_red_empty : 
       forall t k (r : redex k), dec_term t k = in_red r -> only_empty t k.
+
   Proof with auto.
     intros t k r H.
-    destruct t; inversion H; subst; clear H;
-    (
-        intros t0 k' c H H0; generalize dependent t0;
+    destruct t; 
+    inversion H; subst; clear H;
 
-        induction c;
-            intros; simpl in *;
-        [ intuition
-        | destruct (IHc (death_propagation2 _ _ H0) _ H) as (H2, H3);
-          dep_subst;
-          destruct k2, ec0;
-          inversion H1;
-          simpl in *; intuition ]
-    ).
+    solve
+    [ intros t0 k' c H H0; generalize dependent t0;
+
+      induction c;
+      intros; simpl in *;
+      [ intuition
+      | destruct (IHc (death_propagation2 _ _ H0) _ H);
+        dep_subst;
+        destruct k2, ec0;
+        solve [inversion H1; auto] ]].
   Qed.
-
-
 
 
   Lemma dec_term_val_empty : forall t k (v : value k), 
                                  dec_term t k = in_val v -> only_empty t k.
   Proof with auto.
     intros t k v H.
-    destruct t; inversion H; subst; clear H;
-    intros t0 k' c H H0; generalize dependent t0.
-    (
-        induction c;
-            intros; simpl in *;
-        [ intuition
-        | destruct (IHc (death_propagation2 _ _ H0) _ H) as (H2, H3);
-          dep_subst;
-          destruct k2, ec0; inversion H1 ]
-    ). 
-
-    
-        induction c;
-            intros; simpl in *. intuition. 
-            destruct (IHc (death_propagation2 _ _ H0) _ H) as (H2, H3);
-            subst; dependent destruction H3. destruct k2, ec0; inversion H.
-
-destruct k; intros. Focus 2.
-dependent destruction c.
-intuition.
-destruct (context_snoc ec0 c) as (ec1, (c1, H2)).
-rewrite H2 in H. clear H2.
-rewrite plug_compose in H.
-destruct ec1.
-contradict H0; apply (dead_contex_dead c1); simpl...
-compute; trivial.
-discriminate H.
-discriminate H.
-
-Focus 2.
-contradict H0; apply (dead_contex_dead c); simpl...
-compute; trivial.
-
-Focus 1.
-discriminate.
+    destruct t;
+    intros t0 k' c H0 H1; generalize dependent t0;
+    solve
+    [ induction c;
+      intros t0 H0; simpl in *;
+      [ intuition
+      | destruct (IHc (death_propagation2 _ _ H1) _ H0); dep_subst;
+        simpl in H;
+        destruct k2, ec0; 
+        inversion H; subst; 
+        solve [discriminate H | autof] ]].
   Qed.
 
 
   Lemma dec_term_term_top : forall t k {t' ec}, 
             dec_term t k = in_term t' ec -> forall ec', ~ k, t |~ ec << ec'.
+
   Proof.
-    intros t k t' ec H ec' H0; destruct k, t; inversion H; subst; destruct ec'; inversion H0.
+    intros t k t' ec H ec' H0.
+    destruct k, t, ec'; 
+    solve [ inversion H; subst; inversion H0 ].
   Qed.
-
-
-(*
-  Lemma ec_siblings_uni_strong : 
-     forall ec1 ec2, ec_siblings ec1 ec2 -> 
-         forall t1, exists t2, atom_plug t1 ec1 = atom_plug t2 ec2.
-  Proof with eauto.
-  intros.
-  destruct ec1, ec2;
-  destruct H as (s1, (s2, H));
-  try discriminate;
-  inversion H; subst;
-  try solve [exists t1; trivial]. simpl in *.
-  exists s2; simpl...*)
 
 
   Lemma ec_order_comp_fi :
       forall k t ec0 ec1,  k, t |~ ec0 << ec1 ->
           immediate_ec ec0 t /\ immediate_ec ec1 t /\ 
           ~ dead_ckind (k+>ec0) /\ ~ dead_ckind (k+>ec1).
+
   Proof with auto.
-    intros.
-    destruct k, ec0, ec1; 
-    intuition;
-    inversion H; auto; discriminate H0.
+    intros k t ec0 ec1 H.
+    destruct k, ec0, ec1;
+    inversion H;
+    solve [auto].
   Qed.
 
 
@@ -716,30 +684,37 @@ discriminate.
       forall t ec {t'}, t = ec:[t'] -> 
           forall k ec',  k, t |~ ec' << ec -> 
               exists (v : value (k+>ec)), t' = v.
+
   Proof.
-    intros.
-    destruct k, ec0, ec'; intuition;
-    (
-        destruct H0 as ((t1, H1), (t2, H2));
-        destruct (valCa_is_valECa v) as (x, H0);
-        exists x;
-        subst;
-        inversion H1;
-        subst;
-        assumption
-    ).
+    intros t ec0 t' H k ec' H0.
+    subst.
+
+    destruct k, ec0, ec'; autof;
+    unfold ec_order in H0; destruct H0 as (H, _);
+    destruct (valCa_is_valECa v) as (v0, H0);
+
+    solve
+    [ exists v0;
+      simpl; rewrite <- H0;
+      inversion H as (t0, H1); inversion H1; 
+      trivial ].
   Qed.
 
 
   Lemma dec_context_red_bot : 
       forall k ec v r, dec_context ec k v = in_red r -> 
           forall ec', ~ k, ec:[v] |~ ec' << ec.
-  Proof with auto.
-    intros. destruct k, ec0; dependent destruction v; inversion H; intro G; destruct ec'; inversion G.
-
-subst. simpl in *. inversion H0; destruct v0; discriminate.
-
-subst. simpl in *. inversion H0; destruct v0; discriminate.
+  Proof.
+    intros k ec v r H ec'.
+    destruct k, ec, ec'; dependent destruction v;
+    solve
+    [ autof
+    | inversion H;
+      intro G;
+      unfold ec_order in G; destruct G as (G, _);
+      destruct G as (t1, G); inversion G; subst;
+      destruct v0; 
+      autof ].
   Qed.
 
 
@@ -747,112 +722,81 @@ subst. simpl in *. inversion H0; destruct v0; discriminate.
       forall k ec v v', dec_context ec k v = in_val v' -> 
           forall ec', ~ k, ec:[v] |~ ec' << ec.
   Proof.
-    intros k ec v v' H ec' H0; 
-    destruct k,ec; dependent destruction v; inversion H; destruct ec'; intuition.
+    intros k ec v v' H ec'.
+    destruct k, ec, ec'; dependent destruction v; 
+    solve [ autof ].
   Qed.
-
-
-  (*Lemma dec_term_ec_most_transitable : 
-      forall {t0 ec0 t1 ec1 k},
-          transitable_from k ec1 -> dec_term (atom_plug t1 ec1) k = in_term t0 ec0 ->
-          transitable_from k ec0.
-  Proof.
-    destruct ec0, ec1, k;
-    intuition; 
-    inversion H0.
-  Qed.*)
 
 
   Lemma eco_antirefl : forall k t ec, ~ k, t |~ ec << ec.
   Proof.
-    destruct k,ec0; intro H; destruct H.
+    intros k t ec.
+    destruct k, ec; 
+    solve [ auto ].
   Qed.
 
 
   Lemma ec_order_antisym : forall k t ec ec0, 
       k, t |~ ec << ec0 -> ~ k, t |~ ec0 << ec.
+
   Proof.
     intros k t ec ec0 H.
-    destruct k, ec, ec0; inversion H; intro H2; inversion H2.
+    destruct k, ec, ec0;
+    solve [ autof ].
   Qed.
 
-  Lemma ec_order_trans : forall k t ec0 ec1 ec2,
-      k,t |~ ec0 << ec1 -> k,t |~ ec1 << ec2 -> k,t |~ ec0 << ec2.
+
+  Lemma ec_order_trans :  forall k t ec0 ec1 ec2, 
+      k,t |~ ec0 << ec1 -> k,t |~ ec1 << ec2 -> 
+      k,t |~ ec0 << ec2.
+
   Proof.
-    intros.
-    destruct k, ec0, ec1; inversion H;
-    destruct ec2; inversion H0.
+    intros k t ec0 ec1 ec2 H H0.
+    destruct k, ec0, ec1;
+    solve [ autof ].
   Qed.
-
-(*
-  Ltac inj_vr := match goal with
-  | [Hv : value_to_term _ = value_to_term _ |- _] => apply value_to_term_injective in Hv
-  | [Hr : redex_to_term _ = redex_to_term _ |- _] => apply redex_to_term_injective in Hr
-  | [ |- _] => idtac
-  end.*)
-
-  (*Lemma elem_context_det : forall t0 t1 k ec0 ec1,
-      k |~ ec0 << ec1 -> atom_plug t0 ec0 = atom_plug t1 ec1 ->
-      exists v : value (ckind_trans k ec1), t1 = value_to_term v.
-  Proof.
-    intros.
-    destruct ec0; destruct ec1; inversion H0;
-        inj_vr; subst;
-    match goal with
-    | _                            => contradiction (eco_antirefl _ _ H)
-    | [ |- exists v0, _ ?v = _ v0] => exists v; reflexivity
-    | [ H : (_ |~ _ << _) |- _]    => inversion H
-    end.
-  Qed.*)
 
 
   Lemma dec_context_term_next : 
-      forall ec0 k v t ec1, dec_context ec0 k v = in_term t ec1 -> 
-          k, ec0:[v] |~ ec1 << ec0 /\ 
-          forall ec,    k, ec0:[v] |~ ec  << ec0  ->  
-                      ~ k, ec0:[v] |~ ec1 << ec.
-  Proof with eauto.
+      forall ec0 k v t ec1, dec_context ec0 k v = in_term t ec1 ->
+      (*1*) k, ec0:[v] |~ ec1 << ec0 /\ 
+      (*2*) forall ec,  k, ec0:[v] |~ ec << ec0  ->  ~ k, ec0:[v] |~ ec1 << ec.
+
+  Proof.
     intros ec0 k v t ec1 H.
-    destruct k, ec0, ec1; dependent destruction v; inversion H; subst;
-    (
-        split; 
-        [ constructor; compute; eauto
-        | intros ec'' H0 H1; destruct ec''; inversion H0; inversion H1 ]
-    ).
+    destruct k, ec0, ec1; dependent destruction v; 
+    solve 
+    [ autof
+
+    | inversion H; subst;
+      split;
+      [ constructor; 
+        compute; eauto
+      | intros ec'' H0 H1; 
+        destruct ec'';
+        solve [autof] 
+      ] ].
   Qed.
 
 
-  Lemma ec_order_comp_if :
-      forall t ec0 ec1, immediate_ec ec0 t -> immediate_ec ec1 t -> 
-          forall k, ~ dead_ckind (k+>ec0) -> ~ dead_ckind (k+>ec1) ->
-              k,t |~ ec0 << ec1 \/ k,t |~ ec1 << ec0 \/ ec0 = ec1.
-  Proof with eauto.
+  Lemma ec_order_comp_if : forall t ec0 ec1, 
+      immediate_ec ec0 t -> immediate_ec ec1 t -> 
+      forall k, ~ dead_ckind (k+>ec0) -> ~ dead_ckind (k+>ec1) ->
+          k,t |~ ec0 << ec1 \/ k,t |~ ec1 << ec0 \/ ec0 = ec1.
+  Proof.
     intros t ec0 ec1 H0 H1 k H2 H3.
+
     destruct H0 as (t0, H4); destruct H1 as (t1, H5).
     subst t.
     destruct k, ec0, ec1;
-    inversion H5; simpl in *; subst;
-    try solve
-    [ compute in H2; auto
-    | right; left; compute; eauto 
-    | left; compute; eauto 
-    | do 2 right; f_equal;
-      apply valCa_to_term_injective; eauto ].
-  Qed.
+    inversion H5; subst;
 
-(*
-  Lemma ec_order_comp_fi :
-      forall ec0 ec1 k, k |~ ec0 << ec1 ->
-      ec_siblings ec0 ec1 /\ transitable_from k ec0 /\ transitable_from k ec1.
-  Proof with eauto.
-    intuition.
-    - destruct ec0, ec1;
-          try inversion H.
-      * exists e (value_to_term v)...
-      * exists e (value_to_term v)...
-    - intro; intuition.
-    - intro; intuition.
-  Qed.*)
+    solve
+    [ compute; eautof 7
+    | do 2 right; 
+      f_equal;
+      apply valCa_to_term_injective; auto ].
+  Qed.
 
 End no_ECCa_Ref.
 

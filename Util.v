@@ -114,6 +114,15 @@ Ltac dependent_destruction2 H := let i := fresh in
                                  try subst H;
                                  clean_eqs.
 
+Tactic Notation "autof"             := try solve [auto   | exfalso; auto].
+Tactic Notation "autof" integer(n)  := try solve [auto n | exfalso; auto n].
+
+Tactic Notation "eautof"            := try solve [eauto   | exfalso; eauto].
+Tactic Notation "eautof" integer(n) := try solve [eauto n | exfalso; eauto n].
+
+
+Hint Extern 10 (False) => discriminate.
+
 
 
 

@@ -7,6 +7,7 @@ Module RED_LANG_Facts (R : RED_LANG).
 
   Import R.
   
+
   Lemma ccons_inj : 
       forall ec {k1 k2} (c : context k1 k2) ec' {k2'} (c' : context k1 k2'), 
           k2 +> ec = k2' +> ec' -> ec=:c ~= ec'=:c' ->

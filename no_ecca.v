@@ -259,7 +259,7 @@ Module no_ECCa <: RED_LANG.
     - exists (vECaApp v1 v)...
   Qed.
 
-  Hint Constructors no_ECCa.ck.
+
   Lemma value_trivial : forall {k} (v : value k), only_trivial v k.
   Proof.
     intros k1 v t k2 c; revert t.

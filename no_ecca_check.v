@@ -5,89 +5,166 @@ Require Import refocusing_lang_facts.
 
 
 
-Module no_ECCa_Sem <: RED_SEM no_ECCa.
+Module no_ECCa_Hand_Sem <: RED_SEM no_ECCa.
 
+  Module RF := RED_LANG_Facts no_ECCa.
   Import no_ECCa.
+  Import RF.
 
 
-  Inductive dec' : term -> forall {k1 k2}, context k1 k2 -> decomp k1 -> Prop :=
+  Lemma decompose : forall (t : term) k1, ~ dead_ckind k1 ->
+      (exists (v : value k1), t = v) \/
+      (exists k2 (r : redex k2) (c : context k1 k2), t = c[r]).
+
+  Proof with autof.
+    induction t; intros k1 H.
+
+    - destruct IHt1 with ECa as [(v1, ?) | (k2, (r1, (c1, ?)))]; autof;
+          assert (~ dead_ckind C) as G; autof;
+          assert (G0 := IHt2 C G);
+          clear IHt1 IHt2;
+          subst.
+
+      +{ dependent destruction v1; subst.
+
+         - right.
+           exists k1.
+           destruct k1...
+           + eexists (rCApp _ _ _),   [.]; simpl...
+           + eexists (rECaApp _ _ _), [.]; simpl...
+
+         - destruct G0 as [(v2, ?) | (k2, (r2, (c2, ?)))]; subst.
+           + left.
+             destruct k1...
+             * exists (vCApp (vCaVar v) v2)...
+             * exists (vECaApp (vCaVar v) v2)...
+           + right.
+             destruct k1; autof;
+             [ exists k2 r2 (c2 ~+ ap_l (vCaVar v) =: [.](C))
+             | exists k2 r2 (c2 ~+ ap_l (vCaVar v) =: [.](ECa)) ];
+             rewrite plug_compose...
+
+         - destruct G0 as [(v2, ?) | (k2, (r2, (c2, ?)))]; subst.
+           + left.
+             destruct k1...
+             * exists (vCApp (vCaApp v v1) v2)...
+             * exists (vECaApp (vCaApp v v1) v2)...
+           + right.
+             destruct k1; autof;
+             [ exists k2 r2 (c2 ~+ ap_l (vCaApp v v1) =: [.](C))
+             | exists k2 r2 (c2 ~+ ap_l (vCaApp v v1) =: [.](ECa)) ];
+             rewrite plug_compose... }
+
+      + right.
+        destruct k1; autof;
+        [ exists k2 r1 (c1 ~+ ap_r t2 =: [.](C))
+        | exists k2 r1 (c1 ~+ ap_r t2 =: [.](ECa)) ];
+        rewrite plug_compose...
+
+    - left.
+      destruct k1...
+      + exists (vCVar v)...
+      + exists (vECaVar v)...
+
+    - destruct k1...
+      + destruct (IHt C) as [(v1, ?) | (k, (r1, (c, ?)))]; subst...
+        * left; exists (vCLam v v1)...
+        * right.
+          exists k r1 (c ~+ lam_c v =: [.](C)).
+          rewrite plug_compose...
+      + left; exists (vECaLam v t)...
+  Qed.
+
+
+
+  Inductive __dec : term -> forall {k1 k2}, context k1 k2 -> decomp k1 -> Prop :=
 
   | d_CVar   : forall x {k1} (c : context k1 C) d,
-                decctx (vCVar x) c d ->
-                dec' (Var x) c d 
+                 decctx (vCVar x) c d ->
+                 __dec (Var x) c d 
   | d_ECaVar : forall x {k1} (c : context k1 ECa) d,
-                decctx (vECaVar x) c d ->
-                dec' (Var x) c d 
-  | d_CLam  : forall x t {k1} (c : context k1 C) d,
-                dec' t (lam_c x =: c) d ->
-                dec' (Lam x t) c d
+                 decctx (vECaVar x) c d ->
+                 __dec (Var x) c d 
+
+  | d_CLam   : forall x t {k1} (c : context k1 C) d,
+                 __dec t (lam_c x =: c) d -> (*!*)
+                 __dec (Lam x t) c d
   | d_ECaLam : forall x t {k1} (c : context k1 ECa) d,
-                decctx (vECaLam x t) c d ->
-                dec' (Lam x t) c d
+                 decctx (vECaLam x t) c d -> (*!*)
+                 __dec (Lam x t) c d
+
   | d_CApp   : forall t1 t2 {k1} (c : context k1 C) d,
-                dec' t1 (ap_r t2 =: c) d ->
-                dec' (App t1 t2) c d
+                 __dec t1 (ap_r t2 =: c) d ->
+                 __dec (App t1 t2) c d
   | d_ECaApp : forall t1 t2 {k1} (c : context k1 ECa) d,
-                dec' t1 (ap_r t2 =: c) d ->
-                dec' (App t1 t2) c d
+                 __dec t1 (ap_r t2 =: c) d ->
+                 __dec (App t1 t2) c d
 
   with decctx : forall {k2}, value k2 -> 
                 forall {k1}, context k1 k2 -> decomp k1 -> Prop :=
 
   | dc_em       : forall {k} (v : value k),
-                   ~ dead_ckind k ->
-                   decctx v [.] (d_val v)
+                    ~ dead_ckind k ->
+                    decctx v [.] (d_val v)
+
   | dc_CAp_r1   : forall x t0 t {k1} (c : context k1 C),
-                   decctx (vECaLam x t0) (ap_r t =: c) (d_red (rCApp x t0 t) c)
-  | dc_CAp_r2   : forall x t {k1} (c : context k1 C) d,
-                   dec' t (ap_l (vCaVar x) =: c) d ->
-                   decctx (vECaVar x) (ap_r t =: c) d
-  | dc_CAp_r3   : forall v1 v2 t {k1} (c : context k1 C) d,
-                   dec' t (ap_l (vCaApp v1 v2) =: c) d ->
-                   decctx (vECaApp v1 v2) (ap_r t =: c) d
+                    decctx (vECaLam x t0) (ap_r t =: c) (d_red (rCApp x t0 t) c)
   | dc_ECaAp_r1 : forall x t0 t {k1} (c : context k1 ECa),
-                   decctx (vECaLam x t0) (ap_r t =: c) (d_red (rECaApp x t0 t) c)
+                    decctx (vECaLam x t0) (ap_r t =: c) (d_red (rECaApp x t0 t) c)
+
+  | dc_CAp_r2   : forall x t {k1} (c : context k1 C) d,
+                    __dec t (ap_l (vCaVar x) =: c) d ->
+                    decctx (vECaVar x) (ap_r t =: c) d
   | dc_ECaAp_r2 : forall x t {k1} (c : context k1 ECa) d,
-                   dec' t (ap_l (vCaVar x) =: c) d ->
-                   decctx (vECaVar x) (ap_r t =: c) d
+                    __dec t (ap_l (vCaVar x) =: c) d ->
+                    decctx (vECaVar x) (ap_r t =: c) d
+
+  | dc_CAp_r3   : forall v1 v2 t {k1} (c : context k1 C) d,
+                    __dec t (ap_l (vCaApp v1 v2) =: c) d ->
+                    decctx (vECaApp v1 v2) (ap_r t =: c) d
   | dc_ECaAp_r3 : forall v1 v2 t {k1} (c : context k1 ECa) d,
-                   dec' t (ap_l (vCaApp v1 v2) =: c) d ->
-                   decctx (vECaApp v1 v2) (ap_r t =: c) d
+                    __dec t (ap_l (vCaApp v1 v2) =: c) d ->
+                    decctx (vECaApp v1 v2) (ap_r t =: c) d
+
   | dc_CAp_l    : forall v1 v2 {k1} (c : context k1 C) d,
-                   decctx (vCApp v1 v2) c d ->
-                   decctx v2 (ap_l v1 =: c) d
+                    decctx (vCApp v1 v2) c d ->
+                    decctx v2 (ap_l v1 =: c) d
   | dc_ECaAp_l  : forall v1 v2 {k1} (c : context k1 ECa) d,
-                   decctx (vECaApp v1 v2) c d ->
-                   decctx v2 (ap_l v1 =: c) d
+                    decctx (vECaApp v1 v2) c d ->
+                    decctx v2 (ap_l v1 =: c) d
+
   | dc_CLam     : forall v x {k1} (c : context k1 C) d,
-                   decctx (vCLam x v) c d ->
-                   decctx v (lam_c x =: c) d.
+                    decctx (vCLam x v) c d ->
+                    decctx v (lam_c x =: c) d.
 
-  Definition dec t {k1 k2} (c : context k1 k2) d := dec' t c d.
-  Scheme dec_Ind := Induction for dec' Sort Prop
-  with decctx_Ind := Induction for decctx Sort Prop.
+  Definition dec := __dec. Arguments dec t {k1 k2} c d.
 
-  Lemma dead_decctx_dead : forall k1 (c : context k1 CBot) v d, ~ decctx v c d.
-  Proof.
-  intros. intro.
-  dependent destruction H.
-  simpl in H.
-  compute in H; auto.
+  Scheme dec_Ind    := Induction for __dec Sort Prop
+    with decctx_Ind := Induction for decctx Sort Prop.
+
+
+  (* Non-signature entries (helpers) *)
+
+  Lemma dead_decctx_dead : 
+      forall {k1} (c : context k1 CBot) v d, ~ decctx v c d.
+
+  Proof with autof.
+    intros; intro H.
+    dependent destruction H...
   Qed.
 
-  Ltac inj_vr := match goal with
-  | [Hv : value_to_term _ = value_to_term _ |- _] => apply value_to_term_injective in Hv
-  | [Hv : valCa_to_term _ = valCa_to_term _ |- _] => apply valCa_to_term_injective in Hv
-  | [Hr : redex_to_term _ = redex_to_term _ |- _] => apply redex_to_term_injective in Hr
-  | [ |- _] => idtac
-  end.
-(*
-  Lemma L3 : forall x t y v, vECaLam x t <> vECaApp (vCaVar y) v.
-  Proof.
-  intros.
-  intro.
-  discriminate H.
-  Qed.*)
+
+  Ltac inj_vr := 
+      match goal with
+      | [Hv : value_to_term _ = value_to_term _ |- _] => 
+            apply value_to_term_injective in Hv
+      | [Hv : valCa_to_term _ = valCa_to_term _ |- _] => 
+            apply valCa_to_term_injective in Hv
+      | [Hr : redex_to_term _ = redex_to_term _ |- _] => 
+            apply redex_to_term_injective in Hr
+      | [ |- _] => idtac
+      end.
+
 
   Lemma dec_val_self : forall {k2} (v : value k2) {k1} (c : context k1 k2) d, 
       dec v c d <-> decctx v c d.
@@ -151,170 +228,105 @@ Module no_ECCa_Sem <: RED_SEM no_ECCa.
   Qed.
 
 
-  (** A redex in context will only ever be reduced to itself *)
+
+  (* Signature entries *)
+
+  Lemma dec_correct : forall {t k1 k2} {c : context k1 k2} {d}, 
+                          dec t c d -> c[t] = d.
+  Proof with auto.
+    induction 1 using dec_Ind with
+    (P  := fun t _ _ c d (_ : dec t c d)    => c[t] = d)
+    (P0 := fun _ v _ c d (_ : decctx v c d) => c[v] = d)...
+  Qed.
+
+
+  Lemma dec_plug :
+      forall {k1 k2} (c : context k1 k2) {k3} {c0 : context k3 k1} {t d}, 
+          ~ dead_ckind k2 -> dec c[t] c0 d -> dec t (c ~+ c0) d.
+  Proof.
+    induction c.
+    - auto.
+    - intros k3 c0 t0 d H H0.
+      destruct ec0;
+          assert (hh := IHc _ _ _ _ (death_propagation2 _ _ H) H0);
+          dependent destruction hh; subst;
+      solve
+      [ autof
+      | destruct valCa_is_valECa with v as (v', H2);
+        destruct v; dependent destruction v'; 
+        solve
+        [ autof
+        | inversion H2; repeat inj_vr; subst;
+          rewrite H2 in hh;
+          rewrite dec_val_self in hh;
+          dependent destruction hh;
+          auto 
+      ] ].
+  Qed.
+
+
+  Lemma dec_plug_rev :
+      forall {k1 k2} (c : context k1 k2) {k3} {c0 : context k3 k1} {t d}, 
+          ~ dead_ckind k2 -> dec t (c ~+ c0) d -> dec c[t] c0 d.
+  Proof.
+    induction c.
+    - auto.
+    - intros k3 c0 t d H H0.
+      simpl.
+      apply IHc; eauto using death_propagation2.
+      destruct ec0, k2;
+      solve 
+      [ autof 
+      | constructor; auto
+      | match goal with v : valCa |- _ =>
+        destruct (valCa_is_valECa v) as (v', H1);
+        destruct v; dependent destruction v'; 
+        inversion H1; repeat inj_vr; subst;
+        constructor;
+        rewrite H1;
+        apply dec_val_self;
+        constructor;
+        assumption
+        end ].
+  Qed.
+
+
   Lemma dec_redex_self : forall {k2} (r : redex k2) {k1} (c : context k1 k2), 
                              dec (redex_to_term r) c (d_red r c).
   Proof with auto.
-    destruct r; intros; constructor;
-    rewrite (dec_val_self (vECaLam v t)); constructor.
+    destruct r as [x t1 t2 | x t1 t2];
+    solve
+    [ intros;
+      constructor;
+      rewrite (dec_val_self (vECaLam x t1));
+      constructor ].
   Qed.
 
-  Lemma decompose : forall (t : term) k1, ~ dead_ckind k1 ->
-      (exists (v : value k1), t = v) \/
-      (exists k2 (r : redex k2) (c : context k1 k2), t = c[r]).
 
-  Proof with auto.
-    induction t; intros.
-    - destruct IHt1 with ECa as [(v1, H1) | (k2, (r1, (c1, H1)))].
-          discriminate.
-      assert (G0 : ~ dead_ckind C).
-          discriminate.
-      assert (G := IHt2 C G0);
-      clear IHt1 IHt2;
-      subst.
-      + dependent destruction v1; subst.
-        * right. exists k1. 
-          destruct k1; 
-              try solve [contradict H; compute; trivial];
-          [ eexists (rCApp _ _ _), [.]
-          | eexists (rECaApp _ _ _), [.] ];
-          reflexivity.
-        *{
-          destruct G as [(v2, H1) | (k2, (r2, (c2, H1)))]; subst.
-          - left. 
-            destruct k1;  
-                try solve [contradict H; compute; trivial];
-            [ exists (vCApp (vCaVar v) v2)
-            | exists (vECaApp (vCaVar v) v2) ];
-            auto.
-          - right.
-            destruct k1; 
-              try solve [contradict H; compute; trivial];
-            [ exists k2 r2 (c2 ~+ ap_l (vCaVar v) =: (@empty C))
-            | exists k2 r2 (c2 ~+ ap_l (vCaVar v) =: (@empty ECa)) ];
-            simpl; rewrite plug_compose; auto. }
-        * {
-          destruct G as [(v2, H1) | (k2, (r2, (c2, H1)))]; subst.
-          - left.
-            destruct k1; 
-                try solve [contradict H; compute; trivial];
-            [ exists (vCApp (vCaApp v v1) v2)
-            | exists (vECaApp (vCaApp v v1) v2) ];
-            auto.
-          - right.
-            destruct k1; 
-                try solve [contradict H; compute; trivial];
-            [ exists k2 r2 (c2 ~+ ap_l (vCaApp v v1) =: (@empty C))
-            | exists k2 r2 (c2 ~+ ap_l (vCaApp v v1) =: (@empty ECa)) ];
-            rewrite plug_compose; auto. }
-      + right.
-        destruct k1; 
-              try solve [contradict H; compute; trivial];
-        [ exists k2 r1 (c1 ~+ ap_r t2 =: (@empty C))
-        | exists k2 r1 (c1 ~+ ap_r t2 =: (@empty ECa)) ];
-        rewrite plug_compose; simpl; congruence.
-    - left. 
-      destruct k1; 
-          try solve [contradict H; compute; trivial];
-      [ exists (vCVar v)
-      | exists (vECaVar v) ];
-      auto.
-    - destruct k1; 
-          try solve [contradict H; compute; trivial].
-      + destruct (IHt C) as [(v1, ?) | (k, (r1, (c, ?)))]; subst...
-        * left. exists (vCLam v v1)...
-        * right. exists k r1 (c ~+ lam_c v =: (@empty C)).
-          rewrite plug_compose; auto.
-      + left. exists (vECaLam v t)...
-    Qed.
-
-  (** dec is left inverse of plug *)
-  Lemma dec_correct : forall {t k1 k2} {c : context k1 k2} {d}, 
-                          dec t c d -> c[t] = d.
-  Proof.
-    induction 1 using dec_Ind with
-    (P := fun t _ _ c d (H:dec t c d) => c[t] = d)
-    (P0 := fun _ v _ c d (H:decctx v c d) => c[v] = d);
-    intros; simpl; auto.
-  Qed.
-
-  Include RED_LANG_Facts no_ECCa.
-
-  Lemma dec_plug : forall k1 k2 (c : context k1 k2) k3 (c0 : context k3 k1) t d, 
-                          ~ dead_ckind k2 -> dec (plug t c) c0 d -> 
-                          dec t (c ~+ c0) d.
-  Proof.
-    induction c; simpl; auto; destruct ec0;
-    intros ? c0 t0 d H DEC; assert (hh := IHc _ _ _ _ (death_propagation2 _ _ H) DEC);
-    dependent destruction hh; subst; auto; simpl in H; try solve [contradict H; compute; trivial];
-      destruct (valCa_is_valECa v) as (vc, G);
-      rewrite G in hh; rewrite dec_val_self in hh;
-      dependent destruction hh; destruct v; try discriminate;
-      inversion G; repeat (inj_vr; subst); auto.
-  Qed.
-
-  Lemma dec_plug_rev : forall k1 k2 (c : context k1 k2) k3 (c0 : context k3 k1) t d, 
-                          ~ dead_ckind k2 ->  dec t (c ~+ c0) d -> 
-                          dec (plug t c) c0 d.
-  Proof.
-    induction c; simpl; auto; destruct ec0; intros; apply IHc;
-    try solve [ eapply context_tail_liveness; eauto ];
-    destruct k2; simpl in H; try solve [discriminate | contradict H; compute; auto | constructor; auto | auto];
-      destruct (valCa_is_valECa v);
-      simpl; constructor; rewrite H1;
-      apply dec_val_self;
-      destruct v; dependent destruction x; try discriminate H1; 
-      inversion H1; repeat (inj_vr; subst);
-      constructor; auto.
-  Qed.
 
   Inductive decempty : term -> forall {k}, decomp k -> Prop :=
-  | d_intro : forall (t : term) {k} (d : decomp k), dec t (@empty k) d -> decempty t d.
+  | d_intro : forall {t k} {d : decomp k}, dec t [.] d -> decempty t d.
 
   Inductive iter : forall {k}, decomp k -> value k -> Prop :=
   | i_val : forall {k} (v : value k), iter (d_val v) v
-  | i_red : forall {k} (r : redex k) t {k'} (c : context k' k) d v,
-              contract r = Some t -> decempty (plug t c) d -> iter d v ->
-              iter (d_red r c) v.
+  | i_red : forall {k2} (r : redex k2) {t k1} (c : context k1 k2) {d v},
+                contract r = Some t -> decempty c[t] d -> iter d v ->
+                iter (d_red r c) v.
 
   Inductive eval : term -> value init_ckind -> Prop :=
-  | e_intro : forall {t d v}, decempty t d -> iter d v -> eval t v.
+  | e_intro : forall {t} {d : decomp init_ckind} {v : value init_ckind}, 
+                  decempty t d -> iter d v -> eval t v.
 
+End no_ECCa_Hand_Sem.
 
-
-  Lemma redex_trivial : forall k (r : redex k), only_trivial r k.
-  Proof with auto.
-    intros k1 r t k2 c; revert t.
-    induction c.
-    - intuition.
-    - intros.
-      right.
-      destruct IHc with (ec0:[t]) as [(H1, H2) | (v0, H1)]; auto;
-          try solve [contradict H0; apply death_propagation; auto];
-      dep_subst; 
-      simpl in *;
-      match goal with
-      | [Hvr : ?ec :[ ?t ] = _ ?r |- _] => 
-            destruct ec; destruct r; 
-            dependent_destruction2 Hvr
-      end; simpl in *;
-      try solve [ contradict H0; compute; trivial
-                | exists (vECaLam v t1); auto 
-                | dependent destruction v; discriminate
-                | eexists; eauto
-                | apply valCa_is_valECa
-                | eexists (vCBot _); simpl; eauto ].
-  Qed.
-
-End no_ECCa_Sem.
 
 
 Lemma dec_sem_ref : forall t k1 k2 (c : no_ECCa.context k1 k2) d, 
-                        no_ECCa_Sem.dec t c d -> no_ECCa_REF_SEM.dec t c d.
+                        no_ECCa_Hand_Sem.dec t c d -> no_ECCa_REF_SEM.dec t c d.
 Proof.
-  induction 1 using no_ECCa_Sem.dec_Ind with
-  (P := fun t _ _ c d (H : no_ECCa_Sem.dec t c d) => no_ECCa_REF_SEM.dec t c d)
-  (P0:= fun _ v _ c d (H : no_ECCa_Sem.decctx v c d) => no_ECCa_REF_SEM.decctx v c d);
+  induction 1 using no_ECCa_Hand_Sem.dec_Ind with
+  (P := fun t _ _ c d (H : no_ECCa_Hand_Sem.dec t c d) => no_ECCa_REF_SEM.dec t c d)
+  (P0:= fun _ v _ c d (H : no_ECCa_Hand_Sem.decctx v c d) => no_ECCa_REF_SEM.decctx v c d);
   try solve 
   [ econstructor; simpl; eauto
   | econstructor 3; simpl; eauto
@@ -330,11 +342,11 @@ Qed.
 Hint Resolve dec_sem_ref.
  
 Lemma dec_ref_sem : forall t k1 k2 (c : no_ECCa.context k1 k2) d, 
-                        no_ECCa_REF_SEM.dec t c d -> no_ECCa_Sem.dec t c d.
+                        no_ECCa_REF_SEM.dec t c d -> no_ECCa_Hand_Sem.dec t c d.
 Proof.
   induction 1 using no_ECCa_REF_SEM.dec_Ind with
-  (P := fun t _ _ c d (H : no_ECCa_REF_SEM.dec t c d) => no_ECCa_Sem.dec t c d)
-  (P0:= fun _ v _ c d (H : no_ECCa_REF_SEM.decctx v c d) => no_ECCa_Sem.decctx v c d);
+  (P := fun t _ _ c d (H : no_ECCa_REF_SEM.dec t c d) => no_ECCa_Hand_Sem.dec t c d)
+  (P0:= fun _ v _ c d (H : no_ECCa_REF_SEM.decctx v c d) => no_ECCa_Hand_Sem.decctx v c d);
   try (destruct t, k2); try inversion e; subst;
   try solve 
   [ discriminate 
@@ -344,14 +356,14 @@ Qed.
 Hint Resolve dec_ref_sem.
 
 Lemma iter_sem_ref : forall k (d : no_ECCa.decomp k) v, 
-                         no_ECCa_Sem.iter d v <-> no_ECCa_REF_SEM.RS.iter d v.
+                         no_ECCa_Hand_Sem.iter d v <-> no_ECCa_REF_SEM.RS.iter d v.
 Proof with eauto with no_ecca.
 split; intros H; dependent induction H; subst; simpl in *; auto; try solve [constructor];
 dependent destruction H0; econstructor 2; simpl in *; eauto; constructor; first [apply dec_sem_ref | apply dec_ref_sem]; eauto.
 Qed.
 
 Lemma eval_sem_ref : forall t v, 
-                         no_ECCa_Sem.eval t v <-> no_ECCa_REF_SEM.RS.eval t v.
+                         no_ECCa_Hand_Sem.eval t v <-> no_ECCa_REF_SEM.RS.eval t v.
 Proof with auto.
   split;
   (
@@ -382,26 +394,26 @@ Notation " [; c , v ;] " := (@c_apply _ ECa c v) (at level 60).
 Reserved Notation " a → b " (at level 40).
 
 
-Definition vVar k x := match k with C => vCVar x | ECa => vECaVar x | CBot => vCBot (Var x) end.
-
+(*Definition vVar k x := match k with C => vCVar x | ECa => vECaVar x | CBot => vCBot (Var x) end.
+*)
 Inductive trans : configuration -> configuration -> Prop :=
-| t_evarC    : forall x {k1} (c : context k1 C),
+| t_eVarC    : forall x {k1} (c : context k1 C),
                   [$ Var x,   c $]   → [: c, vCVar x :]
-| t_evarECa  : forall x {k1} (c : context k1 ECa),
+| t_eVarECa  : forall x {k1} (c : context k1 ECa),
                   [$ Var x,   c $]   → [: c, vECaVar x :]
-| t_elamC    : forall x t {k1} (c : context k1 C),
+| t_eLamC    : forall x t {k1} (c : context k1 C),
                   [$ Lam x t, c $]   → [$ t, lam_c x=:c $]
-| t_elamECa  : forall x t {k1} (c : context k1 ECa),
+| t_eLamECa  : forall x t {k1} (c : context k1 ECa),
                   [$ Lam x t, c $]   → [: c, vECaLam x t :]
-| t_eappC    : forall t1 t2 {k1} (c : context k1 C),
+| t_eAppC    : forall t1 t2 {k1} (c : context k1 C),
                   [$ App t1 t2, c $] → [$ t1, ap_r t2=:c $]
-| t_eappECa  : forall t1 t2 {k1} (c : context k1 ECa),
+| t_eAppECa  : forall t1 t2 {k1} (c : context k1 ECa),
                   [$ App t1 t2, c $] → [$ t1, ap_r t2=:c $]
 
-| t_alamC    : forall x t1 t2 {k1} (c : context k1 C) {t0},
+| t_aLamC    : forall x t1 t2 {k1} (c : context k1 C) {t0},
                    contract (rCApp x t1 t2) = Some t0 ->
                    [: ap_r t2=:c, vECaLam x t1 :] → [$ t0, c $]
-| t_alamECa  : forall x t1 t2 {k1} (c : context k1 ECa) {t0},
+| t_aLamECa  : forall x t1 t2 {k1} (c : context k1 ECa) {t0},
                    contract (rECaApp x t1 t2) = Some t0 ->
                    [: ap_r t2=:c, vECaLam x t1 :] → [$ t0, c $]
 | t_aVarC    : forall x t {k1} (c : context k1 C),
@@ -484,7 +496,7 @@ Proof.
 Qed.
 
 
-Theorem ECCa_Machine_correct : forall t v, no_ECCa_Sem.eval t v <-> eval t v.
+Theorem ECCa_Machine_correct : forall t v, no_ECCa_Hand_Sem.eval t v <-> eval t v.
 Proof.
   intros; rewrite eval_sem_ref; rewrite ECCa_EAM.eval_apply_correct;
   split; [apply eval_eam_mlm | apply eval_mlm_eam].

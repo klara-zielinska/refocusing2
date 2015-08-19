@@ -421,7 +421,7 @@ Module no_ECCa_Ref <: RED_REF_LANG.
 
   Module R := no_ECCa.
   Module RF := RED_LANG_Facts R.
-  Import R.
+  Export R.
   Import RF.
 
 

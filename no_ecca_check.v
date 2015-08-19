@@ -5,7 +5,7 @@ Require Import refocusing_lang_facts.
 
 
 
-Module no_ECCa_Hand_Sem <: RED_SEM no_ECCa.
+Module no_ECCa_HandSem <: RED_SEM no_ECCa.
 
   Module RF := RED_LANG_Facts no_ECCa.
   Import no_ECCa.
@@ -317,126 +317,183 @@ Module no_ECCa_Hand_Sem <: RED_SEM no_ECCa.
   | e_intro : forall {t} {d : decomp init_ckind} {v : value init_ckind}, 
                   decempty t d -> iter d v -> eval t v.
 
-End no_ECCa_Hand_Sem.
+End no_ECCa_HandSem.
 
 
 
-Lemma dec_sem_ref : forall t k1 k2 (c : no_ECCa.context k1 k2) d, 
-                        no_ECCa_Hand_Sem.dec t c d -> no_ECCa_REF_SEM.dec t c d.
-Proof.
-  induction 1 using no_ECCa_Hand_Sem.dec_Ind with
-  (P := fun t _ _ c d (H : no_ECCa_Hand_Sem.dec t c d) => no_ECCa_REF_SEM.dec t c d)
-  (P0:= fun _ v _ c d (H : no_ECCa_Hand_Sem.decctx v c d) => no_ECCa_REF_SEM.decctx v c d);
-  try solve 
-  [ econstructor; simpl; eauto
-  | econstructor 3; simpl; eauto
-  | eapply (@no_ECCa_REF_SEM.dc_dec)  with (ec:=no_ECCa.ap_r t)(k2:= no_ECCa.C); simpl; auto
-  | eapply (@no_ECCa_REF_SEM.dc_term) with (ec:=no_ECCa.ap_r t)(k2:= no_ECCa.C); simpl; eauto 
-  | eapply (@no_ECCa_REF_SEM.dc_dec)  with (ec:=no_ECCa.ap_r t)(k2:= no_ECCa.ECa); simpl; auto
-  | eapply (@no_ECCa_REF_SEM.dc_term) with (ec:=no_ECCa.ap_r t)(k2:= no_ECCa.ECa); simpl; eauto
-  | eapply (@no_ECCa_REF_SEM.dc_val)  with (ec:=no_ECCa.ap_l v1)(k2:= no_ECCa.C); simpl; auto
-  | eapply (@no_ECCa_REF_SEM.dc_val)  with (ec:=no_ECCa.ap_l v1)(k2:= no_ECCa.ECa); simpl; auto
-  | eapply (@no_ECCa_REF_SEM.dc_val)  with (ec:=no_ECCa.lam_c x)(k2:= no_ECCa.C); simpl; auto
-].
-Qed.
-Hint Resolve dec_sem_ref.
+Module no_ECCa_REF_SEM_Check.
+
+  Import no_ECCa_Ref.
+
+  Module HS := no_ECCa_HandSem.
+  Module RS := no_ECCa_REF_SEM.
+
+
+  Lemma HS_dec_imp_RS_dec : 
+      forall t {k1 k2} (c : context k1 k2) d, HS.dec t c d -> RS.dec t c d.
+
+  Proof.
+    induction 1 using HS.dec_Ind with
+    (P := fun t _ _ c d (_ : HS.dec t c d)    =>  RS.dec t c d)
+    (P0:= fun _ v _ c d (_ : HS.decctx v c d) =>  RS.decctx v c d);
+    solve
+    [ econstructor; simpl; eauto
+    | eapply @RS.d_term; simpl; eauto 
+    | eapply @RS.dc_dec  with (ec:=ap_r _) (k2:= C);   simpl; auto
+    | eapply @RS.dc_term with (ec:=ap_r _) (k2:= C);   simpl; eauto 
+    | eapply @RS.dc_dec  with (ec:=ap_r _) (k2:= ECa); simpl; auto
+    | eapply @RS.dc_term with (ec:=ap_r _) (k2:= ECa); simpl; eauto
+    | eapply @RS.dc_val  with (ec:=ap_l _) (k2:= C);   simpl; auto
+    | eapply @RS.dc_val  with (ec:=ap_l _) (k2:= ECa); simpl; auto
+    | eapply @RS.dc_val  with (ec:=lam_c _)(k2:= C);   simpl; auto ].
+  Qed.
+  (*Hint Resolve dec_sem_ref.*)
  
-Lemma dec_ref_sem : forall t k1 k2 (c : no_ECCa.context k1 k2) d, 
-                        no_ECCa_REF_SEM.dec t c d -> no_ECCa_Hand_Sem.dec t c d.
-Proof.
-  induction 1 using no_ECCa_REF_SEM.dec_Ind with
-  (P := fun t _ _ c d (H : no_ECCa_REF_SEM.dec t c d) => no_ECCa_Hand_Sem.dec t c d)
-  (P0:= fun _ v _ c d (H : no_ECCa_REF_SEM.decctx v c d) => no_ECCa_Hand_Sem.decctx v c d);
-  try (destruct t, k2); try inversion e; subst;
-  try solve 
-  [ discriminate 
-  | constructor; auto 
-  | destruct ec; try destruct k2; dependent destruction v; inversion e; subst; constructor; auto ].
-Qed.
-Hint Resolve dec_ref_sem.
 
-Lemma iter_sem_ref : forall k (d : no_ECCa.decomp k) v, 
-                         no_ECCa_Hand_Sem.iter d v <-> no_ECCa_REF_SEM.RS.iter d v.
-Proof with eauto with no_ecca.
-split; intros H; dependent induction H; subst; simpl in *; auto; try solve [constructor];
-dependent destruction H0; econstructor 2; simpl in *; eauto; constructor; first [apply dec_sem_ref | apply dec_ref_sem]; eauto.
-Qed.
+  Lemma RS_dec_imp_HS_dec : 
+      forall t {k1 k2} (c : context k1 k2) d, RS.dec t c d -> HS.dec t c d.
 
-Lemma eval_sem_ref : forall t v, 
-                         no_ECCa_Hand_Sem.eval t v <-> no_ECCa_REF_SEM.RS.eval t v.
-Proof with auto.
-  split;
-  (
-      intro H;
-      dependent destruction H; econstructor;
-      try solve 
-      [ apply iter_sem_ref; eauto
-      | dependent destruction H; constructor; 
-        first [apply dec_sem_ref | apply dec_ref_sem]; eauto ]
-  ).
-Qed.
+  Proof.
+    induction 1 using RS.dec_Ind with
+    (P := fun t _ _ c d (_ : RS.dec t c d)    => HS.dec t c d)
+    (P0:= fun _ v _ c d (_ : RS.decctx v c d) => HS.decctx v c d);
+    solve 
+  [ match goal with H : dec_term _ _ = _ |- _ =>
+    destruct t, k2; 
+    inversion H; subst; 
+    constructor; auto
+    end
+  | match goal with H : dec_context _ _ _ = _ |- _ =>
+    destruct ec0, k2; dependent destruction v; 
+    inversion H; subst; 
+    constructor; auto
+    end 
+  | constructor; auto ].
+  Qed.
+  (*Hint Resolve dec_ref_sem.*)
+
+
+  Lemma dec_eqv : 
+      forall t {k1 k2} (c : context k1 k2) d, HS.dec t c d <-> RS.dec t c d.
+
+  Proof.
+    split;
+    eauto using RS_dec_imp_HS_dec, HS_dec_imp_RS_dec.
+  Qed.
+
+
+  Lemma decempty_eqv : 
+      forall t {k} (d : decomp k), HS.decempty t d <-> RS.RS.decempty t d.
+
+  Proof with auto.
+    split; 
+    (
+        intro H;
+        dependent_destruction2 H;
+        constructor;
+        apply dec_eqv; auto
+    ).
+  Qed.
+
+
+  Lemma iter_eqv : forall {k} (d : decomp k) v, 
+                           HS.iter d v <-> RS.RS.iter d v.
+  Proof.
+    split; intro H;
+    dependent induction H;
+    solve
+    [ constructor
+    | econstructor; 
+      solve 
+      [ eauto
+      | eapply decempty_eqv; eauto
+    ] ].
+  Qed.
+
+
+  Lemma eval_eqv : 
+      forall t v, HS.eval t v <-> RS.RS.eval t v.
+
+  Proof with auto.
+    split; intro H;
+    (
+        dependent destruction H;
+        econstructor;
+        [ apply decempty_eqv; eauto
+        | apply iter_eqv; eauto ]
+    ).
+  Qed.
+
+End no_ECCa_REF_SEM_Check.
 
 
 
 Module ECCa_Machine <: ABSTRACT_MACHINE.
 
-Import no_ECCa.
-Import ECCa_EAM.
+  Import no_ECCa.
+  Import ECCa_EAM.
 
 
-Notation " [$ t $] " := (c_init t) (at level 60, no associativity).
-Notation " [: v :] " := (c_final v) (at level 60).
-Notation " [$ t , c $] " := (c_eval t c) (at level 60).
-Notation " [: c , v :] " := (c_apply c v) (at level 60).
-Notation " [; c , v ;] " := (@c_apply _ ECa c v) (at level 60).
+  Notation " [$ t $] " := (c_init t) (at level 60, no associativity).
+  Notation " [: v :] " := (c_final v) (at level 60).
+  Notation " [$ t , c $] " := (c_eval t c) (at level 60).
+  Notation " [: c , v :] " := (c_apply c v) (at level 60).
+  Notation " [; c , v ;] " := (@c_apply _ ECa c v) (at level 60).
 
 
-Reserved Notation " a → b " (at level 40).
+  Reserved Notation " a → b " (at level 40).
 
 
-(*Definition vVar k x := match k with C => vCVar x | ECa => vECaVar x | CBot => vCBot (Var x) end.
-*)
-Inductive trans : configuration -> configuration -> Prop :=
-| t_eVarC    : forall x {k1} (c : context k1 C),
-                  [$ Var x,   c $]   → [: c, vCVar x :]
-| t_eVarECa  : forall x {k1} (c : context k1 ECa),
-                  [$ Var x,   c $]   → [: c, vECaVar x :]
-| t_eLamC    : forall x t {k1} (c : context k1 C),
-                  [$ Lam x t, c $]   → [$ t, lam_c x=:c $]
-| t_eLamECa  : forall x t {k1} (c : context k1 ECa),
-                  [$ Lam x t, c $]   → [: c, vECaLam x t :]
-| t_eAppC    : forall t1 t2 {k1} (c : context k1 C),
-                  [$ App t1 t2, c $] → [$ t1, ap_r t2=:c $]
-| t_eAppECa  : forall t1 t2 {k1} (c : context k1 ECa),
-                  [$ App t1 t2, c $] → [$ t1, ap_r t2=:c $]
+  Inductive trans : configuration -> configuration -> Prop :=
 
-| t_aLamC    : forall x t1 t2 {k1} (c : context k1 C) {t0},
-                   contract (rCApp x t1 t2) = Some t0 ->
-                   [: ap_r t2=:c, vECaLam x t1 :] → [$ t0, c $]
-| t_aLamECa  : forall x t1 t2 {k1} (c : context k1 ECa) {t0},
-                   contract (rECaApp x t1 t2) = Some t0 ->
-                   [: ap_r t2=:c, vECaLam x t1 :] → [$ t0, c $]
-| t_aVarC    : forall x t {k1} (c : context k1 C),
-                   [: ap_r t=:c, vECaVar x :]     → [$ t, ap_l (vCaVar x)=:c $]
-| t_aVarECa  : forall x t {k1} (c : context k1 ECa),
-                   [: ap_r t=:c, vECaVar x :]     → [$ t, ap_l (vCaVar x)=:c $]
-| t_aAppC    : forall v1 v2 t {k1} (c : context k1 C),
-                   [: ap_r t=:c, vECaApp v1 v2 :] → [$ t, ap_l (vCaApp v1 v2)=:c $]
-| t_aAppECa  : forall v1 v2 t {k1} (c : context k1 ECa),
-                   [: ap_r t=:c, vECaApp v1 v2 :] → [$ t, ap_l (vCaApp v1 v2)=:c $]
-| t_aValC    : forall v1 v2 {k1} (c : context k1 C),
-                   [: ap_l v1=:c, v2 :]           → [: c, vCApp v1 v2 :]
-| t_aValECa  : forall v1 v2 {k1} (c : context k1 ECa),
-                   [: ap_l v1=:c, v2 :]           → [: c, vECaApp v1 v2 :]
-| t_aValCLam : forall x v {k1} (c : context k1 C),
-                   [: lam_c x=:c, v :]            → [: c, vCLam x v :]
-where " a → b " := (trans a b).
-Definition transition := trans.
+  | t_eVarC    : forall x {k1} (c : context k1 C),
+                    [$ Var x,   c $]   → [: c, vCVar x :]
+  | t_eVarECa  : forall x {k1} (c : context k1 ECa),
+                    [$ Var x,   c $]   → [: c, vECaVar x :]
 
-Notation " a >> b " := (ECCa_EAM.transition a b) (at level 40).
-Notation " a >>+ b " := (ECCa_EAM.AM.trans_close a b) (at level 40).
+  | t_eLamC    : forall x t {k1} (c : context k1 C),
+                    [$ Lam x t, c $]   → [$ t, lam_c x=:c $]  (*!*)
+  | t_eLamECa  : forall x t {k1} (c : context k1 ECa),
+                    [$ Lam x t, c $]   → [: c, vECaLam x t :] (*!*)
 
-Reserved Notation " a →+ b " (at level 40, no associativity).
+  | t_eAppC    : forall t1 t2 {k1} (c : context k1 C),
+                    [$ App t1 t2, c $] → [$ t1, ap_r t2=:c $]
+  | t_eAppECa  : forall t1 t2 {k1} (c : context k1 ECa),
+                    [$ App t1 t2, c $] → [$ t1, ap_r t2=:c $]
+
+  | t_aLamC    : forall x t1 t2 {k1} (c : context k1 C) {t0},
+                     contract (rCApp x t1 t2) = Some t0 ->
+                     [: ap_r t2=:c, vECaLam x t1 :] → [$ t0, c $]
+  | t_aLamECa  : forall x t1 t2 {k1} (c : context k1 ECa) {t0},
+                     contract (rECaApp x t1 t2) = Some t0 ->
+                     [: ap_r t2=:c, vECaLam x t1 :] → [$ t0, c $]
+
+  | t_aVarC    : forall x t {k1} (c : context k1 C),
+                     [: ap_r t=:c, vECaVar x :]     → [$ t, ap_l (vCaVar x)=:c $]
+  | t_aVarECa  : forall x t {k1} (c : context k1 ECa),
+                     [: ap_r t=:c, vECaVar x :]     → [$ t, ap_l (vCaVar x)=:c $]
+
+  | t_aAppC    : forall v1 v2 t {k1} (c : context k1 C),
+                     [: ap_r t=:c, vECaApp v1 v2 :] → [$ t, ap_l (vCaApp v1 v2)=:c $]
+  | t_aAppECa  : forall v1 v2 t {k1} (c : context k1 ECa),
+                     [: ap_r t=:c, vECaApp v1 v2 :] → [$ t, ap_l (vCaApp v1 v2)=:c $]
+
+  | t_aValC    : forall v1 v2 {k1} (c : context k1 C),
+                     [: ap_l v1=:c, v2 :]           → [: c, vCApp v1 v2 :]
+  | t_aValECa  : forall v1 v2 {k1} (c : context k1 ECa),
+                     [: ap_l v1=:c, v2 :]           → [: c, vECaApp v1 v2 :]
+
+  | t_aValCLam : forall x v {k1} (c : context k1 C),
+                     [: lam_c x=:c, v :]            → [: c, vCLam x v :]
+
+  where " a → b " := (trans a b).
+  Definition transition := trans.
+
+
+  Notation " a >> b " := (ECCa_EAM.transition a b) (at level 40).
+  Notation " a >>+ b " := (ECCa_EAM.AM.trans_close a b) (at level 40).
+
+  Reserved Notation " a →+ b " (at level 40, no associativity).
 
 
   Inductive trans_close : configuration -> configuration -> Prop :=
@@ -450,65 +507,71 @@ Reserved Notation " a →+ b " (at level 40, no associativity).
   | e_intro : forall t v, trans_close (c_init t) (c_final v) -> eval t v.
 
 
-Lemma trans_eam_mlm : forall c0 c1, c0 >> c1 -> c0 → c1.
-Proof with auto.
-  intros c0 c1 T; inversion T; subst;
-  let dec_term    := no_ECCa_REF_SEM.DEC.dec_term in
-  let dec_context := no_ECCa_REF_SEM.DEC.dec_context in
-  match goal with
-  | [ DT : dec_term ?t ?k2 = ?int |- _ ] => destruct t, k2; inversion DT
-  | [ DC : dec_context ?ec ?k2 ?v = ?int |- _ ] => destruct ec, k2; dependent_destruction2 v; inversion DC
-  | [ |- _ ] => idtac
-  end; subst; try constructor; auto.
-Qed.
-Hint Resolve trans_eam_mlm.
+  Definition term  := term.
+  Definition value := value init_ckind.
 
-
-Lemma tcl_eam_mlm : forall c0 c1, c0 >>+ c1 -> c0 →+ c1.
-Proof with eauto.
-  intros c0 c1 TC; induction TC; unfold ECCa_EAM.AM.transition in *;
-  [econstructor | econstructor 2]...
-Qed.
-
-
-Lemma eval_eam_mlm : forall t v, ECCa_EAM.AM.eval t v -> eval t v.
-Proof.
-  intros t v E; dependent destruction E; constructor; apply tcl_eam_mlm; auto.
-Qed.
-
-
-Lemma trans_mlm_eam : forall c0 c1, c0 → c1 -> c0 >> c1.
-Proof with auto.
-  intros w w' H; inversion H; subst; econstructor; simpl...
-Qed.
-Hint Resolve trans_mlm_eam.
-
-
-Lemma tcl_mlm_eam : forall c0 c1, c0 →+ c1 -> c0 >>+ c1.
-Proof with eauto.
-  induction 1; subst; [econstructor | econstructor 2]; unfold ECCa_EAM.AM.transition...
-Qed.
-
-
-Lemma eval_mlm_eam : forall t v, eval t v -> ECCa_EAM.AM.eval t v.
-Proof.
-  intros t v E; inversion_clear E; constructor; apply tcl_mlm_eam; auto.
-Qed.
-
-
-Theorem ECCa_Machine_correct : forall t v, no_ECCa_Hand_Sem.eval t v <-> eval t v.
-Proof.
-  intros; rewrite eval_sem_ref; rewrite ECCa_EAM.eval_apply_correct;
-  split; [apply eval_eam_mlm | apply eval_mlm_eam].
-Qed.
-
-
-
-Definition term  := term.
-Definition value := value init_ckind.
-
-Definition configuration := configuration.
-Definition c_init  := c_init.
-Definition c_final := c_final.
+  Definition configuration := configuration.
+  Definition c_init  := c_init.
+  Definition c_final := c_final.
 
 End ECCa_Machine.
+
+
+
+Module ECCa_Machine_Check.
+
+  Import ECCa_Machine.
+
+  Lemma trans_eam_mlm : forall c0 c1, c0 >> c1 -> c0 → c1.
+  Proof with auto.
+    intros c0 c1 T; inversion T; subst;
+    let dec_term    := no_ECCa_REF_SEM.DEC.dec_term in
+    let dec_context := no_ECCa_REF_SEM.DEC.dec_context in
+    match goal with
+    | [ DT : dec_term ?t ?k2 = ?int |- _ ] => destruct t, k2; inversion DT
+    | [ DC : dec_context ?ec ?k2 ?v = ?int |- _ ] => destruct ec, k2; dependent_destruction2 v; inversion DC
+    | [ |- _ ] => idtac
+    end; subst; try constructor; auto.
+  Qed.
+  Hint Resolve trans_eam_mlm.
+
+
+  Lemma tcl_eam_mlm : forall c0 c1, c0 >>+ c1 -> c0 →+ c1.
+  Proof with eauto.
+    intros c0 c1 TC; induction TC; unfold ECCa_EAM.AM.transition in *;
+    [econstructor | econstructor 2]...
+  Qed.
+
+
+  Lemma eval_eam_mlm : forall t v, ECCa_EAM.AM.eval t v -> eval t v.
+  Proof.
+    intros t v E; dependent destruction E; constructor; apply tcl_eam_mlm; auto.
+  Qed.
+
+
+  Lemma trans_mlm_eam : forall c0 c1, c0 → c1 -> c0 >> c1.
+  Proof with auto.
+    intros w w' H; inversion H; subst; econstructor; simpl...
+  Qed.
+  Hint Resolve trans_mlm_eam.
+
+
+  Lemma tcl_mlm_eam : forall c0 c1, c0 →+ c1 -> c0 >>+ c1.
+  Proof with eauto.
+    induction 1; subst; [econstructor | econstructor 2]; unfold ECCa_EAM.AM.transition...
+  Qed.
+
+
+  Lemma eval_mlm_eam : forall t v, eval t v -> ECCa_EAM.AM.eval t v.
+  Proof.
+    intros t v E; inversion_clear E; constructor; apply tcl_mlm_eam; auto.
+  Qed.
+
+
+  Theorem ECCa_Machine_correct : forall t v, no_ECCa_HandSem.eval t v <-> eval t v.
+  Proof.
+    intros; rewrite no_ECCa_REF_SEM_Check.eval_eqv; rewrite ECCa_EAM.eval_apply_correct;
+    split; [apply eval_eam_mlm | apply eval_mlm_eam].
+  Qed.
+
+End ECCa_Machine_Check.

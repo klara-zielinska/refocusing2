@@ -61,7 +61,7 @@ Module Type RED_REF_SEM (R : RED_LANG).
 
   Declare Module DEC : DEC_STEP R.
   Import R.
-  Import DEC.
+  Export DEC.
 
 
   (** A decomposition function specified in terms of the atomic functions above *)
@@ -117,9 +117,8 @@ End RED_REF_SEM.
 Module Type PE_REF_SEM (R : RED_LANG).
 
   Declare Module RefSem : RED_REF_SEM R.
-  Export RefSem.
   Import R.
-  Import DEC.
+  Export RefSem.
 
   Axiom dec_context_not_val : 
       forall ec {k} v (v0 : value k), dec_context ec k v <> in_val v0.
@@ -162,8 +161,8 @@ End RED_SEM_PROPER.
 
 Module Type PRE_ABSTRACT_MACHINE (R : RED_LANG).
 
-  Import R.
   Declare Module DEC : DEC_STEP R.
+  Import R.
   Export DEC.
 
 
@@ -222,8 +221,8 @@ End PRE_ABSTRACT_MACHINE.
 
 Module Type STAGED_ABSTRACT_MACHINE (R : RED_LANG).
 
-  Import R.
   Declare Module DEC : DEC_STEP R.
+  Import R.
   Export DEC.
 
 
@@ -276,8 +275,8 @@ End STAGED_ABSTRACT_MACHINE.
 
 Module Type EVAL_APPLY_MACHINE (R : RED_LANG).
 
-  Import R.
   Declare Module DEC : DEC_STEP R.
+  Import R.
   Export DEC.
 
 
@@ -323,8 +322,8 @@ End EVAL_APPLY_MACHINE.
 
 Module Type PROPER_EA_MACHINE (R : RED_LANG).
 
-  Import R.
   Declare Module DEC : DEC_STEP R.
+  Import R.
   Export DEC.
 
 
@@ -377,8 +376,8 @@ End PROPER_EA_MACHINE.
 
 Module Type PUSH_ENTER_MACHINE (R : RED_LANG).
 
-  Import R.
   Declare Module DEC : DEC_STEP R.
+  Import R.
   Export DEC.
 
 
@@ -422,8 +421,8 @@ End PUSH_ENTER_MACHINE.
 
 Module Type PROPER_PE_MACHINE (R : RED_LANG).
 
-  Import R.
   Declare Module DEC : DEC_STEP R.
+  Import R.
   Export DEC.
 
 

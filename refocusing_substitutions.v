@@ -622,7 +622,7 @@ Module Red_Sem_Proper (R : RED_LANG) (RS : RED_REF_SEM R) : RED_SEM_PROPER R RS.
   Module RLF := RED_LANG_Facts R.
   Import RLF.
   Import RS.
-  Import DEC.
+  Export DEC.
 
 
   Lemma dec_is_function : forall {t k} {d d0 : decomp k}, 
@@ -757,7 +757,7 @@ Module PreAbstractMachine (R : RED_LANG) (RS : RED_REF_SEM R) <: PRE_ABSTRACT_MA
   Module RF := RED_LANG_Facts R.
   Import RF.
   Import RS.
-  Import DEC.
+  Export DEC.
 
 
   (** A decomposition function specified in terms of the atomic functions above *)
@@ -897,7 +897,7 @@ Module StagedAbstractMachine (R : RED_LANG) (RS : RED_REF_SEM R) <: STAGED_ABSTR
   Module RF := RED_LANG_Facts R.
   Import RF.
   Import RS.
-  Import DEC.
+  Export DEC.
 
   Module PAM := PreAbstractMachine R RS.
 
@@ -1033,7 +1033,7 @@ Module EvalApplyMachine (R : RED_LANG) (RS : RED_REF_SEM R) <: EVAL_APPLY_MACHIN
 
   Import R.
   Import RS.
-  Import DEC.
+  Export DEC.
 
   Module SAM := StagedAbstractMachine R RS.
 
@@ -1152,7 +1152,7 @@ Module ProperEAMachine (R : RED_LANG) (RS : RED_REF_SEM R) <: PROPER_EA_MACHINE 
 
   Import R.
   Import RS.
-  Import DEC.
+  Export DEC.
 
   Module EAM := EvalApplyMachine R RS.
 
@@ -1162,7 +1162,7 @@ Module ProperEAMachine (R : RED_LANG) (RS : RED_REF_SEM R) <: PROPER_EA_MACHINE 
   | c_apply : forall {k1 k2}, context k1 k2 -> value k2 -> configuration.
 
 
-  Definition c_init t := c_eval t (@empty init_ckind).
+  Definition c_init t := c_eval t [.](init_ckind).
   Definition c_final (v : value init_ckind) := c_apply [.] v.
 
 
@@ -1307,7 +1307,7 @@ Module PushEnterMachine (R : RED_LANG) (PRS : PE_REF_SEM R) <: PUSH_ENTER_MACHIN
 
   Import R.
   Import PRS.
-  Import DEC.
+  Export DEC.
 
   Module EAM := EvalApplyMachine R RefSem.
   Module PR  := Red_Sem_Proper R PRS.RefSem.
@@ -1430,7 +1430,7 @@ Module ProperPEMachine (R : RED_LANG) (PRS : PE_REF_SEM R) <: PROPER_PE_MACHINE 
 
   Import R.
   Import PRS.
-  Import DEC.
+  Export DEC.
 
   Module PEM := PushEnterMachine R PRS.
 

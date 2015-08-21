@@ -1,7 +1,8 @@
+Require Import Util.
 Require Import Program.
-Require Export refocusing_signatures.
-Require Import refocusing_substitutions.
+Require Import refocusing_lang.
 Require Import refocusing_lang_facts.
+
 
 
 Module no_ECCa <: RED_LANG.
@@ -52,7 +53,7 @@ Module no_ECCa <: RED_LANG.
   | ap_l  : valCa -> ec.
   Definition elem_context := ec.
 
-  
+
   Definition ckind_trans (k : ckind) (ec : elem_context) := 
       match k with
       | C    => match ec with lam_c _ => C    | ap_r _ => ECa | ap_l _ => C end
@@ -60,7 +61,7 @@ Module no_ECCa <: RED_LANG.
       | _    => CBot
       end.
   Notation "k +> ec" := (ckind_trans k ec) (at level 50, left associativity).
-  
+
 
   Definition init_ckind : ckind     :=  C.
   Definition dead_ckind (k : ckind) :=  k = CBot.
@@ -72,7 +73,7 @@ Module no_ECCa <: RED_LANG.
       forall k, dead_ckind k -> forall ec, dead_ckind (k+>ec).
 
   Proof.
-    intuition.
+    intros k H.
     destruct k;
     inversion H;
     reflexivity.
@@ -131,7 +132,6 @@ Module no_ECCa <: RED_LANG.
     (P0 := fun v   => forall v' : valCa,   valCa_to_term v = valCa_to_term v' -> v = v');
     dependent destruction v'; intro H; inversion H; f_equal...
   Qed.
-  (*Hint Resolve value_to_term_injective : no_ecca.*)
 
 
   Lemma valCa_to_term_injective : 
@@ -143,7 +143,6 @@ Module no_ECCa <: RED_LANG.
     (P0 := fun v   => forall v' : valCa,   valCa_to_term v = valCa_to_term v' -> v = v');
     dependent destruction v'; intro H; inversion H; f_equal...
   Qed.
-  (*Hint Resolve value_to_term_injective : no_ecca.*)
 
 
   Lemma redex_to_term_injective : 
@@ -152,14 +151,13 @@ Module no_ECCa <: RED_LANG.
   Proof with auto.
     intros k r r' H.
     destruct k;
-    (
-        induction r; 
-        dependent destruction r'; 
-        inversion H;
-        f_equal; auto 
-    ).
+
+    solve
+    [ induction r; 
+      dependent destruction r'; 
+      inversion H;
+      f_equal; auto ].
   Qed.
-  (*Hint Resolve redex_to_term : no_ecca.*)
 
 
   Fixpoint compose {k1 k2} (c0 : context k1 k2) 
@@ -243,11 +241,11 @@ Module no_ECCa <: RED_LANG.
 
   Definition only_empty t k := 
       forall t' {k'} (c : context k k'), c[t'] = t -> ~ dead_ckind k' -> 
-          k = k' /\ c ~= @empty k.
+          k = k' /\ c ~= [.](k).
 
   Definition only_trivial t k := 
       forall t' {k'} (c : context k k'),  c[t'] = t -> ~ dead_ckind k' -> 
-          k = k' /\ c ~= @empty k \/ exists (v : value k'), t' = v.
+          k = k' /\ c ~= [.](k) \/ exists (v : value k'), t' = v.
 
 
   Lemma valCa_is_valECa : 
@@ -264,30 +262,35 @@ Module no_ECCa <: RED_LANG.
   Proof.
     intros k1 v t k2 c; revert t.
     induction c.
+
     - intuition.
-    - intros.
+
+    - intros t H H0.
       right.
+
       destruct IHc with (ec0:[t]) as [(H1, H2) | (v0, H1)];
-          try solve [auto | contradict H0; apply death_propagation; auto];
-          dep_subst; 
+          try solve [ auto using death_propagation ];
+          dep_subst;
       [ destruct ec0; destruct v;  dependent destruction H
       | destruct ec0; destruct v0; dependent destruction H1 ];
+
       solve
-      [ intuition | apply valCa_is_valECa | eauto ].
+      [ eautof | apply valCa_is_valECa ].
   Qed.
 
 
   Lemma value_redex : forall k (v : value k) (r : redex k), 
                           value_to_term v <> redex_to_term r.
   Proof.
-    intros.
-    dependent destruction r;
-    dependent destruction v; 
+    intros k v r.
+
+    dependent destruction r; dependent destruction v; 
     simpl;
     try match goal with 
-    | [|- App (valCa_to_term ?v) _ <> _] => dependent_destruction2 v
+    | |- App (valCa_to_term ?v) _ <> _ => dependent_destruction2 v
     end;
-    discriminate.
+    
+    solve [ discriminate ].
   Qed.
 
 
@@ -296,8 +299,8 @@ Module no_ECCa <: RED_LANG.
           exists v : value (k+>ec), t0 = v.
 
   Proof with auto.
-    intros.
-    destruct (H t0 _ (ec0 =: [.])) as [(?, H3) | (v, ?)]...
+    intros t t0 ec k H H0 H1.
+    destruct (H t0 _ (ec =: [.])) as [(?, H3) | (v, ?)]...
     - discriminateJM H3.
     - exists v; destruct k...
   Qed.
@@ -317,9 +320,9 @@ Module no_ECCa <: RED_LANG.
       forall t ec k, only_trivial ec:[t] k -> only_trivial t (k+>ec).
 
   Proof with eauto.
-    intros.
+    intros t ec k H.
     intros t' k' c H1 H2.
-    destruct (H t' _ (c ~+ ec0 =: [.])) as [(?, H3) | ?]... 
+    destruct (H t' _ (c ~+ ec =: [.])) as [(?, H3) | ?]... 
     - rewrite plug_compose; subst...
     - destruct c; discriminateJM H3.
   Qed.
@@ -329,61 +332,49 @@ Module no_ECCa <: RED_LANG.
       forall k t, only_trivial t k ->
           (exists (v : value k), t = v) \/ (exists (r : redex k), t = r).
 
-  Proof with auto.
+  Proof with (simpl; eautof).
     intros k t H.
-    induction t; intros;
-    destruct k.
+    induction t;
+        destruct k.
     
     - destruct (ot_subterm_val _ t1 (ap_r t2) _ H) as (v, H0)...
       subst.
       simpl in v; dependent destruction v.
-      + right. exists (rCApp v t t2)...
-      + destruct (ot_subterm_val _ t2 (ap_l (vCaVar v)) _ H) as (v0, H0).
-            auto.
-            unfold dead_ckind; discriminate.
+      + right; eexists (rCApp _ _ _)...
+      + destruct (ot_subterm_val _ t2 (ap_l (vCaVar v)) _ H) as (v0, H0)...
         subst.
-        left; exists (vCApp (vCaVar v) v0)...
-      + destruct (ot_subterm_val _ t2 (ap_l (vCaApp v v1)) _ H) as (v0, H0).
-            auto.
-            unfold dead_ckind; discriminate.
+        left; eexists (vCApp (vCaVar _) _)...
+      + destruct (ot_subterm_val _ t2 (ap_l (vCaApp v v1)) _ H) as (v0, H0)...
         subst.
-        left; exists (vCApp (vCaApp v v1) v0)...
+        left; eexists (vCApp (vCaApp _ _) _)...
 
       (* almost "copy-past" of the previous case *)
-      - destruct (ot_subterm_val _ t1 (ap_r t2) _ H) as (v, H0).
-          trivial.
-          unfold dead_ckind; discriminate.
+    - destruct (ot_subterm_val _ t1 (ap_r t2) _ H) as (v, H0)...
       subst.
       simpl in v; dependent destruction v.
-      + right. exists (rECaApp v t t2)...
-      + destruct (ot_subterm_val _ t2 (ap_l (vCaVar v)) _ H) as (v0, H0).
-            auto.
-            unfold dead_ckind; discriminate.
+      + right; eexists (rECaApp _ _ _)...
+      + destruct (ot_subterm_val _ t2 (ap_l (vCaVar v)) _ H) as (v0, H0)...
         subst.
-        left; exists (vECaApp (vCaVar v) v0)...
-      + destruct (ot_subterm_val _ t2 (ap_l (vCaApp v v1)) _ H) as (v0, H0).
-            auto.
-            unfold dead_ckind; discriminate.
+        left; eexists (vECaApp (vCaVar _) _)...
+      + destruct (ot_subterm_val _ t2 (ap_l (vCaApp v v1)) _ H) as (v0, H0)...
         subst.
-        left; exists (vECaApp (vCaApp v v1) v0)...
+        left; eexists (vECaApp (vCaApp _ _) _)...
 
-    - left; exists (vCBot (App t1 t2))...
+    - left; eexists (vCBot (App _ _))...
 
-    - left; exists (vCVar v)...
+    - left; eexists (vCVar _)...
 
-    - left; exists (vECaVar v)...
+    - left; eexists (vECaVar _)...
 
-    - left; exists (vCBot (Var v))...
+    - left; eexists (vCBot (Var _))...
 
-    - destruct (ot_subterm_val _ t (lam_c v) _ H).
-          auto.
-          unfold dead_ckind; discriminate.
+    - destruct (ot_subterm_val _ t (lam_c v) _ H)...
       subst.
-      left; exists (vCLam v x); subst...
+      left; eexists (vCLam _ _); subst...
 
-    - left; exists (vECaLam v t)...
+    - left; eexists (vECaLam _ _)...
 
-    - left; exists (vCBot (Lam v t))...
+    - left; eexists (vCBot (Lam _ _))...
   Qed.
 
 
@@ -419,7 +410,7 @@ End no_ECCa.
 
 Module no_ECCa_Ref <: RED_REF_LANG.
 
-  Module R := no_ECCa.
+  Module R  := no_ECCa.
   Module RF := RED_LANG_Facts R.
   Export R.
   Import RF.
@@ -498,7 +489,8 @@ Module no_ECCa_Ref <: RED_REF_LANG.
         end.
 
     Proof.
-      destruct k, t; simpl; auto.
+      destruct k, t; simpl; 
+      auto.
     Qed.
 
 
@@ -506,7 +498,7 @@ Module no_ECCa_Ref <: RED_REF_LANG.
     Proof.
       intros.
       destruct k;
-      solve [autof].
+      solve [ autof ].
     Qed.
 
 
@@ -514,9 +506,10 @@ Module no_ECCa_Ref <: RED_REF_LANG.
         forall t k t0 ec0, dec_term t k = in_term t0 ec0 -> ~ dead_ckind (k+>ec0).
 
     Proof.
-      intros.
+      intros t k t0 ec0 H.
       destruct t, k;
-      solve [inversion H; subst; auto].
+      solve [ inversion H; subst; 
+              auto ].
     Qed.
 
 
@@ -532,28 +525,27 @@ Module no_ECCa_Ref <: RED_REF_LANG.
       intros.
       destruct k, ec0; dependent destruction v;
       simpl;
-      solve [auto].
+      solve [ auto ].
     Qed.
 
 
-    Lemma dec_context_from_dead : 
-        forall ec k v, dead_ckind (k+>ec) -> dec_context ec k v = in_dead.
+    Lemma dec_context_from_dead : forall ec k v, 
+        dead_ckind (k+>ec) -> dec_context ec k v = in_dead.
 
     Proof.
       intros.
       destruct ec0, k;
-      solve [autof].
+      solve [ autof ].
     Qed.
 
 
-    Lemma dec_context_next_alive :
-        forall ec k v {t ec0}, dec_context ec k v = in_term t ec0 -> ~ dead_ckind (k+>ec0).
+    Lemma dec_context_next_alive : forall ec k v {t ec0}, 
+        dec_context ec k v = in_term t ec0 -> ~ dead_ckind (k+>ec0).
 
     Proof.
       intros.
-      destruct ec0, ec1, k;
-      solve[ dependent destruction v;  
-             autof ].
+      destruct ec0, ec1, k; dependent destruction v;  
+      solve [ autof ].
     Qed.
 
   End DEC.
@@ -569,21 +561,20 @@ Module no_ECCa_Ref <: RED_REF_LANG.
     - intuition.
     - intros.
       right.
+
       destruct IHc with (ec0:[t]) as [(H1, H2) | (v0, H1)];
           try solve [auto using death_propagation];
-      dep_subst; simpl in *;
+          dep_subst; simpl in *;
       match goal with
-      | [Hvr : ?ec :[ ?t ] = _ ?r |- _] => 
-            destruct ec; destruct r; 
-            dependent_destruction2 Hvr
+      | [Hvr : ec0 :[ t ] = _ ?vr |- _] => 
+            destruct ec0; destruct vr; dependent_destruction2 Hvr
       end;
+
       solve 
-      [ contradict H0; compute; trivial
-      | exists (vECaLam v t1); auto 
-      | dependent destruction v; discriminate
-      | eexists; eauto
+      [ eautof 
       | apply valCa_is_valECa
-      | eexists (vCBot _); simpl; eauto ].
+      | eexists (vECaLam _ _); simpl; auto 
+      | dependent destruction v; discriminate ].
   Qed.
 
 
@@ -636,7 +627,8 @@ Module no_ECCa_Ref <: RED_REF_LANG.
       | destruct (IHc (death_propagation2 _ _ H0) _ H);
         dep_subst;
         destruct k2, ec0;
-        solve [inversion H1; auto] ]].
+        solve [inversion H1; auto] 
+    ] ].
   Qed.
 
 
@@ -654,7 +646,8 @@ Module no_ECCa_Ref <: RED_REF_LANG.
         simpl in H;
         destruct k2, ec0; 
         inversion H; subst; 
-        solve [discriminate H | autof] ]].
+        solve [discriminate H | autof] 
+    ] ].
   Qed.
 
 
@@ -775,7 +768,7 @@ Module no_ECCa_Ref <: RED_REF_LANG.
         compute; eauto
       | intros ec'' H0 H1; 
         destruct ec'';
-        solve [autof] 
+        solve [ autof ] 
       ] ].
   Qed.
 
@@ -784,6 +777,7 @@ Module no_ECCa_Ref <: RED_REF_LANG.
       immediate_ec ec0 t -> immediate_ec ec1 t -> 
       forall k, ~ dead_ckind (k+>ec0) -> ~ dead_ckind (k+>ec1) ->
           k,t |~ ec0 << ec1 \/ k,t |~ ec1 << ec0 \/ ec0 = ec1.
+
   Proof.
     intros t ec0 ec1 H0 H1 k H2 H3.
 
@@ -801,6 +795,3 @@ Module no_ECCa_Ref <: RED_REF_LANG.
 
 End no_ECCa_Ref.
 
-
-Module no_ECCa_REF_SEM := RedRefSem no_ECCa_Ref.
-Module ECCa_EAM := ProperEAMachine no_ECCa no_ECCa_REF_SEM.

@@ -1,6 +1,9 @@
-Require Export refocusing_lang.
+Require Import Util.
 Require Import Program.
 Require Import Eqdep.
+Require Export reduction_semantics.
+
+
 
 
 Module RED_LANG_Facts (R : RED_LANG).

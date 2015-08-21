@@ -1,7 +1,17 @@
-Require Import Utils.
+Require Import Util.
 Require Import Program.
 Require Import no_ecca.
+Require Import refocusing_semantics.
+Require Import refocusing_semantics_derivation.
+Require Import refocusing_machine_generation.
+Require Import abstract_machine.
 Require Import refocusing_lang_facts.
+
+
+
+
+Module no_ECCa_REF_SEM := RedRefSem no_ECCa_Ref.
+Module ECCa_EAM := ProperEAMachine no_ECCa no_ECCa_REF_SEM.
 
 
 
@@ -349,7 +359,6 @@ Module no_ECCa_REF_SEM_Check.
     | eapply @RS.dc_val  with (ec:=ap_l _) (k2:= ECa); simpl; auto
     | eapply @RS.dc_val  with (ec:=lam_c _)(k2:= C);   simpl; auto ].
   Qed.
-  (*Hint Resolve dec_sem_ref.*)
  
 
   Lemma RS_dec_imp_HS_dec : 
@@ -372,7 +381,6 @@ Module no_ECCa_REF_SEM_Check.
     end 
   | constructor; auto ].
   Qed.
-  (*Hint Resolve dec_ref_sem.*)
 
 
   Lemma dec_eqv : 
@@ -442,11 +450,10 @@ Module ECCa_HandMachine <: ABSTRACT_MACHINE.
   Import ECCa_EAM.
 
 
-  Notation "[$ t $]"     := (c_init t)    (at level 60).
-  Notation "[: v :]"     := (c_final v)   (at level 60).
-  Notation "[$ t , c $]" := (c_eval t c)  (at level 60).
-  Notation "[: c , v :]" := (c_apply c v) (at level 60).
-(*Notation "[; c , v ;]" := (@c_apply _ ECa c v) (at level 60).*)
+  Notation "[$ t $]"     := (c_init t)    (t at level 99).
+  Notation "[: v :]"     := (c_final v)   (v at level 99).
+  Notation "[$ t , c $]" := (c_eval t c)  (t, c at level 99).
+  Notation "[: c , v :]" := (c_apply c v) (c, v at level 99).
 
   Reserved Notation " a → b " (at level 40).
 
@@ -501,9 +508,9 @@ Module ECCa_HandMachine <: ABSTRACT_MACHINE.
 
   Inductive trans_close : configuration -> configuration -> Prop :=
   | one_step   : forall {c0 c1 : configuration}, 
-                     c0 → c1 -> trans_close c0 c1
+                   c0 → c1 -> trans_close c0 c1
   | multi_step : forall {c0 c1 c2 : configuration}, 
-                     c0 → c1 -> trans_close c1 c2 -> trans_close c0 c2
+                   c0 → c1 -> trans_close c1 c2 -> trans_close c0 c2
   where " a →+ b " := (trans_close a b).
 
 
@@ -524,8 +531,8 @@ End ECCa_HandMachine.
 
 Module ECCa_Machine_Check.
 
-  Module EAM  := ECCa_EAM.
-  Module HM  :=  ECCa_HandMachine.
+  Module EAM := ECCa_EAM.
+  Module HM  := ECCa_HandMachine.
   Import EAM.
   Import HM.
 

@@ -27,7 +27,7 @@ Require Import Program.
    You may achive this form by spliting the context patterns and determinizing 
    the grammar. E.g., suppose you have a grammar with two productions form k1:  
    k1 -> a k2 a,  k1 -> ab k3 ab,  where L(ab) = L(a) U L(b) and languages L(a), L(b) 
-   are disjoint. Then you may split the second pattern  ab [] ab  to:  a [] a,  b [] ab,  
+   are disjoint. Then you may split the second pattern  ab [] ab  to:  a [] a,  b [] ab,
    ab [] b. So now, the second production is replaced by three: k1 -> a k3 a,  
    k -> b k3 ab,  k -> ab k3 b. Then, you may determinize the grammar. This will cause 
    an introduction of a new context symbol {k2,k3}, replacing the two productions:  
@@ -187,8 +187,8 @@ Module Type RED_LANG.
 
 
   (* decomp k  - decomposition of a term t from the symbol k to a redex.
-     d_red r c - t = c[r].
-     d_val v   - t has no redexes and so it is a value, t = v. *)
+     d_red r c  means: t = c[r].
+     d_val v    means: t has no redexes and so it is a value, t = v. *)
   Inductive decomp k : Set :=
   | d_red : forall {k'}, redex k' -> context k k' -> decomp k
   | d_val : value k -> decomp k.
@@ -222,7 +222,7 @@ Module Type RED_SEM (R : RED_LANG).
   Import R.
 
 
-  (* This is a property of a language and should be in RED_LANG, but doing so
+  (* This is a property of the language and should be in RED_LANG, but doing so
      overcomplicate the library, thus we leave it here for now. *)
   Axiom decompose : forall (t : term) k1, ~ dead_ckind k1 ->
       (exists (v : value k1), t = v) \/
@@ -249,21 +249,28 @@ Module Type RED_SEM (R : RED_LANG).
 
 
 
-  (** A redex in a context will only ever be decomposed to itself. *)
+  (* Together with the previous axioms this ensures that dec contains every 
+     decomposition to a redex. Of coures, we care only about non-dead k2-s, but 
+     this is implied by the existance of a redex k2. *)
   Axiom dec_redex_self : forall {k2} (r : redex k2) {k1} (c : context k1 k2), 
                              dec r c (d_red r c).
 
+  Axiom dec_value_self : forall {k} (v : value k), 
+                             ~ dead_ckind k -> dec v [.] (d_val v).
 
 
+  (* Decomposition of a term *)
   Inductive decempty : term -> forall {k}, decomp k -> Prop :=
   | d_intro : forall {t k} {d : decomp k}, dec t [.] d -> decempty t d.
 
+  (* An evaluation process - starting from a "decomp" *)
   Inductive iter : forall {k}, decomp k -> value k -> Prop :=
   | i_val : forall {k} (v : value k), iter (d_val v) v
   | i_red : forall {k2} (r : redex k2) {t k1} (c : context k1 k2) {d v},
                 contract r = Some t -> decempty c[t] d -> iter d v ->
                 iter (d_red r c) v.
 
+  (* An evaluation process - starting from a term *)
   Inductive eval : term -> value init_ckind -> Prop :=
   | e_intro : forall {t} {d : decomp init_ckind} {v : value init_ckind}, 
                   decempty t d -> iter d v -> eval t v.
@@ -273,10 +280,12 @@ End RED_SEM.
 
 
 
-Module Type RED_SEM_PROPER (R : RED_LANG) (RS : RED_SEM R).
+Module Type DET_RED_SEM (R : RED_LANG).
+
+  Declare Module RS : RED_SEM R.
 
   Import R.
-  Import RS.
+  Export RS.
 
 
   Axiom dec_is_function  : forall {t k} {d d0 : decomp k}, 
@@ -285,86 +294,6 @@ Module Type RED_SEM_PROPER (R : RED_LANG) (RS : RED_SEM R).
                                iter d v -> iter d v0 -> v = v0.
   Axiom eval_is_function : forall {t} {v v0 : value init_ckind}, 
                                eval t v -> eval t v0 -> v = v0.
-  Axiom dec_correct      : forall {t k1 k2} {c : context k1 k2} {d},
-                               dec t c d -> decomp_to_term d = plug t c.
-  Axiom dec_total        : forall t k, ~ dead_ckind k -> 
-                               exists (d : decomp k), decempty t d.
-  Axiom unique_decomposition :
 
-      forall (t : term) k1, ~ dead_ckind k1 ->  
+End DET_RED_SEM.
 
-         (exists v : value k1, t = v) \/
-
-         (exists k2 (r : redex k2) (c : context k1 k2), t = c[r] /\ 
-	      forall k2' (r' : redex k2') (c' : context k1 k2'), 
-                  t = c'[r'] -> k2' = k2 /\ r ~= r' /\ c ~= c').
-
-End RED_SEM_PROPER.
-
-
-
-
-Module Type DEC_STEP (R : RED_LANG).
-
-  Import R.
-
-
-  (* interm_dec k - result of functions performing one step of decomposition of 
-                    a term t from the symbol k to a redex.
-     in_red r      - t is a redex, t = r.
-     in_term t' ec - t = ec[t'] and to find a redex we are going to check t'.
-     in_val v      - there is no redexes in t, t = v.
-     in_dead       - result of the functions for arguments out of their domains. *)
-  Inductive interm_dec k : Set :=
-  | in_red  : redex k -> interm_dec k
-  | in_term : term -> elem_context -> interm_dec k
-  | in_val  : value k -> interm_dec k
-  | in_dead : interm_dec k.
-  Arguments in_red {k} _.    Arguments in_val {k} _.
-  Arguments in_term {k} _ _. Arguments in_dead {k}.
-
-
-  (* dec_term t k       - one step of decomposition of t from the symbol k if we
-                          have no information about subterms of t. 
-                          Domain:  term * { k : ckind | k is not dead }  
-     dec_context ec k v - one step of decomposition of a term ec[t] with an additional
-                          piece of information saying that t is a value v. 
-                          Domain:  elem_context * { (k, v) | k+>ec is not dead and
-                                                             v : value (k+>ec)     }  *)
-  Parameter dec_term    : term -> forall k, interm_dec k.
-  Parameter dec_context : forall ec k, value (k+>ec) -> interm_dec k.
-
-
-  Axiom dec_term_correct : 
-      forall t k, match dec_term t k with
-      | in_red r      => t = r
-      | in_val v      => t = v
-      | in_term t' ec => t = ec:[t']
-      | in_dead       => dead_ckind k 
-      end.
-
-  Axiom dec_term_from_dead : forall t k, 
-      dead_ckind k -> dec_term t k = in_dead.
-
-
-  Axiom dec_context_correct : 
-      forall ec k v, match dec_context ec k v with
-      | in_red r      => ec:[v] = r
-      | in_val v'     => ec:[v] = v'
-      | in_term t ec' => ec:[v] = ec':[t]
-      | in_dead       => dead_ckind (k+>ec) 
-      end.
-
-  Axiom dec_context_from_dead : forall ec k (v : value (k+>ec)), 
-      dead_ckind (k+>ec) -> dec_context ec k v = in_dead.
-
-
-  (* Any decomposition build by applying dec_term and dec_context needs to be 
-     proper. *)
-  Axiom dec_term_next_alive : forall t k {t0 ec0}, 
-      dec_term t k = in_term t0 ec0 -> ~ dead_ckind (k+>ec0).
-
-  Axiom dec_context_next_alive : forall ec k v {t0 ec0}, 
-      dec_context ec k v = in_term t0 ec0 -> ~ dead_ckind (k+>ec0).
-
-End DEC_STEP.

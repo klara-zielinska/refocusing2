@@ -2,7 +2,7 @@ Require Import Util.
 Require Import Program.
 Require Export refocusing_semantics.
 Require Import refocusing_lang.
-Require Import reduction_lang_facts.
+Require Import reduction_semantics_facts.
 
 
 
@@ -581,12 +581,21 @@ Module RedRefSem (R : RED_REF_LANG) <: RED_REF_SEM R.R.
     Inductive iter : forall {k}, decomp k -> value k -> Prop :=
     | i_val : forall {k} (v : value k), iter (d_val v) v
     | i_red : forall {k2} (r : redex k2) {t k1} (c : context k1 k2) {d v},
-                  contract r = Some t -> decempty c[t] d -> iter d v ->
-                  iter (d_red r c) v.
+                contract r = Some t -> decempty c[t] d -> iter d v ->
+                iter (d_red r c) v.
 
     Inductive eval : term -> value init_ckind -> Prop :=
     | e_intro : forall {t} {d : decomp init_ckind} {v : value init_ckind}, 
-                    decempty t d -> iter d v -> eval t v.
+                  decempty t d -> iter d v -> eval t v.
+
+
+    Lemma dec_value_self : forall {k} (v : value k), 
+                             ~ dead_ckind k -> dec v [.] (d_val v).
+    Proof with auto.
+      intros.
+      apply val_dec.
+      constructor...
+    Qed.
 
 
     Definition dec := dec.

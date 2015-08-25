@@ -1,12 +1,13 @@
 Require Import Util.
 Require Export reduction_semantics.
+Require Export refocusing_step.
 
 
 
 Module Type RED_REF_LANG.
 
   Declare Module R   : RED_LANG.
-  Declare Module DEC : DEC_STEP R.
+  Declare Module DEC : REF_STEP R.
   Export R.
   Export DEC.
 
@@ -75,6 +76,7 @@ Module Type RED_REF_LANG.
               exists (v : value (k+>ec)), t' = v.
 
 End RED_REF_LANG.
+
 
 
 

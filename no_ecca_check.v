@@ -3,15 +3,10 @@ Require Import Program.
 Require Import no_ecca.
 Require Import refocusing_semantics.
 Require Import refocusing_semantics_derivation.
-Require Import refocusing_machine_generation.
 Require Import abstract_machine.
-Require Import refocusing_lang_facts.
-
-
-
-
-Module no_ECCa_REF_SEM := RedRefSem no_ECCa_Ref.
-Module ECCa_EAM := ProperEAMachine no_ECCa no_ECCa_REF_SEM.
+Require Import refocusing_machine.
+Require Import refocusing_machine_correct.
+Require Import reduction_semantics_facts.
 
 
 
@@ -313,6 +308,14 @@ Module no_ECCa_HandSem <: RED_SEM no_ECCa.
   Qed.
 
 
+  Lemma dec_value_self : forall {k} (v : value k), 
+                             ~ dead_ckind k -> dec v [.] (d_val v).
+  Proof with auto.
+    intros k v H.
+    apply dec_val_self.
+    constructor...
+  Qed.
+
 
   Inductive decempty : term -> forall {k}, decomp k -> Prop :=
   | d_intro : forall {t k} {d : decomp k}, dec t [.] d -> decempty t d.
@@ -514,12 +517,12 @@ Module ECCa_HandMachine <: ABSTRACT_MACHINE.
   where " a →+ b " := (trans_close a b).
 
 
-  Inductive eval : term -> value init_ckind -> Prop :=
+  Inductive eval : term -> value -> Prop :=
   | e_intro : forall t v, trans_close (c_init t) (c_final v) -> eval t v.
 
 
   Definition term          := term.
-  Definition value         := value init_ckind.
+  Definition value         := value.
   Definition configuration := configuration.
   Definition c_init        := c_init.
   Definition c_final       := c_final.
@@ -533,15 +536,16 @@ Module ECCa_Machine_Check.
 
   Module EAM := ECCa_EAM.
   Module HM  := ECCa_HandMachine.
+  Import no_ECCa_Ref.DEC.
   Import EAM.
   Import HM.
 
 
-  Notation " a >> b "  := (ECCa_EAM.transition a b)     (at level 40, no associativity).
-  Notation " a >>+ b " := (ECCa_EAM.AM.trans_close a b) (at level 40, no associativity).
+  Notation " a >> b "  := (ECCa_EAM.transition a b)  (at level 40, no associativity).
+  Notation " a >>+ b " := (ECCa_EAM.trans_close a b) (at level 40, no associativity).
 
 
-  Lemma EAM_trans_imp_HM_trans : forall c0 c1,  c0 >> c1  ->  c0 → c1.
+  Lemma trans_EAM2HM : forall c0 c1,  c0 >> c1  ->  c0 → c1.
   Proof.
     inversion 1; subst;
     match goal with
@@ -555,7 +559,7 @@ Module ECCa_Machine_Check.
   Qed.
 
 
-  Lemma HM_trans_imp_EAM_trans : forall c0 c1,  c0 → c1  ->  c0 >> c1.
+  Lemma trans_HM2EAM : forall c0 c1,  c0 → c1  ->  c0 >> c1.
   Proof with auto.
     inversion 1; subst;
     econstructor; simpl...
@@ -565,7 +569,7 @@ Module ECCa_Machine_Check.
   Lemma trans_eqv : forall c0 c1,  c0 → c1  <->  c0 >> c1.
   Proof.
     split; 
-    solve [ auto using HM_trans_imp_EAM_trans, EAM_trans_imp_HM_trans ].
+    solve [ auto using trans_HM2EAM, trans_EAM2HM ].
   Qed.
 
 
@@ -582,7 +586,7 @@ Module ECCa_Machine_Check.
   Qed.
 
 
-  Theorem eval_eqv : forall t v, HM.eval t v <-> EAM.AM.eval t v.
+  Theorem eval_eqv : forall t v, HM.eval t v <-> EAM.eval t v.
   Proof.
     split;
     

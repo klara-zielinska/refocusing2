@@ -1,7 +1,7 @@
 Require Import Util.
 Require Import Program.
 Require Import refocusing_lang.
-Require Import refocusing_lang_facts.
+Require Import reduction_semantics_facts.
 
 
 
@@ -15,10 +15,12 @@ Module no_ECCa <: RED_LANG.
   | Var : var -> expr
   | Lam : var -> expr -> expr.
   Definition term := expr.
+  Hint Unfold term.
 
 
   Inductive ck := C | ECa | CBot.
   Definition ckind := ck.
+  Hint Unfold  ckind.
 
 
   Inductive val : ckind -> Type :=
@@ -39,12 +41,17 @@ Module no_ECCa <: RED_LANG.
   | vCaApp : valCa -> val C -> valCa.
   
   Definition value := val.
+  Hint Unfold value.
+
+  Scheme val_Ind   := Induction for val Sort Prop
+    with valCa_Ind := Induction for valCa Sort Prop.
 
 
   Inductive red : ckind -> Type :=
   | rCApp   : var -> term -> term -> red C
   | rECaApp : var -> term -> term -> red ECa.
   Definition redex := red.
+  Hint Unfold redex.
 
 
   Inductive ec :=
@@ -52,6 +59,7 @@ Module no_ECCa <: RED_LANG.
   | ap_r  : term -> ec
   | ap_l  : valCa -> ec.
   Definition elem_context := ec.
+  Hint Unfold elem_context.
 
 
   Definition ckind_trans (k : ckind) (ec : elem_context) := 
@@ -65,8 +73,7 @@ Module no_ECCa <: RED_LANG.
 
   Definition init_ckind : ckind     :=  C.
   Definition dead_ckind (k : ckind) :=  k = CBot.
-
-  Hint Unfold dead_ckind.
+  Hint Unfold init_ckind dead_ckind.
 
 
   Lemma death_propagation : 
@@ -117,10 +124,6 @@ Module no_ECCa <: RED_LANG.
       | rECaApp x t1 t2 => App (Lam x t1) t2
       end.
   Coercion redex_to_term : redex >-> term.
-
-
-  Scheme val_Ind   := Induction for val Sort Prop
-    with valCa_Ind := Induction for valCa Sort Prop.
 
 
   Lemma value_to_term_injective : 
@@ -199,23 +202,6 @@ Module no_ECCa <: RED_LANG.
 
 
   Parameter subst : var -> term -> term -> term.
-
-  (*Import Arith.Peano_dec.
-  Fixpoint subst x ex e :=
-  match e with
-  | Z  => Z
-  | S e1 => S (subst x ex e1)
-  | App e1 e2 => App (subst x ex e1) (subst x ex e2) 
-  | Var y => if eq_nat_dec y x then ex else Var y
-  | Lam y e1 => if eq_nat_dec y x then Lam y e1 else Lam y (subst x ex e1)
-  | Case e0 e1 y e2 => Case (subst x ex e0) (subst x ex e1) y 
-                          (if eq_nat_dec y x then e2 else (subst x ex e2)) 
-  | Letv y e1 e2 => Letv y (subst x ex e1) (if eq_nat_dec y x then e2 else subst x ex e2)
-  | Fix y e1 => if eq_nat_dec y x then Fix y e1 else Fix y (subst x ex e1)
-  | Pair e1 e2 => Pair (subst x ex e1) (subst x ex e2)
-  | Fst e1 => Fst (subst x ex e1)
-  | Snd e1 => Snd (subst x ex e1)
-  end.*)
 
 
   Definition contract {k} (r : redex k) : option term :=
@@ -408,6 +394,7 @@ End no_ECCa.
 
 
 
+
 Module no_ECCa_Ref <: RED_REF_LANG.
 
   Module R  := no_ECCa.
@@ -416,7 +403,7 @@ Module no_ECCa_Ref <: RED_REF_LANG.
   Import RF.
 
 
-  Module DEC <: DEC_STEP R.
+  Module DEC <: REF_STEP R.
 
     Inductive interm_dec k : Set :=
     | in_red  : redex k -> interm_dec k
@@ -795,3 +782,11 @@ Module no_ECCa_Ref <: RED_REF_LANG.
 
 End no_ECCa_Ref.
 
+
+
+
+Require Import refocusing_semantics_derivation.
+Require Import refocusing_machine.
+
+Module no_ECCa_REF_SEM := RedRefSem no_ECCa_Ref.
+Module ECCa_EAM        := ProperEAMachine no_ECCa no_ECCa_REF_SEM.

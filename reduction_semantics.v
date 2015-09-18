@@ -6,42 +6,50 @@ Require Import Program.
    the formalized language.
    
    In this formalisation we represent evaluation contexts in terms of elementary
-   contexts (if you do not understand this go to the paper). To find the elem.
-   contexts and the grammar of eval. contexts given in terms of elem. contexts, first 
-   translate the original grammar to a form where each right side of a production is 
-   a hole or it has a context non-terminal, then take each non-hole right side and 
-   replace the context symbol by a hole. The result is a context pattern - we will
-   use EC markings for them.
+   contexts (if you do not understand this go to the paper). To obtain the grammar 
+   proper for this formalization first translate the original grammar to a form, 
+   where each right side of a production is a hole or it has a context non-terminal.
+   Now if you take each non-hole right side and replace the context symbol by a hole,
+   you will a set of get context patterns that identify needed elementary contexts - 
+   we will use EC markings for these patterns.
 
-   E.g., if k1, k2 are context symbols and there is a production  k1 -> a b k2 c  ,
-   then the result context pattern is  a b [] c  .
+   E.g., if k1, k2 are context non-terminals and there is a production  k1 -> a b k2 c,
+   then the coresponding context pattern is  a b [] c  .
 
-   Contexts that match the patterns are elem. contexts. However, not every grmmar is
-   proper for our formalisation, so you may still need to refine it both with the set 
-   of elem. contexts.
+   Unfortunatly, not all such grammars are proper for our formalisation, so we may 
+   still need to refine them. If we try to say it intuitivly, the grammars describe 
+   automata on words build from elementary contexts and these automata need to be 
+   deterministic.
 
-   First of all, for any context symbol k and elem. context ec there needs to at most
-   one k' such that there exists a production  k -> EC[k']  and ec matches EC. Let us
-   call such grammar a >deterministic grammar of contexts<. 
+   Saying it less intuitvaly: for any context non-teminal symbol k and elem. context ec 
+   there needs to be at most one k' such that there exists a production  k -> EC[k']  
+   and ec matches EC. Let us call such grammars >deterministic grammars of contexts<. 
 
    You may achive this form by spliting the context patterns and determinizing 
-   the grammar. E.g., suppose you have a grammar with two productions form k1:  
-   k1 -> a k2 a,  k1 -> ab k3 ab,  where L(ab) = L(a) U L(b) and languages L(a), L(b) 
-   are disjoint. Then you may split the second pattern  ab [] ab  to:  a [] a,  b [] ab,
-   ab [] b. So now, the second production is replaced by three: k1 -> a k3 a,  
-   k -> b k3 ab,  k -> ab k3 b. Then, you may determinize the grammar. This will cause 
-   an introduction of a new context symbol {k2,k3}, replacing the two productions:  
-   k1 -> a k2 a,  k1 -> a k3 a,  with  k1 -> a {k2,k3} a  and derivating the missing 
-   part of the grammar from the symbol {k2,k3}. 
+   the grammar.
 
-   Second of all, the production  k -> []  must be present in the grammar for any k.
-   You may just add the missing ones. This does not break any generality in our case,
-   because in our formalisation you may define a set of redexes per each kind of
-   a hole. So, if there was no production  k -> [],  then you may just set up 
-   an empty set of redexes for k.
+   E.g., suppose you have a grammar with two productions form k1:  k1 -> a k2 a,  
+   k1 -> ab k3 ab,  where L(a), L(b) are disjoint languages and L(ab) = L(a) U L(b). 
+   Then you may split the second pattern  ab [] ab  to:  a [] a,  b [] ab,  ab [] b. 
+   So, the second production may be replaced by three other:  k1 -> a k3 a,  
+   k -> b k3 ab,  k -> ab k3 b. And then you may determinize the grammar by the
+   exponential construction. In this case, it will introduce a new context symbol 
+   {k2,k3}, replacing the productions  k1 -> a k2 a,  k1 -> a k3 a  with  
+   k1 -> a {k2,k3} a  and derivating the missing part of the grammar from the symbol
+   {k2,k3}.
 
-   Definition: If a derivation of a context ends with a production k -> [], then
-   we say that the context has a >hole of the kind k<. *)
+   In this formalisation contexts are treated as words of elementary contexts, where
+   the end of a word means a hole. Because such a word may end in any place, this 
+   enforces an additional condition on the grammars that, the production  k -> []  
+   exists for any non-terminal k. However, this condition is not restrictive (keep
+   reading).
+
+   Definition: If a derivation of a context ends with a production  k -> [], then
+   we say that the context has a >hole of the kind k<. 
+
+   In this formalisation we may give a different set of redexes that may occure in 
+   a hole per each hole kind. Hence, if there was no production  k -> [], then
+   we may equivalently fix an empty set of redexes for this k. *)
 
 
 

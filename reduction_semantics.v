@@ -53,6 +53,7 @@ Require Import Program.
 
 
 
+
 (* Signature for languages with reduction semantics and multiple kinds of contextes. *)
 
 Module Type RED_LANG.
@@ -225,6 +226,8 @@ End RED_LANG.
 
 
 
+(* Signature for reduction semantics *)
+
 Module Type RED_SEM (R : RED_LANG).
 
   Import R.
@@ -246,7 +249,7 @@ Module Type RED_SEM (R : RED_LANG).
                            dec t c d -> c[t] = d.
 
 
-  (* dec t c d  is equivalnet to  dec c[t] [.] d. *)
+  (* Following two axioms say that  dec t c d  is equivalnet to  dec c[t] [.] d. *)
   Axiom dec_plug : 
       forall {k1 k2} (c : context k1 k2) {k3} {c0 : context k3 k1} {t d}, 
           ~ dead_ckind k2 -> dec c[t] c0 d -> dec t (c ~+ c0) d.
@@ -258,11 +261,12 @@ Module Type RED_SEM (R : RED_LANG).
 
 
   (* Together with the previous axioms this ensures that dec contains every 
-     decomposition to a redex. Of coures, we care only about non-dead k2-s, but 
-     this is implied by the existance of a redex k2. *)
+     decomposition to a redex. (We care only about non-dead k2, but this is 
+     implied by the existance of a redex k2.) *)
   Axiom dec_redex_self : forall {k2} (r : redex k2) {k1} (c : context k1 k2), 
                              dec r c (d_red r c).
 
+  (* All proper values need to be in dec. *)
   Axiom dec_value_self : forall {k} (v : value k), 
                              ~ dead_ckind k -> dec v [.] (d_val v).
 
@@ -278,7 +282,7 @@ Module Type RED_SEM (R : RED_LANG).
                 contract r = Some t -> decempty c[t] d -> iter d v ->
                 iter (d_red r c) v.
 
-  (* An evaluation process - starting from a term *)
+  (* An effective evaluation process - starting from a term *)
   Inductive eval : term -> value init_ckind -> Prop :=
   | e_intro : forall {t} {d : decomp init_ckind} {v : value init_ckind}, 
                   decempty t d -> iter d v -> eval t v.
@@ -287,6 +291,8 @@ End RED_SEM.
 
 
 
+
+(* Signature for deterministic reduction semantics *)
 
 Module Type DET_RED_SEM (R : RED_LANG).
 

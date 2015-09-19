@@ -127,7 +127,7 @@ Module no_ECCa <: RED_LANG.
 
 
   Lemma value_to_term_injective : 
-      forall k (v v' : value k), value_to_term v = value_to_term v' -> v = v'.
+      forall {k} (v v' : value k), value_to_term v = value_to_term v' -> v = v'.
 
   Proof with auto.
     induction v using val_Ind with 
@@ -149,7 +149,7 @@ Module no_ECCa <: RED_LANG.
 
 
   Lemma redex_to_term_injective : 
-      forall k (r r' : redex k), redex_to_term r = redex_to_term r' -> r = r'.
+      forall {k} (r r' : redex k), redex_to_term r = redex_to_term r' -> r = r'.
 
   Proof with auto.
     intros k r r' H.
@@ -181,8 +181,8 @@ Module no_ECCa <: RED_LANG.
   Notation "ec :[ t ]" := (elem_plug t ec) (at level 0).
 
 
-  Lemma elem_plug_injective1 : forall ec {t0 t1},
-      ec:[t0] = ec:[t1] -> t0 = t1.
+  Lemma elem_plug_injective1 : forall ec {t0 t1}, ec:[t0] = ec:[t1] -> t0 = t1.
+
   Proof.
     intros ec t0 t1 H.
     destruct ec;
@@ -206,8 +206,8 @@ Module no_ECCa <: RED_LANG.
 
   Definition contract {k} (r : redex k) : option term :=
       match r with
-      | rCApp   x t tx => Some (subst x tx t)
-      | rECaApp x t tx => Some (subst x tx t)
+      | rCApp   x t0 t1 => Some (subst x t1 t0)
+      | rECaApp x t0 t1 => Some (subst x t1 t0)
       end.
 
 
@@ -265,7 +265,7 @@ Module no_ECCa <: RED_LANG.
   Qed.
 
 
-  Lemma value_redex : forall k (v : value k) (r : redex k), 
+  Lemma value_redex : forall {k} (v : value k) (r : redex k), 
                           value_to_term v <> redex_to_term r.
   Proof.
     intros k v r.
@@ -483,7 +483,7 @@ Module no_ECCa_Ref <: RED_REF_LANG.
 
     Lemma dec_term_from_dead : forall t k, dead_ckind k -> dec_term t k = in_dead.
     Proof.
-      intros.
+      intros t k H.
       destruct k;
       solve [ autof ].
     Qed.
@@ -509,8 +509,8 @@ Module no_ECCa_Ref <: RED_REF_LANG.
         end.
 
     Proof.
-      intros.
-      destruct k, ec0; dependent destruction v;
+      intros ec k v.
+      destruct k, ec; dependent destruction v;
       simpl;
       solve [ auto ].
     Qed.
@@ -520,8 +520,8 @@ Module no_ECCa_Ref <: RED_REF_LANG.
         dead_ckind (k+>ec) -> dec_context ec k v = in_dead.
 
     Proof.
-      intros.
-      destruct ec0, k;
+      intros ec k v H.
+      destruct ec, k;
       solve [ autof ].
     Qed.
 
@@ -530,8 +530,8 @@ Module no_ECCa_Ref <: RED_REF_LANG.
         dec_context ec k v = in_term t ec0 -> ~ dead_ckind (k+>ec0).
 
     Proof.
-      intros.
-      destruct ec0, ec1, k; dependent destruction v;  
+      intros ec k v t ec0 H.
+      destruct ec, ec0, k; dependent destruction v;  
       solve [ autof ].
     Qed.
 
@@ -541,7 +541,7 @@ Module no_ECCa_Ref <: RED_REF_LANG.
 
 
 
-  Lemma redex_trivial : forall k (r : redex k), only_trivial r k.
+  Lemma redex_trivial : forall {k} (r : redex k), only_trivial r k.
   Proof with auto.
     intros k1 r t k2 c; revert t.
     induction c.
@@ -597,6 +597,61 @@ Module no_ECCa_Ref <: RED_REF_LANG.
   Qed.
 
 
+  Lemma ec_order_antisym : forall k t ec ec0, 
+      k, t |~ ec << ec0 -> ~ k, t |~ ec0 << ec.
+
+  Proof.
+    intros k t ec ec0 H.
+    destruct k, ec, ec0;
+    solve [ autof ].
+  Qed.
+
+
+  Lemma ec_order_trans :  forall k t ec0 ec1 ec2, 
+      k,t |~ ec0 << ec1 -> k,t |~ ec1 << ec2 -> 
+      k,t |~ ec0 << ec2.
+
+  Proof.
+    intros k t ec0 ec1 ec2 H H0.
+    destruct k, ec0, ec1;
+    solve [ autof ].
+  Qed.
+
+
+  Lemma ec_order_comp_if : forall t ec0 ec1, 
+      immediate_ec ec0 t -> immediate_ec ec1 t -> 
+      forall k, ~ dead_ckind (k+>ec0) -> ~ dead_ckind (k+>ec1) ->
+          k,t |~ ec0 << ec1 \/ k,t |~ ec1 << ec0 \/ ec0 = ec1.
+
+  Proof.
+    intros t ec0 ec1 H0 H1 k H2 H3.
+
+    destruct H0 as (t0, H4); destruct H1 as (t1, H5).
+    subst t.
+    destruct k, ec0, ec1;
+    inversion H5; subst;
+
+    solve
+    [ compute; eautof 7
+    | do 2 right; 
+      f_equal;
+      apply valCa_to_term_injective; auto ].
+  Qed.
+
+
+  Lemma ec_order_comp_fi :
+      forall k t ec0 ec1,  k, t |~ ec0 << ec1 ->
+          immediate_ec ec0 t /\ immediate_ec ec1 t /\ 
+          ~ dead_ckind (k+>ec0) /\ ~ dead_ckind (k+>ec1).
+
+  Proof with auto.
+    intros k t ec0 ec1 H.
+    destruct k, ec0, ec1;
+    inversion H;
+    solve [auto].
+  Qed.
+
+
   Lemma dec_term_red_empty : 
       forall t k (r : redex k), dec_term t k = in_red r -> only_empty t k.
 
@@ -648,40 +703,6 @@ Module no_ECCa_Ref <: RED_REF_LANG.
   Qed.
 
 
-  Lemma ec_order_comp_fi :
-      forall k t ec0 ec1,  k, t |~ ec0 << ec1 ->
-          immediate_ec ec0 t /\ immediate_ec ec1 t /\ 
-          ~ dead_ckind (k+>ec0) /\ ~ dead_ckind (k+>ec1).
-
-  Proof with auto.
-    intros k t ec0 ec1 H.
-    destruct k, ec0, ec1;
-    inversion H;
-    solve [auto].
-  Qed.
-
-
-  Lemma elem_context_det : 
-      forall t ec {t'}, t = ec:[t'] -> 
-          forall k ec',  k, t |~ ec' << ec -> 
-              exists (v : value (k+>ec)), t' = v.
-
-  Proof.
-    intros t ec0 t' H k ec' H0.
-    subst.
-
-    destruct k, ec0, ec'; autof;
-    unfold ec_order in H0; destruct H0 as (H, _);
-    destruct (valCa_is_valECa v) as (v0, H0);
-
-    solve
-    [ exists v0;
-      simpl; rewrite <- H0;
-      inversion H as (t0, H1); inversion H1; 
-      trivial ].
-  Qed.
-
-
   Lemma dec_context_red_bot : 
       forall k ec v r, dec_context ec k v = in_red r -> 
           forall ec', ~ k, ec:[v] |~ ec' << ec.
@@ -709,35 +730,6 @@ Module no_ECCa_Ref <: RED_REF_LANG.
   Qed.
 
 
-  Lemma eco_antirefl : forall k t ec, ~ k, t |~ ec << ec.
-  Proof.
-    intros k t ec.
-    destruct k, ec; 
-    solve [ auto ].
-  Qed.
-
-
-  Lemma ec_order_antisym : forall k t ec ec0, 
-      k, t |~ ec << ec0 -> ~ k, t |~ ec0 << ec.
-
-  Proof.
-    intros k t ec ec0 H.
-    destruct k, ec, ec0;
-    solve [ autof ].
-  Qed.
-
-
-  Lemma ec_order_trans :  forall k t ec0 ec1 ec2, 
-      k,t |~ ec0 << ec1 -> k,t |~ ec1 << ec2 -> 
-      k,t |~ ec0 << ec2.
-
-  Proof.
-    intros k t ec0 ec1 ec2 H H0.
-    destruct k, ec0, ec1;
-    solve [ autof ].
-  Qed.
-
-
   Lemma dec_context_term_next : 
       forall ec0 k v t ec1, dec_context ec0 k v = in_term t ec1 ->
       (*1*) k, ec0:[v] |~ ec1 << ec0 /\ 
@@ -760,24 +752,24 @@ Module no_ECCa_Ref <: RED_REF_LANG.
   Qed.
 
 
-  Lemma ec_order_comp_if : forall t ec0 ec1, 
-      immediate_ec ec0 t -> immediate_ec ec1 t -> 
-      forall k, ~ dead_ckind (k+>ec0) -> ~ dead_ckind (k+>ec1) ->
-          k,t |~ ec0 << ec1 \/ k,t |~ ec1 << ec0 \/ ec0 = ec1.
+  Lemma elem_context_det : 
+      forall t ec {t'}, t = ec:[t'] -> 
+          forall k ec',  k, t |~ ec' << ec -> 
+              exists (v : value (k+>ec)), t' = v.
 
   Proof.
-    intros t ec0 ec1 H0 H1 k H2 H3.
+    intros t ec0 t' H k ec' H0.
+    subst.
 
-    destruct H0 as (t0, H4); destruct H1 as (t1, H5).
-    subst t.
-    destruct k, ec0, ec1;
-    inversion H5; subst;
+    destruct k, ec0, ec'; autof;
+    unfold ec_order in H0; destruct H0 as (H, _);
+    destruct (valCa_is_valECa v) as (v0, H0);
 
     solve
-    [ compute; eautof 7
-    | do 2 right; 
-      f_equal;
-      apply valCa_to_term_injective; auto ].
+    [ exists v0;
+      simpl; rewrite <- H0;
+      inversion H as (t0, H1); inversion H1; 
+      trivial ].
   Qed.
 
 End no_ECCa_Ref.

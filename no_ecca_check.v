@@ -105,6 +105,7 @@ Module no_ECCa_HandSem <: RED_SEM no_ECCa.
                  __dec t1 (ap_r t2 =: c) d ->
                  __dec (App t1 t2) c d
 
+
   with decctx : forall {k2}, value k2 -> 
                 forall {k1}, context k1 k2 -> decomp k1 -> Prop :=
 

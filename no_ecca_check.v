@@ -459,7 +459,7 @@ Module ECCa_HandMachine <: ABSTRACT_MACHINE.
   Notation "[$ t , c $]" := (c_eval t c)  (t, c at level 99).
   Notation "[: c , v :]" := (c_apply c v) (c, v at level 99).
 
-  Reserved Notation " a → b " (at level 40).
+  Reserved Notation "c1 → c2" (at level 40).
 
 
   Inductive trans : configuration -> configuration -> Prop :=
@@ -504,18 +504,18 @@ Module ECCa_HandMachine <: ABSTRACT_MACHINE.
   | t_apValCLam : forall x v {k1} (c : context k1 C),
                     [: lam_c x=:c, v :]            → [: c, vCLam x v :]
 
-  where " a → b " := (trans a b).
+  where "c1 → c2" := (trans c1 c2).
   Definition transition := trans.
 
 
-  Reserved Notation " a →+ b " (at level 40, no associativity).
+  Reserved Notation "c1 →+ c2" (at level 40, no associativity).
 
   Inductive trans_close : configuration -> configuration -> Prop :=
   | one_step   : forall {c0 c1 : configuration}, 
                    c0 → c1 -> trans_close c0 c1
   | multi_step : forall {c0 c1 c2 : configuration}, 
                    c0 → c1 -> trans_close c1 c2 -> trans_close c0 c2
-  where " a →+ b " := (trans_close a b).
+  where "c1 →+ c2 " := (trans_close c1 c2).
 
 
   Inductive eval : term -> value -> Prop :=
@@ -542,8 +542,8 @@ Module ECCa_Machine_Check.
   Import HM.
 
 
-  Notation " a >> b "  := (ECCa_EAM.transition a b)  (at level 40, no associativity).
-  Notation " a >>+ b " := (ECCa_EAM.trans_close a b) (at level 40, no associativity).
+  Notation "c1 >> c2"  := (ECCa_EAM.transition c1 c2)  (at level 40, no associativity).
+  Notation "c1 >>+ c2" := (ECCa_EAM.trans_close c1 c2) (at level 40, no associativity).
 
 
   Lemma trans_EAM2HM : forall c0 c1,  c0 >> c1  ->  c0 → c1.
@@ -552,7 +552,7 @@ Module ECCa_Machine_Check.
     match goal with
     | H : dec_term ?t ?k2 = _ |- _        => destruct t, k2; 
                                              inversion H; subst
-    | H : dec_context ?ec ?k2 ?v = _ |- _ => destruct ec, k2; dependent_destruction2 v; 
+    | H : dec_context ?ec ?k2 ?v = _ |- _ => destruct ec, k2; dependent_destruction2 v;
                                              inversion H; subst
     end;
 
@@ -574,7 +574,7 @@ Module ECCa_Machine_Check.
   Qed.
 
 
-  Lemma tramsCl_eqv : forall c0 c1,  c0 →+ c1  <->  c0 >>+ c1.
+  Lemma transCl_eqv : forall c0 c1,  c0 →+ c1  <->  c0 >>+ c1.
   Proof.
     split;
 
@@ -595,8 +595,7 @@ Module ECCa_Machine_Check.
     [ intro H;
       destruct H;
       constructor;
-      apply tramsCl_eqv; auto ].
+      apply transCl_eqv; auto ].
   Qed.
-
 
 End ECCa_Machine_Check.

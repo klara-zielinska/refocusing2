@@ -233,12 +233,13 @@ Module Type PROPER_EA_MACHINE (R : RED_LANG) (RS : RED_REF_SEM R) <: ABSTRACT_MA
   Definition transition := trans.
   Hint Unfold transition.
 
+
+  Reserved Notation "c1 →+ c2" (at level 40, no associativity).
+
   Inductive trans_close : configuration -> configuration -> Prop :=
-  | one_step   : forall (c0 c1 : configuration), 
-                   transition c0 c1 -> trans_close c0 c1
-  | multi_step : forall (c0 c1 c2 : configuration), 
-                   transition c0 c1 -> trans_close c1 c2 -> trans_close c0 c2.
-  Notation "c0 →+ c1" := (trans_close c0 c1) (at level 40, no associativity).
+  | one_step   : forall c1 c2,     c1 → c2  ->  c1 →+ c2
+  | multi_step : forall c1 c2 c3,  c1 → c2  ->  c2 →+ c3  ->  c1 →+ c3
+  where "c1 →+ c2" := (trans_close c1 c2).
 
 
   Inductive eval : term -> value -> Prop :=
@@ -317,7 +318,7 @@ Module Type PROPER_PE_MACHINE (R : RED_LANG) (PERS : PE_REF_SEM R) <: ABSTRACT_M
   Definition c_final (v : value) := c_fin v.
 
 
-  Reserved Notation " a → b " (at level 40, no associativity).
+  Reserved Notation "c1 → c2" (at level 40, no associativity).
 
   Inductive trans : configuration -> configuration -> Prop :=
 
@@ -341,17 +342,17 @@ Module Type PROPER_PE_MACHINE (R : RED_LANG) (PERS : PE_REF_SEM R) <: ABSTRACT_M
                dec_term t k2 = in_term t0 ec ->
                c_eval t c → c_eval t0 (ec=:c)
 
-  where " a →  b " := (trans a b).
+  where "c1 → c2" := (trans c1 c2).
   Definition transition := trans.
   Hint Unfold transition.
 
 
+  Reserved Notation "c1 →+ c2" (at level 40, no associativity).
+
   Inductive trans_close : configuration -> configuration -> Prop :=
-  | one_step   : forall (c0 c1 : configuration), 
-                   transition c0 c1 -> trans_close c0 c1
-  | multi_step : forall (c0 c1 c2 : configuration), 
-                   transition c0 c1 -> trans_close c1 c2 -> trans_close c0 c2.
-  Notation "c0 →+ c1" := (trans_close c0 c1) (at level 40, no associativity).
+  | one_step   : forall c1 c2,     c1 → c2  ->  c1 →+ c2
+  | multi_step : forall c1 c2 c3,  c1 → c2  ->  c2 →+ c3  ->  c1 →+ c3
+  where "c1 →+ c2" := (trans_close c1 c2).
 
   Inductive eval : term -> value -> Prop :=
   | e_intro : forall t v, trans_close (c_init t) (c_final v) -> eval t v.

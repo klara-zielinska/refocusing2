@@ -2,11 +2,13 @@ Require Import reduction_semantics.
 Require Export refocusing_step.
 Require Import refocusing_semantics.
 Require Export abstract_machine.
+Require Export refocusing_machine_sig.
 
 
 
 
-Module PreAbstractMachine (R : RED_LANG) (RS : RED_REF_SEM R).
+Module PreAbstractMachine (R : RED_LANG) (RS : RED_REF_SEM R) 
+           : PRE_ABSTRACT_MACHINE R RS.
 
   Module DEC := RS.DEC.
   Import R.
@@ -69,7 +71,8 @@ End PreAbstractMachine.
 
 
 
-Module StagedAbstractMachine (R : RED_LANG) (RS : RED_REF_SEM R).
+Module StagedAbstractMachine (R : RED_LANG) (RS : RED_REF_SEM R) 
+           : STAGED_ABSTRACT_MACHINE R RS.
 
   Module DEC := RS.DEC.
   Import R.
@@ -120,9 +123,9 @@ Module StagedAbstractMachine (R : RED_LANG) (RS : RED_REF_SEM R).
               dec t c v -> 
               iter (d_red r c) v.
 
-  Scheme dec_Ind    := Induction for dec Sort Prop
+  Scheme dec_Ind    := Induction for dec    Sort Prop
     with decctx_Ind := Induction for decctx Sort Prop
-    with iter_Ind   := Induction for iter Sort Prop.
+    with iter_Ind   := Induction for iter   Sort Prop.
 
 
   Inductive eval : term -> value init_ckind -> Prop :=
@@ -133,7 +136,8 @@ End StagedAbstractMachine.
 
 
 
-Module EvalApplyMachine (R : RED_LANG) (RS : RED_REF_SEM R).
+Module EvalApplyMachine (R : RED_LANG) (RS : RED_REF_SEM R)
+           : EVAL_APPLY_MACHINE R RS.
 
   Module DEC := RS.DEC.
   Import R.
@@ -176,7 +180,7 @@ Module EvalApplyMachine (R : RED_LANG) (RS : RED_REF_SEM R).
                dec t (ec0=:c) v0 ->
                decctx v (ec=:c) v0.
 
-  Scheme dec_Ind    := Induction for dec Sort Prop
+  Scheme dec_Ind    := Induction for dec    Sort Prop
     with decctx_Ind := Induction for decctx Sort Prop.
 
 
@@ -229,17 +233,17 @@ Module ProperEAMachine (R : RED_LANG) (RS : RED_REF_SEM R) <: ABSTRACT_MACHINE.
                dec_context ec k2 v = in_term t ec0 ->
                c_apply (ec=:c) v → c_eval t (ec0=:c)
 
-  where " a → b " := (trans a b).
+  where "c1 → c2" := (trans c1 c2).
   Definition transition := trans.
   Hint Unfold transition.
 
 
+  Reserved Notation "c1 →+ c2" (at level 40, no associativity).
+
   Inductive trans_close : configuration -> configuration -> Prop :=
-  | one_step   : forall (c0 c1 : configuration), 
-                   transition c0 c1 -> trans_close c0 c1
-  | multi_step : forall (c0 c1 c2 : configuration), 
-                   transition c0 c1 -> trans_close c1 c2 -> trans_close c0 c2.
-  Notation "c0 →+ c1" := (trans_close c0 c1) (at level 40, no associativity).
+  | one_step   : forall c1 c2,     c1 → c2  ->  c1 →+ c2
+  | multi_step : forall c1 c2 c3,  c1 → c2  ->  c2 →+ c3  ->  c1 →+ c3
+  where "c1 →+ c2" := (trans_close c1 c2).
 
 
   Inductive eval : term -> value -> Prop :=
@@ -250,7 +254,8 @@ End ProperEAMachine.
 
 
 
-Module PushEnterMachine (R : RED_LANG) (PERS : PE_REF_SEM R).
+Module PushEnterMachine (R : RED_LANG) (PERS : PE_REF_SEM R)
+           : PUSH_ENTER_MACHINE R PERS.
 
   Module DEC := PERS.RefSem.DEC.
   Import R.
@@ -314,11 +319,11 @@ Module ProperPEMachine (R : RED_LANG) (PERS : PE_REF_SEM R) <: ABSTRACT_MACHINE.
   | c_fin : forall {k}, R.value k                   -> conf.
   Definition configuration := conf.
 
-  Definition c_init t  := c_eval t [.](init_ckind).
+  Definition c_init t            := c_eval t [.](init_ckind).
   Definition c_final (v : value) := c_fin v.
 
 
-  Reserved Notation " a → b " (at level 40, no associativity).
+  Reserved Notation "c1 → c2" (at level 40, no associativity).
 
   Inductive trans : configuration -> configuration -> Prop :=
 
@@ -347,12 +352,12 @@ Module ProperPEMachine (R : RED_LANG) (PERS : PE_REF_SEM R) <: ABSTRACT_MACHINE.
   Hint Unfold transition.
 
 
+  Reserved Notation "c1 →+ c2" (at level 40, no associativity).
+
   Inductive trans_close : configuration -> configuration -> Prop :=
-  | one_step   : forall (c0 c1 : configuration), 
-                   transition c0 c1 -> trans_close c0 c1
-  | multi_step : forall (c0 c1 c2 : configuration), 
-                   transition c0 c1 -> trans_close c1 c2 -> trans_close c0 c2.
-  Notation "c0 →+ c1" := (trans_close c0 c1) (at level 40, no associativity).
+  | one_step   : forall c1 c2,     c1 → c2  ->  c1 →+ c2
+  | multi_step : forall c1 c2 c3,  c1 → c2  ->  c2 →+ c3  ->  c1 →+ c3
+  where "c1 →+ c2" := (trans_close c1 c2).
 
 
   Inductive eval : term -> value -> Prop :=

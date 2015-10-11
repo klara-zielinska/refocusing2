@@ -361,7 +361,7 @@ Module ProperEAMachine_Correct (R : RED_LANG) (RS : RED_REF_SEM R)
     intros co H.
 
     dependent induction H;
-        match goal with H : transition _ _ |- _ => 
+        match goal with H : _ → _ |- _ => 
               dependent_destruction2 H end;
         match goal with 
         | H : dec_term _ ?k = _ |- _=> 
@@ -521,7 +521,7 @@ Module ProperPEMachine_Correct (R : RED_LANG) (PRS : PE_REF_SEM R)
   Proof with eauto.
     intros t k1 k2 c v H.
     dependent induction H;
-        match goal with H : transition _ _ |- _ => 
+        match goal with H : _ → _ |- _ => 
             dependent_destruction2 H end;
     solve 
     [ eauto 

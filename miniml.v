@@ -4,7 +4,6 @@ Require Import refocusing_lang.
 Require Import reduction_semantics_facts.
 
 
-
 Module MiniML <: RED_LANG.
 
   Parameter var : Set.
@@ -67,7 +66,7 @@ Module MiniML <: RED_LANG.
   Hint Unfold elem_context.
 
 
-  Definition ckind_trans (_ : ckind) (_ : elem_context) : ckind := tt.
+  Definition ckind_trans (_ : ckind) (_ : elem_context) : ckind := ().
   Notation "k +> ec" := (ckind_trans k ec) (at level 50, left associativity).
 
 
@@ -195,16 +194,17 @@ Module MiniML <: RED_LANG.
 
 
   Definition contract {k} (r : redex k) : option term :=
-    match r with
-    | rApp (vLam x t) v  => Some (subst x v t)
-    | rLet x v t         => Some (subst x v t)
-    | rFix x e           => Some (subst x (Fix x e) e)
-    | rFst (vPair v1 v2) => Some ((v1 : value') : term)
-    | rSnd (vPair v1 v2) => Some ((v2 : value') : term)
-    | rCase vZ t _ _     => Some t
-    | rCase (vS v) _ x t => Some (subst x (v : value') t)
-    | _                  => None
-    end.
+      match r with
+      | rApp (vLam x t) v  => Some (subst x v t)
+      | rLet x v t         => Some (subst x v t)
+      | rFix x e           => Some (subst x (Fix x e) e)
+      | rFst (vPair v1 v2) => Some ((v1 : value') : term)
+      | rSnd (vPair v1 v2) => Some ((v2 : value') : term)
+      | rCase vZ t _ _     => Some t
+      | rCase (vS v) _ x t => Some (subst x (v : value') t)
+      | _                  => None
+      end.
+  Notation contract' := (@contract ()).
 
 
   Inductive decomp (k : ckind) : Set :=
@@ -346,11 +346,11 @@ End MiniML.
 
 
 
-Module MiniMLRef <: RED_REF_LANG.
+Module MiniML_Ref <: RED_REF_LANG.
 
   Module R  := MiniML.
   Module RF := RED_LANG_Facts R.
-  Import R.
+  Export R.
   Import RF.
 
 
@@ -691,7 +691,7 @@ Module MiniMLRef <: RED_REF_LANG.
       eexists; trivial ].
   Qed.
 
-End MiniMLRef.
+End MiniML_Ref.
 
 
 
@@ -699,444 +699,5 @@ End MiniMLRef.
 Require Import refocusing_semantics_derivation.
 Require Import refocusing_machine.
 
-Module MiniML_REF_SEM := RedRefSem MiniMLRef.
+Module MiniML_REF_SEM := RedRefSem MiniML_Ref.
 Module MiniML_EAM     := ProperEAMachine MiniML MiniML_REF_SEM.
-
-
-
-
-Module MiniML_HandSem <: RED_SEM MiniML.
-
-  Module RF := RED_LANG_Facts MiniML.
-  Import MiniML.
-  Import RF.
-
-
-  Lemma decompose : forall (t : term) k1, ~ dead_ckind k1 ->
-      (exists (v : value k1), t = v) \/
-      (exists k2 (r : redex k2) (c : context k1 k2), t = c[r]).
-
-  Proof with simpl; f_equal; eauto.
-    intros t () _.
-
-    induction t.
-
-    - left.
-      exists vZ...
-
-    - destruct IHt as [(v, ?) | ((), (r, (c, ?)))].
-      + left.
-        exists (vS v)...
-      + right.
-        exists () r (c ~+ s_c =: [.](())).
-        rewrite plug_compose...
-
-    - right; exists ().
-      destruct IHt1 as [(v1, ?) | ((), (r1, (c1, ?)))].
-      + destruct IHt2 as [(v2, ?) | ((), (r2, (c2, ?)))].
-        * exists (rApp v1 v2) [.](())...
-        * exists r2 (c2 ~+ ap_l v1 =: [.](())).
-          rewrite plug_compose...
-      + exists r1 (c1 ~+ ap_r t2 =: [.](())).
-        rewrite plug_compose...
-
-    - left.
-      eexists (vVar _)...
-
-    - left.
-      eexists (vLam _ _)...
-
-    - right.
-      destruct IHt1 as [(v1, ?) | ((), (r, (c, ?)))].
-      + eexists (), (rCase v1 _ _ _), [.]...
-      + eexists (), r, (c ~+  case_c _ _ _ =: [.]).
-        rewrite plug_compose...
-
-    - right.
-      destruct IHt1 as [(v1, ?) | ((), (r, (c, ?)))].
-      + eexists (), (rLet _ _ _), [.]...
-      + eexists (), r, (c ~+ let_c _ _ =: [.]).
-        rewrite plug_compose...
-
-    - right.
-      eexists (), (rFix _ _), [.]...
-
-    - destruct IHt1 as [(v1, ?) | ((), (r1, (c1, ?)))].
-      + destruct IHt2 as [(v2, ?) | ((), (r2, (c2, ?)))].
-        * left.
-          exists (vPair v1 v2)...
-        * right.
-          eexists (), r2, (c2 ~+ pair_l v1 =: [.]).
-          rewrite plug_compose...
-      + right.
-        eexists (), r1, (c1 ~+ pair_r t2 =: [.]).
-        rewrite plug_compose...
-
-    - right.
-      destruct IHt as [(v, ?) | ((), (r, (c, ?)))].
-      + eexists (), (rFst v), [.]... 
-      + eexists (), r, (c ~+ fst_c =: [.]).
-        rewrite plug_compose...
-
-    - right.
-      destruct IHt as [(v, ?) | ((), (r, (c, ?)))].
-      + eexists (), (rSnd v), [.]... 
-      + eexists (), r, (c ~+ snd_c =: [.]).
-        rewrite plug_compose...
-  Qed.
-
-
-
-  Inductive __dec : term -> context' -> decomp' -> Prop :=
-
-  | d_z   : forall c d, decctx vZ c d               -> __dec Z c d
-
-  | d_s   : forall t c d, __dec t (s_c =: c) d      -> __dec (S t) c d
-
-  | d_case: forall t ez x es c d, 
-              __dec t (case_c ez x es =: c) d       -> __dec (Case t ez x es) c d
-
-  | d_var : forall x c d, decctx (vVar x) c d       -> __dec (Var x) c d
-
-  | d_lam : forall x t c d, decctx (vLam x t) c d   -> __dec (Lam x t) c d
-
-  | d_app : forall t1 t2 c d, 
-              __dec t1 (ap_r t2 =: c) d             -> __dec (App t1 t2) c d
-
-  | d_let : forall x t e c d, 
-              __dec t (let_c x e =: c) d            -> __dec (Letv x t e) c d
-
-  | d_fix : forall x t c, 
-              __dec (Fix x t) c (d_red (rFix x t) c)
-
-  | d_pair: forall t1 t2 c d, 
-              __dec t1 (pair_r t2 =: c) d           -> __dec (Pair t1 t2) c d
-
-  | d_fst : forall t c d, __dec t (fst_c =: c) d    -> __dec (Fst t) c d
-
-  | d_snd : forall t c d, __dec t (snd_c =: c) d    -> __dec (Snd t) c d
-
-
-  with decctx : value' -> context' -> decomp' -> Prop :=
-
-  | dc_em : forall v,
-              decctx v [.] (d_val v)
-
-  | dc_s  : forall v c d, decctx (vS v) c d         -> decctx v (s_c =: c) d
-
-  | dc_cs : forall v x ez es (c : context'),
-              decctx v (case_c ez x es =: c) (d_red (rCase v ez x es) c)
-
-  | dc_apr: forall v t (c : context') d, 
-              __dec t (ap_l v =: c) d -> decctx v (ap_r t =: c) d
-
-  | dc_apl: forall v v0 (c : context'),
-              decctx v (ap_l v0 =: c) (d_red (rApp v0 v) c)
-
-  | dc_let: forall v x e (c : context'),
-              decctx v (let_c x e =: c) (d_red (rLet x v e) c)
-
-  | dc_p_r: forall t v (c : context') d, 
-              __dec t (pair_l v =: c) d             -> decctx v (pair_r t =: c) d
-
-  | dc_p_l: forall v v0 c d, 
-              decctx (vPair v0 v) c d               -> decctx v (pair_l v0 =: c) d
-
-  | dc_fst: forall v (c : context'), 
-              decctx v (fst_c =: c) (d_red (rFst v) c)
-
-  | dc_snd: forall v (c : context'),
-              decctx v (snd_c =: c) (d_red (rSnd v) c).
-
-  Definition destruct_ckind : forall {P : ckind -> Type}, P () -> forall k, P k :=
-      fun P H k => match k as k' return P k' with () => H end.
-  Notation "# t" := (destruct_ckind t) (at level 0).
-
-
-  Definition dec t : forall {k1 k2 : ckind}, context k1 k2 -> decomp k1 -> Prop := 
-      ##(__dec t).
-
-  Definition decctx' : 
-      forall {k2}, value k2 -> forall {k1}, context k1 k2 -> decomp k1 -> Prop :=
-      #(fun v => #(decctx v)).
-
-  Scheme dec_Ind    := Induction for __dec  Sort Prop
-    with decctx_Ind := Induction for decctx Sort Prop.
-
-
-  Lemma dec_val_self : forall (v : value') c d, __dec v c d <-> decctx v c d.
-  Proof.
-    induction v;
-        intros c d; split; intro H;
-        inversion H; dep_subst; 
-
-    solve
-    [ auto
-
-    | constructor; auto
-
-    | match goal with H : _ |- _ => 
-      apply IHv in H;
-      inversion H1; dep_subst;
-      solve [ auto ]
-      end
-
-    | match goal with H : _ |- _ => 
-      apply IHv1 in H;
-      inversion H; dep_subst;
-      match goal with H : _ |- _ => 
-      apply IHv2 in H;
-      inversion H; dep_subst;
-      solve [ auto ]
-      end end
-
-    | constructor; fold (@value_to_term ()); 
-      apply IHv; 
-      constructor;
-      auto
-
-    | constructor; fold (@value_to_term ());
-      apply IHv1; constructor;
-      apply IHv2; constructor;
-      auto ].
-  Qed.
-
-
-
-  Lemma dec_correct : forall {t k1 k2} {c : context k1 k2} {d}, 
-                          dec t c d -> c[t] = d.
-  Proof with auto.
-    destruct k1, k2.
-    induction 1 using dec_Ind with
-    (P  := fun t c d (_ : __dec t c d)  => c[t] = d)
-    (P0 := fun v c d (_ : decctx v c d) => c[v] = d)...
-  Qed.
-
-
-  Lemma dec_plug :
-      forall {k1 k2} (c : context k1 k2) {k3} {c0 : context k3 k1} {t d}, 
-          ~ dead_ckind k2 -> dec c[t] c0 d -> dec t (c ~+ c0) d.
-  Proof.
-    induction c.
-    - auto.
-    - intros k3 c0 t0 d H H0.
-      destruct ec0;
-          assert (hh := IHc _ _ _ _ (death_propagation2 _ _ H) H0);
-          destruct k1, k2, k3; simpl in hh;
-          dependent destruction hh; subst;
-      solve
-      [ auto
-      | apply dec_val_self in hh;
-        inversion hh; dep_subst;
-        auto ].
-  Qed.
-
-
-  Lemma dec_plug_rev :
-      forall {k1 k2} (c : context k1 k2) {k3} {c0 : context k3 k1} {t d}, 
-          ~ dead_ckind k2 -> dec t (c ~+ c0) d -> dec c[t] c0 d.
-  Proof.
-    induction c.
-    - auto.
-    - intros k3 c0 t d H H0.
-      simpl.
-      apply IHc; eauto using death_propagation2.
-      destruct ec0, k1, k2, k3;
-      solve 
-      [ constructor; 
-        auto
-      | constructor;
-        apply dec_val_self;
-        constructor;
-        assumption ].
-  Qed.
-
-
-  Lemma dec_redex_self : forall {k2} (r : redex k2) {k1} (c : context k1 k2), 
-                             dec (redex_to_term r) c (d_red r c).
-  Proof.
-    destruct k2, k1.
-    destruct r as [v1 v2 | x v t | x t | v | v | v t1 x t2];
-        intro c;
-    solve 
-    [ constructor;
-      repeat (apply dec_val_self; constructor); 
-      auto ].
-  Qed.
-
-
-  Lemma dec_value_self : forall {k} (v : value k), 
-                             ~ dead_ckind k -> dec v [.] (d_val v).
-  Proof with auto.
-    intros k v H.
-    destruct k.
-    apply dec_val_self.
-    constructor...
-  Qed.
-
-
-  Inductive decempty : term -> forall {k}, decomp k -> Prop :=
-  | d_intro : forall {t k} {d : decomp k}, dec t [.] d -> decempty t d.
-
-  Inductive iter : forall {k}, decomp k -> value k -> Prop :=
-  | i_val : forall {k} (v : value k), iter (d_val v) v
-  | i_red : forall {k2} (r : redex k2) {t k1} (c : context k1 k2) {d v},
-                contract r = Some t -> decempty c[t] d -> iter d v ->
-                iter (d_red r c) v.
-
-  Inductive eval : term -> value init_ckind -> Prop :=
-  | e_intro : forall {t} {d : decomp init_ckind} {v : value init_ckind}, 
-                  decempty t d -> iter d v -> eval t v.
-
-End MiniML_HandSem.
-
-
-
-(*
-Lemma dec_sem_ref : forall t c d, MiniML_Sem.dec t c d -> MiniML_REF_SEM.dec t c d.
-Proof.
-  induction 1 using MiniML_Sem.dec_Ind with
-  (P := fun t c d (H : MiniML_Sem.dec t c d) => MiniML_REF_SEM.dec t c d)
-  (P0:= fun v c d (H : MiniML_Sem.decctx v c d) => MiniML_REF_SEM.decctx v c d); intros; simpl in *; auto;
-  [ econstructor | econstructor 3 | econstructor 3 | econstructor | econstructor 2 | econstructor 3 | econstructor 3
-  | econstructor | econstructor 3 | econstructor 3 | econstructor 3 | constructor | econstructor | constructor
-  | econstructor 4 | constructor | constructor | econstructor 4 | econstructor | constructor | constructor]; simpl; eauto.
-Qed.
-Hint Resolve dec_sem_ref.
-
-Lemma dec_ref_sem : forall t c d, MiniML_REF_SEM.dec t c d -> MiniML_Sem.dec t c d.
-Proof.
-  induction 1 using MiniML_REF_SEM.dec_Ind with
-  (P := fun t c d (H : MiniML_REF_SEM.dec t c d) => MiniML_Sem.dec t c d)
-  (P0:= fun v c d (H : MiniML_REF_SEM.decctx v c d) => MiniML_Sem.decctx v c d); intros; simpl in *; auto;
-  try (constructor; fail);
-  try (destruct t; inversion DT; subst; constructor; auto);
-  destruct ec; inversion DC; subst; constructor; auto.
-Qed.
-Hint Resolve dec_ref_sem.
-
-Lemma iter_sem_ref : forall d v, MiniML_Sem.iter d v <-> MiniML_REF_SEM.RS.iter d v.
-Proof with eauto with miniml.
-destruct d; split; intros H; induction H; subst; simpl in *; auto; try constructor;
-inversion_clear D_EM; econstructor 2; simpl in *; eauto; constructor; unfold MiniML_REF_SEM.RS.dec...
-Qed.
-
-Lemma eval_sem_ref : forall t v, MiniML_Sem.eval t v <-> MiniML_REF_SEM.RS.eval t v.
-Proof with auto.
-split; intro H; inversion_clear H; econstructor; inversion_clear D_EM; [ constructor | 
-rewrite <- iter_sem_ref | constructor | rewrite iter_sem_ref]; unfold MiniML_REF_SEM.RS.dec in *; eauto.
-Qed.
-
-Module MiniML_Machine <: ABSTRACT_MACHINE.
-
-Definition term := MiniML.term.
-Definition value := MiniML.value.
-
-Definition configuration := MiniML_EAM.configuration.
-Definition c_init := MiniML_EAM.c_init.
-Definition c_final := MiniML_EAM.c_final.
-Definition c_eval := MiniML_EAM.c_eval.
-Definition c_apply := MiniML_EAM.c_apply.
-
-Notation " [ a ] " := (c_init a) (at level 60, no associativity).
-Notation " [: a :] " := (c_final a) (at level 60).
-Notation " [ a , b ] " := (c_eval a b) (at level 60).
-Notation " [: a , b :] " := (c_apply a b) (at level 60).
-
-Reserved Notation " a → b " (at level 40).
-
-Inductive trans : configuration -> configuration -> Prop :=
-| t_init : forall t,           [ t ] →  [t, MiniML.empty]
-| t_final: forall v,           [: MiniML.empty, v :] → [: v :]
-| t_ez   : forall c,           [MiniML.Z, c] → [: c, MiniML.vZ :]
-| t_es   : forall t c,         [MiniML.S t, c] → [t, MiniML.s_c :: c]
-| t_evar : forall x c,         [MiniML.Var x, c] → [: c, MiniML.vVar x :]
-| t_elam : forall x t c,       [MiniML.Lam x t, c] → [: c, MiniML.vLam x t :]
-| t_eapp : forall t1 t2 c,     [MiniML.App t1 t2, c] → [t1, MiniML.ap_r t2 :: c]
-| t_ecas : forall t ez x es c, [MiniML.Case t ez x es, c] → [t, MiniML.case_c ez x es :: c]
-| t_efix : forall x t t0 c
-             (CTR : MiniML.contract (MiniML.rFix x t) = Some t0),
-             [MiniML.Fix x t, c] → [t0, c]
-| t_elet : forall x t e c,     [MiniML.Letv x t e, c] → [t, MiniML.let_c x e :: c]
-| t_epar : forall t1 t2 c,     [MiniML.Pair t1 t2, c] → [t1, MiniML.pair_r t2 :: c]
-| t_efst : forall t c,         [MiniML.Fst t, c] → [t, MiniML.fst_c :: c]
-| t_esnd : forall t c,         [MiniML.Snd t, c] → [t, MiniML.snd_c :: c]
-| t_as   : forall v c,         [: MiniML.s_c :: c, v :] → [: c, MiniML.vS v :]
-| t_aa_r : forall v t c,       [: MiniML.ap_r t :: c, v :] → [t, MiniML.ap_l v :: c]
-| t_aa_l : forall v v0 t c
-             (CTR : MiniML.contract (MiniML.rApp v0 v) = Some t),
-             [: MiniML.ap_l v0 :: c, v :] → [t, c]
-| t_acas : forall v ez x es c t
-             (CTR : MiniML.contract (MiniML.rCase v ez x es) = Some t),
-             [: MiniML.case_c ez x es :: c, v :] → [t, c]
-| t_alet : forall v x e c t
-             (CTR : MiniML.contract (MiniML.rLet x v e) = Some t),
-             [: MiniML.let_c x e :: c, v :] → [t, c]
-| t_ap_r : forall v t c,       [: MiniML.pair_r t :: c, v :] → [t, MiniML.pair_l v :: c]
-| t_ap_l : forall v v0 c,      [: MiniML.pair_l v0 :: c, v :] → [: c, MiniML.vPair v0 v :]
-| t_afst : forall v c t
-             (CTR : MiniML.contract (MiniML.rFst v) = Some t),
-             [: MiniML.fst_c :: c, v :] → [t, c]
-| t_asnd : forall v c t
-             (CTR : MiniML.contract (MiniML.rSnd v) = Some t),
-             [: MiniML.snd_c :: c, v :] → [t, c]
-where " a → b " := (trans a b).
-Definition transition := trans.
-
-Notation " a >> b " := (MiniML_EAM.transition a b) (at level 40).
-Notation " a >>+ b " := (MiniML_EAM.AM.trans_close a b) (at level 40).
-
-Reserved Notation " a →+ b " (at level 40, no associativity).
-
-Inductive trans_close : configuration -> configuration -> Prop :=
-| one_step   : forall c0 c1 (STEP : c0 → c1), c0 →+ c1
-| multi_step : forall c0 c1 c2 (STEP : c0 → c1) (REC : c1 →+ c2), c0 →+ c2
-where " a →+ b " := (trans_close a b).
-
-Inductive eval : term -> value -> Prop :=
-| e_intro : forall t v (TC : [ t ] →+ [: v :]), eval t v.
-
-Lemma trans_eam_mlm : forall c0 c1, c0 >> c1 -> c0 → c1.
-Proof with auto.
-  intros c0 c1 T; inversion T; subst; match goal with
-  | [ DT : MiniML_EAM.dec_term ?t = ?int |- _ ] => destruct t; inversion DT
-  | [ DC : MiniML_EAM.dec_context ?ec ?v = ?int |- _ ] => destruct ec; inversion DC
-  | [ |- _ ] => idtac
-  end; subst; constructor...
-Qed.
-Hint Resolve trans_eam_mlm.
-
-Lemma tcl_eam_mlm : forall c0 c1, c0 >>+ c1 -> c0 →+ c1.
-Proof with eauto.
-  intros c0 c1 TC; induction TC; subst; unfold MiniML_EAM.AM.transition in *;
-  [econstructor | econstructor 2]...
-Qed.
-
-Lemma eval_eam_mlm : forall t v, MiniML_EAM.AM.eval t v -> eval t v.
-Proof.
-  intros t v E; inversion_clear E; constructor; apply tcl_eam_mlm; auto.
-Qed.
-
-Lemma trans_mlm_eam : forall c0 c1, c0 → c1 -> c0 >> c1.
-Proof with auto.
-  intros w w' H; inversion H; subst; econstructor; simpl...
-Qed.
-Hint Resolve trans_mlm_eam.
-
-Lemma tcl_mlm_eam : forall c0 c1, c0 →+ c1 -> c0 >>+ c1.
-Proof with eauto.
-  induction 1; subst; [econstructor | econstructor 2]; unfold MiniML_EAM.AM.transition...
-Qed.
-
-Lemma eval_mlm_eam : forall t v, eval t v -> MiniML_EAM.AM.eval t v.
-Proof.
-  intros t v E; inversion_clear E; constructor; apply tcl_mlm_eam; auto.
-Qed.
-
-Theorem MiniML_Machine_correct : forall t v, MiniML_Sem.eval t v <-> eval t v.
-Proof.
-  intros; rewrite eval_sem_ref; rewrite MiniML_EAM.eval_apply_correct;
-  split; [apply eval_eam_mlm | apply eval_mlm_eam].
-Qed.
-
-End MiniML_Machine.*)

@@ -184,9 +184,9 @@ Module Type RED_LANG.
   Axiom value_trivial : forall {k} (v : value k), only_trivial v k.
   Axiom value_redex   : forall {k} (v : value k) (r : redex k), 
                             value_to_term v <> redex_to_term r.
-  Axiom trivial_val_red : 
-      forall k t, only_trivial t k ->
-         (exists (v : value k), t = v) \/ (exists (r : redex k), t = r).
+  (*Axiom trivial_val_red : 
+      forall k t, ~dead_ckind k -> only_trivial t k ->
+         (exists (v : value k), t = v) \/ (exists (r : redex k), t = r).*)
 
 
 

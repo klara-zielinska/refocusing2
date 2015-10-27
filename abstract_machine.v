@@ -1,10 +1,11 @@
 Module Type ABSTRACT_MACHINE.
 
   Parameters term configuration value : Set.
+
   Parameter c_init  : term -> configuration.
   Parameter c_final : value -> configuration.
-  Parameter transition : configuration -> configuration -> Prop.
 
+  Parameter transition : configuration -> configuration -> Prop.
   Notation "c1 → c2" := (transition c1 c2) (at level 40, no associativity).
 
 
@@ -20,3 +21,15 @@ Module Type ABSTRACT_MACHINE.
   | e_intro : forall t v, trans_close (c_init t) (c_final v) -> eval t v.
 
 End ABSTRACT_MACHINE.
+
+
+
+
+Module Type DET_ABSTRACT_MACHINE <: ABSTRACT_MACHINE.
+
+  Include ABSTRACT_MACHINE.
+
+  Parameter next_conf : configuration -> option configuration.
+  Axiom next_correct  : forall c1 c2, next_conf c1 = Some c2 <-> c1 → c2.
+
+End DET_ABSTRACT_MACHINE.

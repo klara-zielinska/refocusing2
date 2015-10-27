@@ -305,7 +305,7 @@ destruct t1, t2; destruct n0, n; autof ].
       if lt_dec i j then Var (i+g) else
       match s with
       | Sub (Cl t e') => if eq_nat_dec i j then Cl t ((0, Lift (g+j))::e') : term
-                                           else OpVar (i-j-1) e' (g+j)
+                                           else OpVar (i-j-1) e (g+j)
       | Lift g'       => OpVar (i-j) e (g+j+g')
       end.
 
@@ -1197,7 +1197,7 @@ Proof.
 Qed.
 
 
-Lemma good_propagation1 : 
+Definition good_propagation1 : 
     forall (st1 st2 : configuration), good_state st1 -> st1 → st2 -> good_state st2.
 
 Proof.
@@ -1254,7 +1254,7 @@ Proof.
     inversion H0; subst.
     + destruct t; simpl in *; intuition.
     + destruct t; simpl in *; intuition.
-Qed.
+Defined.
 
 Lemma good_propagation : 
     forall (st1 st2 : configuration), good_state st1 -> st1 →+ st2 -> good_state st2.
@@ -1264,28 +1264,72 @@ Proof.
   eauto using good_propagation1.
 Qed.
 
-Lemma progress : forall st, good_state st -> 
-              (exists k v, st = c_apply [.](k) v) \/ (exists st', st → st').
+Definition progress : forall st, good_state st -> 
+              (exists k v, st = c_apply [.](k) v) + { st' | st → st' }.
 Proof.
   intros.
   destruct st.
   - right. 
-    destruct H as [? [? ?]]. 
     destruct t as [? | ? | tt1 tt2 | [[? | ? | ? ?] [ | (?, ?) ?]] | ? [ | (?, ?) ?] ?], k2;
     try destruct tt1, tt2;
+
+    destruct H as [? [? ?]];
     inversion H; autof;
+
     eexists; try solve [ apply t_val; simpl; intuition
                        | apply t_term; simpl; intuition
                        | eapply t_red; simpl; intuition].
-  - destruct H as [? [? ?]].
-    destruct c.
-    + left. eauto.
+  - destruct c.
+    + left. dependent destruction v; eauto.
     + right. 
       destruct ec0 as [ | tt | ?], k2; dependent destruction v;
-      destruct tt; simpl in H0; autof;
+      destruct tt;
+      destruct H as [? [? ?]]; try destruct H0; try destruct H;
       eexists; try solve [ apply t_cval; simpl; auto 
                          | eapply t_cred; [simpl; auto | simpl; auto] 
-                         | apply t_cterm; simpl; auto 
-                         | dependent destruction v
-                         | autof ].
-Qed.
+                         | apply t_cterm; simpl; auto].
+Defined.
+
+
+Require Import abstract_machine_facts.
+
+Module Sim := DetAbstractMachine_Sim ECCa_es_cl_EAM.
+
+
+Let tr := Lam0 (App0 (Lam0 (Lam0 (Var0 1))) (Var0 0)).
+
+Eval compute in 
+    Sim.n_steps 
+    ( c_eval (Cl (Lam0 (App0  tr  (Var0 0))) ([]) : term)
+             [.](C) )
+    20.
+
+
+Fixpoint nat_term0 n :=
+    match n with
+    | 0   => Lam0 (Lam0 (Var0 0))
+    | S n => Lam0 (Lam0 (App0 (Var0 1) (App0 (App0 (nat_term0 n) (Var0 1)) (Var0 0))))
+    end.
+
+
+Let add_term0 := 
+    Lam0 (Lam0 (Lam0 (Lam0 
+        (App0 (App0 (Var0 3) 
+            (Var0 1)) 
+            (App0 (App0 (Var0 2) (Var0 1)) (Var0 0)))))).
+
+Let mul_term0 := 
+    Lam0 (Lam0 (Lam0 (Lam0
+        (App0 (App0
+
+        (App0 (App0 (Var0 2) 
+            (Lam0 (App0 (App0 add_term0 (Var0 4)) (Var0 0)) ))
+            (nat_term0 0))
+
+        (Var0 1)) (Var0 0))))).
+
+
+Eval compute in
+    Sim.n_steps 
+    ( c_eval (Cl (App0 (App0 mul_term0 (nat_term0 2)) (nat_term0 4)) ([]) : term) [.](C)) 
+    536.

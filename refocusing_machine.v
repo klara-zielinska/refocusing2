@@ -1,3 +1,4 @@
+Require Import Util.
 Require Import reduction_semantics.
 Require Export refocusing_step.
 Require Import refocusing_semantics.
@@ -249,6 +250,72 @@ Module ProperEAMachine (R : RED_LANG) (RS : RED_REF_SEM R) <: ABSTRACT_MACHINE.
   Inductive eval : term -> value -> Prop :=
   | e_intro : forall t v, trans_close (c_init t) (c_final v) -> eval t v.
 
+
+  Definition next_conf st :=
+      match st with
+      | c_eval t _ k2 c  => 
+            match dec_term t k2 with
+            | in_red r => option_map (fun t' => c_eval t' c) (contract r)
+            | in_val v => Some (c_apply c v)
+            | in_term t ec => Some (c_eval t (ec=:c))
+            | in_dead => None
+            end
+      | c_apply _ _ (ccons ec k c) v => 
+            match dec_context ec k v with
+            | in_red r => option_map (fun t' => c_eval t' c) (contract r)
+            | in_val v => Some (c_apply c v)
+            | in_term t ec => Some (c_eval t (ec=:c))
+            | in_dead => None
+            end
+      | c_apply _ _ [.] v => 
+            None
+      end.
+
+
+  Lemma next_correct  : forall c1 c2, next_conf c1 = Some c2 <-> c1 → c2.
+
+  Proof.
+  intros c1 c2; split; intro H.
+
+  {
+      destruct c1; simpl in H.
+      - remember (dec_term t k2) as dc.
+        destruct dc.
+        + remember (contract r) as opt.
+          destruct opt.
+          * inversion H; subst.
+            eapply t_red; eauto.
+          * inversion H.
+        + inversion H; subst.
+          apply t_term; auto.
+        + inversion H; subst.
+          apply t_val; auto.
+        + inversion H.
+      - destruct c; autof.
+        remember (dec_context ec k2 v) as dc.
+        destruct dc.
+        + remember (contract r) as opt.
+          destruct opt.
+          * inversion H; subst.
+            eapply t_cred; eauto.
+          * inversion H.
+        + inversion H; subst.
+          apply t_cterm; auto.
+        + inversion H; subst.
+          apply t_cval; auto.
+        + inversion H.
+  }
+
+  {
+      destruct H;
+          simpl;
+          match goal with H : @eq (interm_dec _) _ _ |- _ => rewrite H end;
+      solve 
+      [ auto 
+      | rewrite H0; auto].
+  }
+  Qed.
+
 End ProperEAMachine.
 
 
@@ -362,5 +429,70 @@ Module ProperPEMachine (R : RED_LANG) (PERS : PE_REF_SEM R) <: ABSTRACT_MACHINE.
 
   Inductive eval : term -> value -> Prop :=
   | e_intro : forall t v, trans_close (c_init t) (c_final v) -> eval t v.
+
+
+  Definition next_conf st :=
+      match st with
+      | c_eval t _ k2 c  => 
+            match dec_term t k2 with
+            | in_red r => option_map (fun t' => c_eval t' c) (contract r)
+            | in_val v => match c in context _ k2 
+                              return R.value k2 -> option configuration with 
+                          | [.]          => fun _ => Some (c_fin v)
+                          | ccons ec k c => fun v => 
+                                match dec_context ec k v with
+                                | in_red r       => option_map (fun t' => c_eval t' c)
+                                                               (contract r)
+                                | in_term t' ec' => Some (c_eval t' (ec'=:c))
+                                | _              => None
+                                end
+                          end v
+            | in_term t ec => Some (c_eval t (ec=:c))
+            | in_dead => None
+            end
+      | _ => None
+      end.
+
+
+  Lemma next_correct  : forall c1 c2, next_conf c1 = Some c2 <-> c1 → c2.
+
+  Proof.
+  intros c1 c2; split; intro H.
+
+  {
+      destruct c1; simpl in H.
+      - remember (dec_term t k2) as dc.
+        destruct dc.
+        + remember (contract r) as opt.
+          destruct opt.
+          * inversion H; subst.
+            eapply t_red; eauto.
+          * inversion H.
+        + inversion H; subst.
+          apply t_rec; auto.
+        + destruct c.
+          * inversion H; subst.
+            apply t_cval; auto.
+          * remember (dec_context ec k2 v) as dc.
+            destruct dc;
+            inversion H.
+            { remember (contract r) as opt.
+              destruct opt;
+              inversion H; subst.
+              eapply t_cred; eauto. }
+            { eapply t_crec; eauto. }
+        + inversion H.
+      - inversion H. 
+  }
+
+  {
+      destruct H;
+          simpl;
+          match goal with H : @eq (interm_dec _) _ _ |- _ => rewrite H end;
+      try solve 
+      [ auto 
+      | rewrite H0; try rewrite H1; auto].
+  }
+  Qed.
 
 End ProperPEMachine.

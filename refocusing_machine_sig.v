@@ -188,7 +188,7 @@ End EVAL_APPLY_MACHINE.
 
 
 
-Module Type PROPER_EA_MACHINE (R : RED_LANG) (RS : RED_REF_SEM R) <: ABSTRACT_MACHINE.
+Module Type PROPER_EA_MACHINE (R : RED_LANG) (RS : RED_REF_SEM R) <: DET_ABSTRACT_MACHINE.
 
   Import R.
   Import RS.DEC.
@@ -204,6 +204,18 @@ Module Type PROPER_EA_MACHINE (R : RED_LANG) (RS : RED_REF_SEM R) <: ABSTRACT_MA
 
   Definition c_init t            := c_eval t [.](init_ckind).
   Definition c_final (v : value) := c_apply [.] v.
+  (*Definition final_of (st : configuration) : option value := 
+      match st with 
+      | c_apply k _ [.] v => 
+          match is_initial k with
+          | left H => match H in _ = k return R.value k -> option value with
+                      | eq_refl => fun v => Some v
+                      end v
+          | _      => None
+          end
+      | _ => None
+      end.
+  Axiom final_of_correct : forall c v, final_of c = Some v <-> c_final v = c.*)
 
 
   Reserved Notation " a → b " (at level 40, no associativity).
@@ -244,6 +256,30 @@ Module Type PROPER_EA_MACHINE (R : RED_LANG) (RS : RED_REF_SEM R) <: ABSTRACT_MA
 
   Inductive eval : term -> value -> Prop :=
   | e_intro : forall t v, trans_close (c_init t) (c_final v) -> eval t v.
+
+
+  Definition next_conf st :=
+      match st with
+      | c_eval t _ k2 c  => 
+            match dec_term t k2 with
+            | in_red r => option_map (fun t' => c_eval t' c) (contract r)
+            | in_val v => Some (c_apply c v)
+            | in_term t ec => Some (c_eval t (ec=:c))
+            | in_dead => None
+            end
+      | c_apply _ _ (ccons ec k c) v => 
+            match dec_context ec k v with
+            | in_red r => option_map (fun t' => c_eval t' c) (contract r)
+            | in_val v => Some (c_apply c v)
+            | in_term t ec => Some (c_eval t (ec=:c))
+            | in_dead => None
+            end
+      | c_apply _ _ [.] v => 
+            None
+      end.
+
+
+  Axiom next_correct  : forall c1 c2, next_conf c1 = Some c2 <-> c1 → c2.
 
 End PROPER_EA_MACHINE.
 
@@ -299,7 +335,7 @@ End PUSH_ENTER_MACHINE.
 
 
 
-Module Type PROPER_PE_MACHINE (R : RED_LANG) (PERS : PE_REF_SEM R) <: ABSTRACT_MACHINE.
+Module Type PROPER_PE_MACHINE (R : RED_LANG) (PERS : PE_REF_SEM R) <: DET_ABSTRACT_MACHINE.
 
   Import R.
   Import PERS.RefSem.DEC.
@@ -316,6 +352,18 @@ Module Type PROPER_PE_MACHINE (R : RED_LANG) (PERS : PE_REF_SEM R) <: ABSTRACT_M
 
   Definition c_init t  := c_eval t [.](init_ckind).
   Definition c_final (v : value) := c_fin v.
+  (*Definition final_of (st : configuration) : option value := 
+      match st with 
+      | c_fin k v => 
+          match is_initial k with
+          | left H => match H in _ = k return R.value k -> option value with
+                      | eq_refl => fun v => Some v
+                      end v
+          | _      => None
+          end
+      | _ => None
+      end.
+  Axiom final_of_correct : forall c v, final_of c = Some v <-> c_final v = c.*)
 
 
   Reserved Notation "c1 → c2" (at level 40, no associativity).
@@ -356,5 +404,31 @@ Module Type PROPER_PE_MACHINE (R : RED_LANG) (PERS : PE_REF_SEM R) <: ABSTRACT_M
 
   Inductive eval : term -> value -> Prop :=
   | e_intro : forall t v, trans_close (c_init t) (c_final v) -> eval t v.
+
+
+  Definition next_conf st :=
+      match st with
+      | c_eval t _ k2 c  => 
+            match dec_term t k2 with
+            | in_red r => option_map (fun t' => c_eval t' c) (contract r)
+            | in_val v => match c in context _ k2 
+                              return R.value k2 -> option configuration with 
+                          | [.]          => fun _ => Some (c_fin v)
+                          | ccons ec k c => fun v => 
+                                match dec_context ec k v with
+                                | in_red r       => option_map (fun t' => c_eval t' c)
+                                                               (contract r)
+                                | in_term t' ec' => Some (c_eval t' (ec'=:c))
+                                | _              => None
+                                end
+                          end v
+            | in_term t ec => Some (c_eval t (ec=:c))
+            | in_dead => None
+            end
+      | _ => None
+      end.
+
+
+  Axiom next_correct  : forall c1 c2, next_conf c1 = Some c2 <-> c1 → c2.
 
 End PROPER_PE_MACHINE.

@@ -111,4 +111,17 @@ END Hell *)
 
 End DetAbstractMachine_Sim.
 
-  
+
+
+
+Module AM_Safety_Facts (AM : ABSTRACT_MACHINE) (S : AM_SAFETY AM).
+
+  Import AM S.
+
+  Lemma preservation_trans : forall c1 c2, good_conf c1 -> c1 →+ c2 -> good_conf c2.
+  Proof.
+    induction 2;
+    eauto using preservation.
+  Qed.
+
+End AM_Safety_Facts.

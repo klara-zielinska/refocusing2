@@ -218,7 +218,7 @@ Module Type PROPER_EA_MACHINE (R : RED_LANG) (RS : RED_REF_SEM R) <: DET_ABSTRAC
   Axiom final_of_correct : forall c v, final_of c = Some v <-> c_final v = c.*)
 
 
-  Reserved Notation " a → b " (at level 40, no associativity).
+  Reserved Notation "st1 → st2" (at level 40, no associativity).
 
   Inductive trans : configuration -> configuration -> Prop :=
 
@@ -241,9 +241,12 @@ Module Type PROPER_EA_MACHINE (R : RED_LANG) (RS : RED_REF_SEM R) <: DET_ABSTRAC
                dec_context ec k2 v = in_term t ec0 ->
                c_apply (ec=:c) v → c_eval t (ec0=:c)
 
-  where " a → b " := (trans a b).
+  where "st1 → st2" := (trans st1 st2).
   Definition transition := trans.
   Hint Unfold transition.
+
+  Axiom final_correct : forall v st, ~ c_final v → st.
+
 
 
   Reserved Notation "c1 →+ c2" (at level 40, no associativity).
@@ -393,6 +396,8 @@ Module Type PROPER_PE_MACHINE (R : RED_LANG) (PERS : PE_REF_SEM R) <: DET_ABSTRA
   where "c1 → c2" := (trans c1 c2).
   Definition transition := trans.
   Hint Unfold transition.
+
+  Axiom final_correct : forall v st, ~ c_final v → st.
 
 
   Reserved Notation "c1 →+ c2" (at level 40, no associativity).

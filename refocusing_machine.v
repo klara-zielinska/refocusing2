@@ -239,6 +239,13 @@ Module ProperEAMachine (R : RED_LANG) (RS : RED_REF_SEM R) <: ABSTRACT_MACHINE.
   Hint Unfold transition.
 
 
+  Lemma final_correct : forall v st, ~ c_final v → st.
+
+  Proof.
+    inversion 1.
+  Qed.
+
+
   Reserved Notation "c1 →+ c2" (at level 40, no associativity).
 
   Inductive trans_close : configuration -> configuration -> Prop :=
@@ -417,6 +424,13 @@ Module ProperPEMachine (R : RED_LANG) (PERS : PE_REF_SEM R) <: ABSTRACT_MACHINE.
   where " a →  b " := (trans a b).
   Definition transition := trans.
   Hint Unfold transition.
+
+
+  Lemma final_correct : forall v st, ~ c_final v → st.
+
+  Proof.
+    inversion 1.
+  Qed.
 
 
   Reserved Notation "c1 →+ c2" (at level 40, no associativity).

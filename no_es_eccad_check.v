@@ -575,6 +575,13 @@ Module ECCaD_HandMachine <: ABSTRACT_MACHINE.
   Definition transition := trans.
 
 
+  Lemma final_correct : forall v st, ~ c_final v → st.
+
+  Proof.
+    inversion 1.
+  Qed.
+
+
   Reserved Notation " a →+ b " (at level 40, no associativity).
 
   Inductive trans_close : configuration -> configuration -> Prop :=

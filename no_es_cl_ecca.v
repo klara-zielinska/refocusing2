@@ -22,18 +22,18 @@ Module no_es_cl_ECCa <: RED_LANG.
   | Cl : term0 -> list (nat * substitut) -> closure
 
   with substitut : Set :=
-  | Sub  : closure -> substitut
-  | Lift : nat     -> substitut.
+  | Sub   : closure -> substitut
+  | Shift : nat     -> substitut.
 
   Notation env    := (list (nat * substitut)).
   Notation "t @ s" := (Cl t s) (at level 10).
 
 
   Inductive __term : Set := 
-  | Var   : nat     -> __term
-  | Lam   : __term  -> __term
-  | App   : __term  -> __term -> __term
-  | Cl_t  : closure -> __term
+  | Var   : nat               -> __term
+  | Lam   : __term            -> __term
+  | App   : __term -> __term  -> __term
+  | Cl_t  : closure           -> __term
   | OpVar : nat -> env -> nat -> __term.
   Definition term := __term.
   Hint Unfold term.
@@ -64,17 +64,17 @@ Module no_es_cl_ECCa <: RED_LANG.
 
   Inductive val : ckind -> Type :=
 
-  | vCLam   : val C -> val C
-  | vCVar   : nat -> val C
-  | vCApp   : valCa -> val C -> val C
+  | vCLam   : val C           -> val C
+  | vCVar   : nat             -> val C
+  | vCApp   : valCa -> val C  -> val C
   
-  | vECaLam    : term -> val ECa
+  | vECaLam    : term         -> val ECa
   | vECaLam_cl : term0 -> env -> val ECa
-  | vECaCa     : valCa -> val ECa
+  | vECaCa     : valCa        -> val ECa
   
   with valCa : Set :=
 
-  | vCaVar : nat -> valCa
+  | vCaVar : nat            -> valCa
   | vCaApp : valCa -> val C -> valCa.
 
   Definition value := val.
@@ -110,37 +110,30 @@ Module no_es_cl_ECCa <: RED_LANG.
       end.
   Coercion value_to_term : value >-> term.
 
-(*
-  Definition vVar n k : value k := 
-      match k with 
-      | C => vCVar n | ECa => vECaVar n 
-      | CBot => vCBot (Var n) 
-      end.*)
-
 
   Definition not_closure (t : term) := match t with Cl_t _ => False | _ => True end.
 
   Inductive red : ckind -> Type :=
-  | rAppLam    : forall k, CECa k -> term -> term -> red k
-  | rAppLam_cl : forall k, CECa k -> term0 -> env -> term -> red k
+  | rAppLam    : forall k, CECa k -> term         -> term         -> red k
+  | rAppLam_cl : forall k, CECa k -> term0 -> env -> term         -> red k
 
-  | rSubVar : forall k, CECa k -> nat            -> env -> red k
-  | rSubVarOp : forall k, CECa k -> nat            -> env -> nat -> red k
-  | rSubLam :                     term0          -> env -> red C
-  | rSubApp : forall k, CECa k -> term0 -> term0 -> env -> red k.
+  | rSubVar    : forall k, CECa k -> nat            -> env        -> red k
+  | rSubOpVar  : forall k, CECa k -> nat            -> env -> nat -> red k
+  | rSubLam    :                     term0          -> env        -> red C
+  | rSubApp    : forall k, CECa k -> term0 -> term0 -> env        -> red k.
   Definition redex := red.
   Hint Unfold redex.
 
 
   Definition redex_to_term {k} (r : redex k) : term := 
       match r with
-      | rAppLam _ _ t1 t2        => App (Lam t1) (t2 : term)
-      | rAppLam_cl _ _  t0 e t2  => App (Cl (Lam0 t0) e : term) t2
+      | rAppLam _ _ t1 t2       => App (Lam t1) (t2 : term)
+      | rAppLam_cl _ _  t0 e t2 => App (Cl (Lam0 t0) e : term) t2
 
-      | rSubVar _ _ i     e   => Cl (Var0 i) e
-      | rSubVarOp _ _ i e g => OpVar i e g
-      | rSubLam     t0    e   => Cl (Lam0 t0) e
-      | rSubApp _ _ t1 t2 e   => Cl (App0 t1 t2) e
+      | rSubVar _ _ i     e => Cl (Var0 i) e
+      | rSubOpVar _ _ i e g => OpVar i e g
+      | rSubLam     t0    e => Cl (Lam0 t0) e
+      | rSubApp _ _ t1 t2 e => Cl (App0 t1 t2) e
       end.
   Coercion redex_to_term : redex >-> term.
 
@@ -301,26 +294,27 @@ destruct t1, t2; destruct n0, n; autof ].
 
   Definition immediate_ec ec t := exists t', ec:[t'] = t.
 
+
   Definition sub_step i j s e g :=
       if lt_dec i j then Var (i+g) else
       match s with
-      | Sub (Cl t e') => if eq_nat_dec i j then Cl t ((0, Lift (g+j))::e') : term
+      | Sub (Cl t e') => if eq_nat_dec i j then Cl t ((0, Shift (g+j))::e') : term
                                            else OpVar (i-j-1) e (g+j)
-      | Lift g'       => OpVar (i-j) e (g+j+g')
+      | Shift g'      => OpVar (i-j) e (g+j+g')
       end.
 
   Definition contract {k} (r : redex k) : option term :=
       match r with
-      | rAppLam    _ _ _ _    => None 
-      | rAppLam_cl _ _ t e (Cl_t cl) => Some (Cl t ((0, Sub cl)::e) : term)
-      | rAppLam_cl _ _ t e _         => None
-      | rSubVar _ _ i ([])    => Some (Var i)
-      | rSubVar _ _ i ((j, s)::e) => Some (sub_step i j s e 0)
-      | rSubVarOp _ _ i ([]) g => Some (Var (i+g))
-      | rSubVarOp _ _ i ((j, s)::e) g => Some (sub_step i j s e g)
-      | rSubLam t ([])        => Some (Lam (Cl t ([]) : term))
-      | rSubLam t ((j, s)::e) => Some (Lam (Cl t ((1+j, s)::e) : term))
-      | rSubApp _ _ t1 t2 e   => Some (App (Cl t1 e : term) (Cl t2 e : term))
+      | rAppLam    _ _ _ _            => None 
+      | rAppLam_cl _ _ t e (Cl_t cl)  => Some (Cl t ((0, Sub cl)::e) : term)
+      | rAppLam_cl _ _ t e _          => None
+      | rSubVar _ _ i ([])            => Some (Var i)
+      | rSubVar _ _ i ((j, s)::e)     => Some (sub_step i j s e 0)
+      | rSubOpVar _ _ i ([]) g        => Some (Var (i+g))
+      | rSubOpVar _ _ i ((j, s)::e) g => Some (sub_step i j s e g)
+      | rSubLam t ([])                => Some (Lam (Cl t ([]) : term))
+      | rSubLam t ((j, s)::e)         => Some (Lam (Cl t ((1+j, s)::e) : term))
+      | rSubApp _ _ t1 t2 e           => Some (App (Cl t1 e : term) (Cl t2 e : term))
       end.
 
 
@@ -500,10 +494,10 @@ destruct v; discriminate.
     - autof.
 
     - right.
-      eexists (rSubVarOp C I _ _ _)...
+      eexists (rSubOpVar C I _ _ _)...
 
     - right.
-      eexists (rSubVarOp ECa I _ _ _)...
+      eexists (rSubOpVar ECa I _ _ _)...
 
     - autof.
   Qed.
@@ -755,7 +749,7 @@ Module no_es_cl_ECCa_Ref <: RED_REF_LANG.
                   | Cl_t (Cl (Var0 i) e)     => in_red (rSubVar C I i e)
                   | Cl_t (Cl (Lam0 t) e)     => in_red (rSubLam t e)
                   | Cl_t (Cl (App0 t1 t2) e) => in_red (rSubApp C I t1 t2 e)
-                  | OpVar i e g => in_red (rSubVarOp C I i e g)
+                  | OpVar i e g => in_red (rSubOpVar C I i e g)
                   end
         | ECa  => match t with
                   | App t1 t2 => in_term t1 (ap_r t2)
@@ -764,7 +758,7 @@ Module no_es_cl_ECCa_Ref <: RED_REF_LANG.
                   | Cl_t (Cl (Var0 i) e)     => in_red (rSubVar ECa I i e)
                   | Cl_t (Cl (Lam0 t) e)     => in_val (vECaLam_cl t e)
                   | Cl_t (Cl (App0 t1 t2) e) => in_red (rSubApp ECa I t1 t2 e)
-                  | OpVar i e g   => in_red (rSubVarOp ECa I i e g)
+                  | OpVar i e g   => in_red (rSubOpVar ECa I i e g)
                   end
         | CBot => in_dead
         end.
@@ -1136,165 +1130,166 @@ Require Import refocusing_semantics_derivation.
 Require Import refocusing_machine.
 
 Module no_es_cl_ECCa_REF_SEM := RedRefSem no_es_cl_ECCa_Ref.
-Module ECCa_es_cl_EAM             := ProperEAMachine no_es_cl_ECCa no_es_cl_ECCa_REF_SEM.
+Module ECCa_es_cl_EAM        := ProperEAMachine no_es_cl_ECCa no_es_cl_ECCa_REF_SEM.
 
 
+Module ECCa_es_cl_EAM_safe : AM_SAFETY ECCa_es_cl_EAM.
 
-Import ECCa_es_cl_EAM.
-Import no_es_cl_ECCa_Ref.
-Import no_es_cl_ECCa.
+  Import ECCa_es_cl_EAM.
+  Import no_es_cl_ECCa.
 
 
-Fixpoint ec_in_context ec {k1 k2} (c : context k1 k2) :=
+  (*Fixpoint ec_in_context ec {k1 k2} (c : context k1 k2) :=
     match c with
     | [.]       => False
     | ec' =: c' => ec' = ec \/ ec_in_context ec c'
-    end.
+    end.*)
 
-Fixpoint good_context {k1 k2} (c : context k1 k2) :=
-    match c with
-    | [.]                 => True
-    | ap_r (Cl_t _) =: c' => good_context c'
-    |        ap_r _ =: _  => False
-    |             _ =: c' => good_context c'
-    end.
-    (*forall t, ec_in_context (ap_r t) c -> exists (cl : closure), t = cl.*)
+  Fixpoint good_context {k1 k2} (c : context k1 k2) :=
+      match c with
+      | [.]                 => True
+      | ap_r (Cl_t _) =: c' => good_context c'
+      |        ap_r _ =: _  => False
+      |             _ =: c' => good_context c'
+      end.
 
-Fixpoint good_term t k := 
-    match t with
-    | Cl_t _                => True
-    | App (Cl_t _) (Cl_t _) => True
-    | Var _                 => True
-    | Lam t                 => C = k /\ good_term t C
-    | OpVar _ _ _           => True
-    | _                     => False
-    end.
+  Fixpoint good_term t k := 
+      match t with
+      | Cl_t _                => True
+      | App (Cl_t _) (Cl_t _) => True
+      | Var _                 => True
+      | Lam t                 => C = k /\ good_term t C
+      | OpVar _ _ _           => True
+      | _                     => False
+      end.
 
-Definition good_value {k} (v : value k) :=
-    match v with
-    | vECaLam _ => False
-    | _ => True
-    end.
+  Definition good_value {k} (v : value k) :=
+      match v with
+      | vECaLam _ => False
+      | _ => True
+      end.
 
-Definition good_state st :=
-    match st with
-    | c_eval t _ k c  => good_term t k /\ good_context c /\ k <> CBot
-    | c_apply _ k c v => good_value v /\ good_context c /\ k <> CBot
-    end.
-
-
-Lemma sub_step_good : forall i j s e g k, good_term (sub_step i j s e g) k.
-Proof.
-  intros.
-  unfold sub_step.
-  destruct (lt_dec i j).
-  - simpl; auto.
-  - destruct s as [[t e'] | g'].
-    + destruct (eq_nat_dec i j).
-      * simpl; auto.
-      * simpl; auto.
-    + simpl; auto.
-Qed.
+  Definition good_conf (st : configuration) :=
+      match st with
+      | c_eval t k1 k2 c  => good_term t k2 /\ good_context c /\ 
+                             k1 = init_ckind /\ k2 <> CBot
+      | c_apply k1 k2 c v => good_value v /\ good_context c /\ 
+                             k1 = init_ckind /\ k2 <> CBot
+      end.
 
 
-Definition good_propagation1 : 
-    forall (st1 st2 : configuration), good_state st1 -> st1 → st2 -> good_state st2.
+  Lemma sub_step_good : forall i j s e g k, good_term (sub_step i j s e g) k.
+  Proof.
+    intros.
+    unfold sub_step.
+    destruct (lt_dec i j).
+    - simpl; auto.
+    - destruct s as [[t e'] | g'].
+      + destruct (eq_nat_dec i j).
+        * simpl; auto.
+        * simpl; auto.
+      + simpl; auto.
+  Qed.
 
-Proof.
-  intros st1 st2 H H0.
-  destruct H0; try destruct H.
-  
-  - destruct t as [? | ? | tt1 tt2 | [[? | ? | ? ?] ?] | ?], k2;
-    try destruct tt1, tt2;
-    inversion H; subst;
-    try discriminate;
-    inversion H0; subst. 
-    + destruct l as [ | (?, ?) ?]; inversion H1. 
-      * simpl; auto.
-      * simpl; intuition.
-        auto using sub_step_good.
-    + destruct l as [ | (?, ?) ?]; inversion H1. 
-      * simpl; auto.
-      * simpl; intuition.
-        auto using sub_step_good.
-    + destruct l as [ | (?, ?) ?]; inversion H1.
-      * simpl; auto.
-      * simpl; auto.
-    + inversion H1; simpl; auto.
-    + inversion H1; simpl; auto.
-    + destruct l as [ | (?, ?) ?]; inversion H1. 
-      * simpl; auto.
-      * simpl; intuition.
-        auto using sub_step_good.
-    + destruct l as [ | (?, ?) ?]; inversion H1. 
-      * simpl; auto.
-      * simpl; intuition.
-        auto using sub_step_good.
-  - destruct t as [? | ? | tt1 tt2 | [[? | ? | ? ?] ?] | ?], k2;
-    try destruct tt1, tt2;
-    inversion H; subst;
-    inversion H0; subst; 
-    simpl; intuition.
-  - destruct t as [? | ? | tt1 tt2 | [[? | ? | ? ?] ?] | ?], k2;
-    try destruct tt1, tt2;
-    inversion H; subst;
-    try discriminate;
-    inversion H0; subst.
-    + simpl in *; intuition.
-    + simpl; intuition.
-    + simpl; auto.
-  - destruct ec0, k2; dependent destruction v; 
-    inversion H0; subst; autof.
-    + destruct t0; inversion H1; subst. simpl; intuition.
-    + destruct t0; inversion H1; subst. simpl; intuition.
-  - destruct ec0 as [ | tt | ? ], k2; destruct tt; simpl in H;
-    dependent destruction v; 
-    inversion H0; simpl in *; intuition. 
-  - destruct ec0, k2; dependent destruction v;
-    inversion H0; subst.
-    + destruct t; simpl in *; intuition.
-    + destruct t; simpl in *; intuition.
-Defined.
 
-Lemma good_propagation : 
-    forall (st1 st2 : configuration), good_state st1 -> st1 →+ st2 -> good_state st2.
+  Lemma preservation : forall st1 st2, good_conf st1 -> st1 → st2 -> good_conf st2.
 
-Proof.
-  induction 2;
-  eauto using good_propagation1.
-Qed.
+  Proof.
+    intros st1 st2 H H0.
+    destruct H0; try destruct H.
+    
+    - destruct t as [? | ? | tt1 tt2 | [[? | ? | ? ?] ?] | ?], k2;
+      try destruct tt1, tt2;
+      inversion H; subst;
+      try discriminate;
+      inversion H0; subst. 
+      + destruct l as [ | (?, ?) ?]; inversion H1. 
+        * simpl; auto.
+        * simpl; intuition.
+          auto using sub_step_good.
+      + destruct l as [ | (?, ?) ?]; inversion H1. 
+        * simpl; auto.
+        * simpl; intuition.
+          auto using sub_step_good.
+      + destruct l as [ | (?, ?) ?]; inversion H1.
+        * simpl; auto.
+        * simpl; auto.
+      + inversion H1; simpl; auto.
+      + inversion H1; simpl; auto.
+      + destruct l as [ | (?, ?) ?]; inversion H1. 
+        * simpl; auto.
+        * simpl; intuition.
+          auto using sub_step_good.
+      + destruct l as [ | (?, ?) ?]; inversion H1. 
+        * simpl; auto.
+        * simpl; intuition.
+          auto using sub_step_good.
+    - destruct t as [? | ? | tt1 tt2 | [[? | ? | ? ?] ?] | ?], k2;
+      try destruct tt1, tt2;
+      inversion H; subst;
+      inversion H0; subst; 
+      simpl; intuition.
+    - destruct t as [? | ? | tt1 tt2 | [[? | ? | ? ?] ?] | ?], k2;
+      try destruct tt1, tt2;
+      inversion H; subst;
+      try discriminate;
+      inversion H0; subst.
+      + simpl in *; intuition.
+      + simpl; intuition.
+      + simpl; auto.
+    - destruct ec0, k2; dependent destruction v; 
+      inversion H0; subst; autof.
+      + destruct t0; inversion H1; subst. simpl; intuition.
+      + destruct t0; inversion H1; subst. simpl; intuition.
+    - destruct ec0 as [ | tt | ? ], k2; destruct tt; simpl in H;
+      dependent destruction v; 
+      inversion H0; simpl in *; intuition. 
+    - destruct ec0, k2; dependent destruction v;
+      inversion H0; subst.
+      + destruct t; simpl in *; intuition.
+      + destruct t; simpl in *; intuition.
+  Qed.
 
-Definition progress : forall st, good_state st -> 
-              (exists k v, st = c_apply [.](k) v) + { st' | st → st' }.
-Proof.
-  intros.
-  destruct st.
-  - right. 
-    destruct t as [? | ? | tt1 tt2 | [[? | ? | ? ?] [ | (?, ?) ?]] | ? [ | (?, ?) ?] ?], k2;
-    try destruct tt1, tt2;
 
-    destruct H as [? [? ?]];
-    inversion H; autof;
+  Lemma progress : forall st, good_conf st -> 
+                       (exists v, st = c_final v) \/ (exists st', st → st').
+  Proof.
+    intros.
+    destruct st.
+    - right. 
+      destruct t as [? | ? | tt1 tt2 | [[? | ? | ? ?] [ | (?, ?) ?]] | ? [ | (?, ?) ?] ?], k2;
+      try destruct tt1, tt2;
 
-    eexists; try solve [ apply t_val; simpl; intuition
-                       | apply t_term; simpl; intuition
-                       | eapply t_red; simpl; intuition].
-  - destruct c.
-    + left. dependent destruction v; eauto.
-    + right. 
-      destruct ec0 as [ | tt | ?], k2; dependent destruction v;
-      destruct tt;
-      destruct H as [? [? ?]]; try destruct H0; try destruct H;
-      eexists; try solve [ apply t_cval; simpl; auto 
-                         | eapply t_cred; [simpl; auto | simpl; auto] 
-                         | apply t_cterm; simpl; auto].
-Defined.
+      destruct H as [? [? ?]];
+      inversion H; try solve [intuition];
+
+      eexists; try solve [ apply t_val; simpl; intuition
+                         | apply t_term; simpl; intuition
+                         | eapply t_red; simpl; intuition].
+    - destruct c.
+      + left. 
+        simpl in H; rec_subst H. 
+        dependent destruction v;
+        eauto.
+      + right. 
+        destruct ec0 as [ | tt | ?], k2; dependent destruction v;
+        destruct tt;
+        destruct H as [? [? ?]]; try destruct H0; try destruct H;
+        eexists; try solve [ apply t_cval; simpl; auto 
+                           | eapply t_cred; [simpl; auto | simpl; auto] 
+                           | apply t_cterm; simpl; auto].
+  Qed.
+
+End ECCa_es_cl_EAM_safe.
+
 
 
 Require Import abstract_machine_facts.
 
 Module Sim := DetAbstractMachine_Sim ECCa_es_cl_EAM.
 
+Import ECCa_es_cl_EAM.
+Import no_es_cl_ECCa.
 
 Let tr := Lam0 (App0 (Lam0 (Lam0 (Var0 1))) (Var0 0)).
 

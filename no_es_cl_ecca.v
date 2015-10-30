@@ -1133,7 +1133,8 @@ Module no_es_cl_ECCa_REF_SEM := RedRefSem no_es_cl_ECCa_Ref.
 Module ECCa_es_cl_EAM        := ProperEAMachine no_es_cl_ECCa no_es_cl_ECCa_REF_SEM.
 
 
-Module ECCa_es_cl_EAM_safe : AM_SAFETY ECCa_es_cl_EAM.
+
+Module ECCa_es_cl_EAM_safe <: AM_SAFE_REGION ECCa_es_cl_EAM.
 
   Import ECCa_es_cl_EAM.
   Import no_es_cl_ECCa.
@@ -1169,7 +1170,7 @@ Module ECCa_es_cl_EAM_safe : AM_SAFETY ECCa_es_cl_EAM.
       | _ => True
       end.
 
-  Definition good_conf (st : configuration) :=
+  Definition safe (st : configuration) :=
       match st with
       | c_eval t k1 k2 c  => good_term t k2 /\ good_context c /\ 
                              k1 = init_ckind /\ k2 <> CBot
@@ -1192,7 +1193,7 @@ Module ECCa_es_cl_EAM_safe : AM_SAFETY ECCa_es_cl_EAM.
   Qed.
 
 
-  Lemma preservation : forall st1 st2, good_conf st1 -> st1 → st2 -> good_conf st2.
+  Lemma preservation : forall st1 st2, safe st1 -> st1 → st2 -> safe st2.
 
   Proof.
     intros st1 st2 H H0.
@@ -1251,7 +1252,7 @@ Module ECCa_es_cl_EAM_safe : AM_SAFETY ECCa_es_cl_EAM.
   Qed.
 
 
-  Lemma progress : forall st, good_conf st -> 
+  Lemma progress : forall st, safe st -> 
                        (exists v, st = c_final v) \/ (exists st', st → st').
   Proof.
     intros.
@@ -1284,47 +1285,61 @@ End ECCa_es_cl_EAM_safe.
 
 
 
+
+Module ECCa_es_cl_EAM_minus <: DET_ABSTRACT_MACHINE.
+
+  Module AM := ECCa_es_cl_EAM.
+  Import no_es_cl_ECCa.
+
+  Definition term := term0.
+  Definition value := AM.value.
+  Definition configuration := AM.configuration.
+  Definition c_init (t : term0) := AM.c_init (Cl_t (Cl t nil)). (*!*)
+  Definition c_final := AM.c_final.
+  Definition final_correct := AM.final_correct.
+  Definition transition := AM.transition.
+  Notation "c1 → c2" := (transition c1 c2) (at level 40, no associativity).
+
+  Reserved Notation "c1 →+ c2" (at level 40, no associativity).
+  Reserved Notation "c1 →* c2" (at level 40, no associativity).
+
+  Inductive trans_close : configuration -> configuration -> Prop :=
+  | one_step   : forall c1 c2,     c1 → c2  ->  c1 →+ c2
+  | multi_step : forall c1 c2 c3,  c1 → c2  ->  c2 →+ c3  ->  c1 →+ c3
+  where "c1 →+ c2" := (trans_close c1 c2).
+
+  Definition trans_ref_close c1 c2 := c1 = c2 \/ trans_close c1 c2.
+  Notation "c1 →* c2" := (trans_ref_close c1 c2).
+
+  Inductive eval : term -> value -> Prop :=
+  | e_intro : forall t v, trans_close (c_init t) (c_final v) -> eval t v.
+
+  Definition next_conf := AM.next_conf.
+  Definition next_correct := AM.next_correct.
+
+End ECCa_es_cl_EAM_minus.
+
+
+
+
 Require Import abstract_machine_facts.
 
-Module Sim := DetAbstractMachine_Sim ECCa_es_cl_EAM.
+Module ECCa_es_cl_EAM_minus_InitSafe <: 
+           AM_INIT_SAFE  ECCa_es_cl_EAM_minus  ECCa_es_cl_EAM_safe.
 
-Import ECCa_es_cl_EAM.
-Import no_es_cl_ECCa.
+  Import ECCa_es_cl_EAM_minus ECCa_es_cl_EAM_safe.
 
-Let tr := Lam0 (App0 (Lam0 (Lam0 (Var0 1))) (Var0 0)).
+  Lemma init_safe : forall t, safe (c_init t).
+  Proof. simpl; auto. Qed.
 
-Eval compute in 
-    Sim.n_steps 
-    ( c_eval (Cl (Lam0 (App0  tr  (Var0 0))) ([]) : term)
-             [.](C) )
-    20.
+End ECCa_es_cl_EAM_minus_InitSafe.
 
 
-Fixpoint nat_term0 n :=
-    match n with
-    | 0   => Lam0 (Lam0 (Var0 0))
-    | S n => Lam0 (Lam0 (App0 (Var0 1) (App0 (App0 (nat_term0 n) (Var0 1)) (Var0 0))))
-    end.
 
 
-Let add_term0 := 
-    Lam0 (Lam0 (Lam0 (Lam0 
-        (App0 (App0 (Var0 3) 
-            (Var0 1)) 
-            (App0 (App0 (Var0 2) (Var0 1)) (Var0 0)))))).
+Module ECCa_es_cl_EAM_minus_Progress <: AM_PROGRESS ECCa_es_cl_EAM_minus :=
 
-Let mul_term0 := 
-    Lam0 (Lam0 (Lam0 (Lam0
-        (App0 (App0
-
-        (App0 (App0 (Var0 2) 
-            (Lam0 (App0 (App0 add_term0 (Var0 4)) (Var0 0)) ))
-            (nat_term0 0))
-
-        (Var0 1)) (Var0 0))))).
+    AM_ProgressFromSafety  ECCa_es_cl_EAM_minus  ECCa_es_cl_EAM_safe
+                           ECCa_es_cl_EAM_minus_InitSafe.
 
 
-Eval compute in
-    Sim.n_steps 
-    ( c_eval (Cl (App0 (App0 mul_term0 (nat_term0 2)) (nat_term0 4)) ([]) : term) [.](C)) 
-    536.

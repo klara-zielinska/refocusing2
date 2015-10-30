@@ -114,14 +114,51 @@ End DetAbstractMachine_Sim.
 
 
 
-Module AM_Safety_Facts (AM : ABSTRACT_MACHINE) (S : AM_SAFETY AM).
+Module AM_SafeRegion_Facts (AM : ABSTRACT_MACHINE) (S : AM_SAFE_REGION AM).
 
   Import AM S.
 
-  Lemma preservation_trans : forall c1 c2, good_conf c1 -> c1 →+ c2 -> good_conf c2.
+  Lemma preservation_trans : forall c1 c2, safe c1 -> c1 →+ c2 -> safe c2.
   Proof.
     induction 2;
     eauto using preservation.
   Qed.
 
-End AM_Safety_Facts.
+End AM_SafeRegion_Facts.
+
+
+
+
+Module Type AM_INIT_SAFE (AM : ABSTRACT_MACHINE) (S : AM_SAFE_REGION AM).
+
+  Import AM S.
+
+  Axiom init_safe : forall t, safe (c_init t).
+
+End AM_INIT_SAFE.
+
+
+
+
+Module AM_ProgressFromSafety (AM : ABSTRACT_MACHINE) (S : AM_SAFE_REGION AM)
+                             (IS : AM_INIT_SAFE AM S) : AM_PROGRESS AM.
+
+  Import AM.
+
+  Module SRF := AM_SafeRegion_Facts AM S.
+
+
+  Lemma progress : forall t c, c_init t →* c ->
+                       (exists v, c = c_final v) \/ (exists c', c → c').
+
+  Proof.
+    intros t c H.
+    apply S.progress.
+    destruct H.
+    - subst; apply IS.init_safe.
+    - eapply SRF.preservation_trans;
+      eauto using IS.init_safe.
+  Qed.
+
+End AM_ProgressFromSafety.
+

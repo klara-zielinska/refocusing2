@@ -12,12 +12,15 @@ Module Type ABSTRACT_MACHINE.
 
 
   Reserved Notation "c1 →+ c2" (at level 40, no associativity).
+  Reserved Notation "c1 →* c2" (at level 40, no associativity).
 
   Inductive trans_close : configuration -> configuration -> Prop :=
   | one_step   : forall c1 c2,     c1 → c2  ->  c1 →+ c2
   | multi_step : forall c1 c2 c3,  c1 → c2  ->  c2 →+ c3  ->  c1 →+ c3
   where "c1 →+ c2" := (trans_close c1 c2).
 
+  Definition trans_ref_close c1 c2 := c1 = c2 \/ trans_close c1 c2.
+  Notation "c1 →* c2" := (trans_ref_close c1 c2).
 
   Inductive eval : term -> value -> Prop :=
   | e_intro : forall t v, trans_close (c_init t) (c_final v) -> eval t v.
@@ -39,14 +42,27 @@ End DET_ABSTRACT_MACHINE.
 
 
 
-Module Type AM_SAFETY (AM : ABSTRACT_MACHINE).
+Module Type AM_SAFE_REGION (AM : ABSTRACT_MACHINE).
 
   Import AM.
 
-  Parameter good_conf : configuration -> Prop.
+  Parameter safe : configuration -> Prop.
 
-  Axiom preservation : forall c1 c2, good_conf c1 -> c1 → c2 -> good_conf c2.
-  Axiom progress     : forall c, good_conf c -> 
+  Axiom preservation : forall c1 c2, safe c1 -> c1 → c2 -> safe c2.
+  Axiom progress     : forall c, safe c -> 
                            (exists v, c = c_final v) \/ (exists c', c → c').
 
-End AM_SAFETY.
+End AM_SAFE_REGION.
+
+
+
+
+Module Type AM_PROGRESS (AM : ABSTRACT_MACHINE).
+
+  Import AM.
+
+  Axiom progress : forall t c, c_init t →* c ->
+                       (exists v, c = c_final v) \/ (exists c', c → c').
+
+End AM_PROGRESS.
+

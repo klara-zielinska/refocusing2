@@ -84,13 +84,12 @@ Module RedRefSem (R : RED_REF_LANG) <: RED_REF_SEM R.R.
                    forall k1, exists k2 (c : context k1 k2), c[t0] = t1.
   Proof with eauto.
     intros t0 t1 H k1;
-    induction H; intros.
-    - inversion H; subst.
+    induction H.
+    - destruct H as [ec H]; subst.
       exists (k1+>ec); eexists (ec=:[.]).
       simpl...
     - destruct IHclos_trans_1n as (k2, (c, H1)). 
-      inversion H.
-      subst.
+      destruct H as [ec H]; subst.
       exists (k2+>ec); exists (ec=:c)...
   Qed.
 
@@ -332,11 +331,9 @@ Module RedRefSem (R : RED_REF_LANG) <: RED_REF_SEM R.R.
         assert (~ dead_ckind (k+>e)) as Hndk.
           { eapply dec_term_next_alive... } 
         econstructor 3...
-        destruct (redex_trivial r t _ (e=:[.]) hh) as [(H1, H2) | (v, H1)]...
+        destruct (redex_trivial1 r e t Hndk hh) as (v, H1)...
 
-        + discriminateJM H2. 
-
-        + { subst t.
+        { subst t.
           clear H0 Heqi; generalize dependent v; generalize dependent e.
           induction e using (well_founded_ind (wf_eco k r)); intros.
 
@@ -354,12 +351,11 @@ Module RedRefSem (R : RED_REF_LANG) <: RED_REF_SEM R.R.
             rewrite ht in hh.
             assert (~ dead_ckind (k+>e0)).
               { eapply dec_context_not_dead... }
-            destruct (redex_trivial r t _ (e0=:[.]) hh) as [(H4, H5) | (v1, H4)]...
-            + discriminateJM H5.
-            + subst t.
-              destruct (dec_context_term_next _ _ _ Heqi).
-              apply H0...
-              * congruence.
+            destruct (redex_trivial1 r e0 t H1 hh) as (v1, H4)...
+            subst t.
+            destruct (dec_context_term_next _ _ _ Heqi).
+            apply H0...
+            + congruence.
 
           - rewrite ht in hh; contradiction (value_redex _ _ hh).
 
@@ -611,7 +607,7 @@ Module RedRefSem (R : RED_REF_LANG) <: RED_REF_SEM R.R.
   Qed.
 
 
-  Module DEC := DEC.
+  Module ST := ST.
 
   Definition dec_term    := dec_term.
   Definition dec_context := dec_context.

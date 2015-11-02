@@ -54,45 +54,30 @@ Require Import Program.
 
 
 
-(* Signature for languages with reduction semantics and multiple kinds of contextes. *)
+Module Type RED_SYNTAX.
 
-Module Type RED_LANG.
-
-  (* Preconditions: To instaniate this module you need to determinizethe grammar of 
-     contextes. *)
+  Parameters term : Set.
 
 
-  Parameters term  elem_context : Set.
-  Parameter  ckind : Set. (* kinds of contexts, that is, non-terminal context symbols 
-                             in the grammar *)
-
-
-  Parameter  init_ckind : ckind.         (* start symbol in the grammar *)
-  Parameter  dead_ckind : ckind -> Prop. (* set of sink symbols; if your grammar
-                                            is not total you need to introduce at least
-                                            one *)
+  Parameter elem_context : Set.
+  Parameter ckind : Set. (* kinds of contexts, that is, non-terminal context symbols 
+                            in the grammar *)
 
 
   (* ckind_trans - function that determinates the productions in the grammar, that is,
                    if ckind_trans k1 ec = k2, then k1 -> EC[k2] where ec matches EC or
                    there is no such production and k2 is a sink. 
-                   In other words, it is the transition function of a finit automaton 
+                   In other words, it is the transition function of a finite automaton 
                    representing the totalized grammar. *)
   Parameter  ckind_trans : ckind -> elem_context -> ckind.
   Infix "+>" := ckind_trans (at level 50, left associativity).
-
-
-  (* The sink property: *)
-  Axiom death_propagation : 
-      forall k, dead_ckind k -> forall ec, dead_ckind (k+>ec).
-
 
 
   (* context k1 k2 - contexts of kind k1 (derivated from k1) with a hole of kind k2. 
                      Contexts are represented by reversed derivations in the grammar.
                      E.g., if a context is derivated by a sequence of productions
                      k1 -> ec1 k2, k2 -> ec2 k3, k3 -> ec3 k4, k4 -> [], then it is 
-                     represented by the list  (ec3, k4), (ec2, k3), (ec1, k2)  ot 
+                     represented by the list  (ec3, k3), (ec2, k2), (ec1, k1)  of 
                      the type  context k1 k4.
                      The second elements in the pairs are implicite. *)
   Inductive context (k1 : ckind) : ckind -> Set :=
@@ -104,15 +89,15 @@ Module Type RED_LANG.
   Notation "[.]( k )" := (@empty k).
   Infix    "=:"       := ccons (at level 60, right associativity).
 
-  (* Note: Contexts are reversed, because during evaluation by refocusing we always 
-     access the elem. context nearest to the hole of a context. *)
 
-
-  (* Definition: The hole of a context is >dead< if its kind is a sink symbol. *)
-
-  (* Definition: A context is >proper< if its hole is not dead. 
-     (Context with dead holes are contexts that cannot be generated in the orginal
-     grammar.) *)
+  (* Standard contexts composition: *)
+  Fixpoint compose {k1 k2} (c0 : context k1 k2) 
+                      {k3} (c1 : context k3 k1) : context k3 k2 := 
+      match c0 in context _ k2' return context k3 k2' with
+      | [.]     => c1
+      | ec=:c0' => ec =: compose c0' c1
+      end.
+  Infix "~+" := compose (at level 60, right associativity).
 
 
 
@@ -121,7 +106,6 @@ Module Type RED_LANG.
 
   Parameter elem_plug : term -> elem_context -> term.
   Notation "ec :[ t ]" := (elem_plug t ec) (at level 0, t at level 99).
-
   Fixpoint plug (t : term) {k1 k2} (c : context k1 k2) : term :=
       match c with
       | [.]    => t 
@@ -140,14 +124,12 @@ Module Type RED_LANG.
   Definition immediate_ec ec t := exists t', ec:[t'] = t.
 
 
-
   (* redex k - representations of redexes that may occur in a hole of the kind k. 
      value k where k is not a sink
              - (almost) normal forms of kind k, that is, representations of terms
                that cannot be decomposed to a context k k' and a redex k'.  value k
                where k is a sink may be anything. *)
   Parameters value redex : ckind -> Set.
-
 
   Parameter value_to_term : forall {k}, value k -> term.
   Coercion  value_to_term : value >-> term.
@@ -160,9 +142,49 @@ Module Type RED_LANG.
       forall {k} (r r' : redex k), redex_to_term r = redex_to_term r' -> r = r'.
 
 
+
+  Parameter  dead_ckind : ckind -> Prop. (* set of sink symbols; if your grammar
+                                            is not total you need to introduce at least
+                                            one *)
+
+End RED_SYNTAX.
+
+
+
+(* Signature for languages with reduction semantics and multiple kinds of contextes. *)
+
+Module Type RED_LANG <: RED_SYNTAX.
+
+  (* Preconditions: To instaniate this module you need to determinizethe grammar of 
+     contextes. *)
+
+  Include RED_SYNTAX.
+
+
+  (* The sink property: *)
+  Axiom death_propagation : 
+      forall k, dead_ckind k -> forall ec, dead_ckind (k+>ec).
   (* A key property of sink non-terminals: *)
-  Axiom proper_death : forall k1, dead_ckind k1 -> 
-                           ~ exists k2 (c : context k1 k2) (r : redex k2), True.
+  Axiom proper_death : 
+      forall k, dead_ckind k -> ~ exists (r : redex k), True.
+
+
+  Parameter  init_ckind : ckind.         (* start symbol in the grammar *)
+
+
+  (* Note: Contexts are reversed, because during evaluation by refocusing we always 
+     access the elem. context nearest to the hole of a context. *)
+
+
+  (* Definition: The hole of a context is >dead< if its kind is a sink symbol. *)
+
+  (* Definition: A context is >proper< if its hole is not dead. 
+     (Context with dead holes are contexts that cannot be generated in the orginal
+     grammar.) *)
+
+
+
+
 
 
   (* Definition: A decomposition c[t] is empty if c is empty. *)
@@ -181,13 +203,18 @@ Module Type RED_LANG.
 
 
   (* Axioms of normal forms: *)
-  Axiom value_trivial : forall {k} (v : value k), only_trivial v k.
-  Axiom value_redex   : forall {k} (v : value k) (r : redex k), 
-                            value_to_term v <> redex_to_term r.
+  Axiom value_trivial1 : forall {k} (v : value k) ec {t}, 
+                             ~dead_ckind (k+>ec) -> ec:[t] = v -> 
+                                 exists (v' : value (k+>ec)), t = v'.
+  Axiom value_redex    : forall {k} (v : value k) (r : redex k), 
+                             value_to_term v <> redex_to_term r.
   (*Axiom trivial_val_red : 
       forall k t, ~dead_ckind k -> only_trivial t k ->
          (exists (v : value k), t = v) \/ (exists (r : redex k), t = r).*)
 
+  Axiom decompose : forall (t : term) k1, ~ dead_ckind k1 ->
+      (exists (v : value k1), t = v) \/
+      (exists k2 (r : redex k2) (c : context k1 k2), t = c[r]).
 
 
   (* Reduction of a redex (it may get stuck): *)
@@ -211,16 +238,6 @@ Module Type RED_LANG.
   Coercion decomp_to_term : decomp >-> term.
 
 
-
-  (* Standard contexts composition: *)
-  Fixpoint compose {k1 k2} (c0 : context k1 k2) 
-                      {k3} (c1 : context k3 k1) : context k3 k2 := 
-      match c0 in context _ k2' return context k3 k2' with
-      | [.]     => c1
-      | ec=:c0' => ec =: compose c0' c1
-      end.
-  Infix "~+" := compose (at level 60, right associativity).
-
 End RED_LANG.
 
 
@@ -231,13 +248,6 @@ End RED_LANG.
 Module Type RED_SEM (R : RED_LANG).
 
   Import R.
-
-
-  (* This is a property of the language and should be in RED_LANG, but doing so
-     overcomplicate the library, thus we leave it here for now. *)
-  Axiom decompose : forall (t : term) k1, ~ dead_ckind k1 ->
-      (exists (v : value k1), t = v) \/
-      (exists k2 (r : redex k2) (c : context k1 k2), t = c[r]).
 
 
   (* Decomposition relation 

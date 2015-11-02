@@ -171,7 +171,7 @@ Module StagedAbstractMachine_Correct (R : RED_LANG) (RS : RED_REF_SEM R)
     | eauto
 
     | match goal       with H0 : ?x = ?d0,  H1 : ?x = ?d1 |- _ => 
-      match type of d0 with SAM.DEC.interm_dec _ => 
+      match type of d0 with SAM.ST.interm_dec _ => 
           rewrite H0 in H1; inversion H1; subst; eauto 
       end end ].
 
@@ -211,7 +211,7 @@ Module StagedAbstractMachine_Correct (R : RED_LANG) (RS : RED_REF_SEM R)
     destruct (dec_total t init_ckind) as (d, H0).
     - dependent destruction H...
       + inversion H0; dep_subst...
-      + intro G; rewrite SAM.DEC.dec_term_from_dead in H...
+      + intro G; rewrite SAM.ST.dec_term_from_dead in H...
     - dependent destruction H0. econstructor...
       + eapply PAMC.dec_eqv...
       + eapply dec_SAM2PAM...
@@ -238,7 +238,7 @@ Module EvalApplyMachine_Correct (R : RED_LANG) (RS : RED_REF_SEM R)
   Module SAMC := StagedAbstractMachine_Correct R RS SAM.
   Import R.
   Import RS.
-  Export DEC.
+  Export ST.
 
 
 
@@ -315,7 +315,7 @@ Module ProperEAMachine_Correct (R : RED_LANG) (RS : RED_REF_SEM R)
   Module EAM  := EvalApplyMachine R RS.
   Module EAMC := EvalApplyMachine_Correct R RS EAM.
   Import R.
-  Import RS.DEC.
+  Import RS.ST.
   Import PEAM.
 
 
@@ -405,7 +405,7 @@ Module PushEnterMachine_Correct (R : RED_LANG) (PERS : PE_REF_SEM R)
   Module EAM  := EvalApplyMachine R PERS.RefSem.
   Module EAMC := EvalApplyMachine_Correct R PERS.RefSem EAM.
   Import R.
-  Import PEM.DEC.
+  Import PEM.ST.
 
 
 
@@ -421,7 +421,7 @@ Module PushEnterMachine_Correct (R : RED_LANG) (PERS : PE_REF_SEM R)
       | [.] => fun v => PEM.dec v [.] v0
       | ccons ec _ c => fun v => forall d, dec_context ec _ v = d ->
         match d with
-        | PEM.DEC.in_red r => forall t, contract r = Some t -> PEM.dec t c v0
+        | PEM.ST.in_red r => forall t, contract r = Some t -> PEM.dec t c v0
         | in_term t ec0 => PEM.dec t (ec0=:c) v0
         | in_val v => False
         | in_dead => False
@@ -494,7 +494,7 @@ Module ProperPEMachine_Correct (R : RED_LANG) (PRS : PE_REF_SEM R)
   Module PEM  := PushEnterMachine R PRS.
   Module PEMC := PushEnterMachine_Correct R PRS PEM.
   Import R.
-  Import RS.DEC.
+  Import RS.ST.
   Import PPEM.
 
 

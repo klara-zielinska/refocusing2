@@ -6,9 +6,9 @@ Require Export reduction_semantics.
 
 
 
-Module RED_LANG_Facts (R : RED_LANG).
+Module RED_SYNTAX_Facts (SX : RED_SYNTAX).
 
-  Import R.
+  Import SX.
   
 
   Lemma ccons_inj : 
@@ -22,37 +22,6 @@ Module RED_LANG_Facts (R : RED_LANG).
     inversion H2; subst.
     dep_subst.
     auto.
-  Qed.
-
-
-  Lemma death_propagation2 : 
-      forall k ec, ~ dead_ckind (k+>ec) -> ~ dead_ckind k.
-
-  Proof.
-    intuition.
-    apply H.
-    apply death_propagation.
-    assumption.
-  Qed.
-
-
-  Lemma dead_context_dead : 
-      forall {k1 k2}, context k1 k2 -> dead_ckind k1 -> dead_ckind k2.
-
-  Proof with auto.
-    intros ? ? c H; revert c.
-    induction 1.
-    - trivial.
-    - apply death_propagation...
-  Qed.
-
-
-  Lemma proper_death2 : 
-      forall {k1 k2}, context k1 k2 -> redex k2 -> ~ dead_ckind k1.
-
-  Proof with eauto.
-    intros k1 k2 c r H.
-    apply (proper_death k1)...
   Qed.
 
 
@@ -104,6 +73,75 @@ Module RED_LANG_Facts (R : RED_LANG).
       exists ec1; eexists (ec0=:c1); rewrite IH; trivial.
   Qed.
 
+
+End RED_SYNTAX_Facts.
+
+
+
+
+Module RED_LANG_Facts (R : RED_LANG).
+
+  Module SXF := RED_SYNTAX_Facts R.
+  Export SXF.
+  Import R.
+
+
+  Lemma death_propagation2 : 
+      forall k ec, ~ dead_ckind (k+>ec) -> ~ dead_ckind k.
+
+  Proof.
+    intuition.
+    apply H.
+    apply death_propagation.
+    assumption.
+  Qed.
+
+
+  Lemma dead_context_dead : 
+      forall {k1 k2}, context k1 k2 -> dead_ckind k1 -> dead_ckind k2.
+
+  Proof with auto.
+    intros ? ? c H; revert c.
+    induction 1.
+    - trivial.
+    - apply death_propagation...
+  Qed.
+
+
+  Lemma proper_death_trans :
+      forall k1, dead_ckind k1 ->
+          ~ exists {k2} (c : context k1 k2) (r : redex k2), True.
+
+  Proof with auto.
+    intros k1 H [k2 [c [ r _]]].
+    eapply proper_death.
+    - apply (dead_context_dead c)...
+    - eauto.
+  Qed.
+
+
+  Lemma proper_death2 : 
+      forall {k1 k2}, context k1 k2 -> redex k2 -> ~ dead_ckind k1.
+
+  Proof with eauto.
+    intros k1 k2 c r H.
+    apply (proper_death_trans k1)...
+  Qed.
+
+
+  Lemma value_trivial : forall {k} (v : value k), only_trivial v k.
+
+  Proof.
+    intros k1 v (*&*) t k2 c; revert t.
+    induction c;
+        intros t H H0.
+    - auto.
+    - right.
+      destruct (IHc ec:[t]) as [H1 | [v' H1]]; 
+      solve 
+      [ eauto using death_propagation2 
+      | try rec_subst H1; eauto using value_trivial1, death_propagation2 ].
+  Qed.
 
 End RED_LANG_Facts.
 

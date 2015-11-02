@@ -7,13 +7,13 @@ Require Import reduction_semantics_facts.
 
 
 
-Module MiniML_HandSem <: RED_SEM MiniML.
+Module MiniML_HandSem <: RED_SEM MiniML_Ref.R.
 
-  Module RF := RED_LANG_Facts MiniML.
-  Import MiniML.
+  Module RF := RED_LANG_Facts MiniML_Ref.R.
+  Import MiniML_SX MiniML_Ref.
   Import RF.
 
-
+(*
   Lemma decompose : forall (t : term) k1, ~ dead_ckind k1 ->
       (exists (v : value k1), t = v) \/
       (exists k2 (r : redex k2) (c : context k1 k2), t = c[r]).
@@ -85,8 +85,11 @@ Module MiniML_HandSem <: RED_SEM MiniML.
       + eexists (), (rSnd v), [.]... 
       + eexists (), r, (c ~+ snd_c =: [.]).
         rewrite plug_compose...
-  Qed.
+  Qed.*)
 
+  Notation value' := (value ()).
+  Notation context' := (context () ()).
+  Notation decomp' := (decomp ()).
 
 
   Inductive __dec : term -> context' -> decomp' -> Prop :=
@@ -337,7 +340,7 @@ Module MiniML_REF_SEM_Check.
             inversion H; subst; 
             constructor; auto
       | H : dec_context ?ec _ ?v = _ |- _ =>
-            destruct ec0; inversion e; subst'; econstructor; auto
+            destruct ec; inversion e; subst'; econstructor; auto
             end ].
   Qed.
 
@@ -405,8 +408,10 @@ End MiniML_REF_SEM_Check.
 
 Module MiniML_HandMachine <: ABSTRACT_MACHINE.
 
-  Import MiniML.
+  Import MiniML_SX.
   Import MiniML_EAM.
+
+  Notation contract' := (@MiniML_Ref.R.contract ()).
 
   Notation "[$ t $]"     := (c_init t)    (t at level 99).
   Notation "[: v :]"     := (c_final v)   (v at level 99).
@@ -473,6 +478,8 @@ Module MiniML_HandMachine <: ABSTRACT_MACHINE.
                    c0 → c1 -> trans_close c1 c2 -> trans_close c0 c2
   where "c1 →+ c2 " := (trans_close c1 c2).
 
+  Definition trans_ref_close c1 c2 := c1 = c2 \/ trans_close c1 c2.
+  Notation "c1 →* c2" := (trans_ref_close c1 c2).
 
   Inductive eval : term -> value -> Prop :=
   | e_intro : forall t v, trans_close (c_init t) (c_final v) -> eval t v.
@@ -493,7 +500,7 @@ Module MiniML_Machine_Check.
 
   Module EAM := MiniML_EAM.
   Module HM  := MiniML_HandMachine.
-  Import MiniML_Ref.DEC.
+  Import MiniML_Ref.ST.
   Import EAM.
   Import HM.
 

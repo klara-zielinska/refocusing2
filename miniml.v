@@ -4,7 +4,7 @@ Require Import refocusing_lang.
 Require Import reduction_semantics_facts.
 
 
-Module MiniML <: RED_LANG.
+Module MiniML_SX <: RED_SYNTAX.
 
   Parameter var : Set.
 
@@ -70,18 +70,8 @@ Module MiniML <: RED_LANG.
   Notation "k +> ec" := (ckind_trans k ec) (at level 50, left associativity).
 
 
-  Definition init_ckind : ckind     := ().
   Definition dead_ckind (_ : ckind) := False.
-  Hint Unfold init_ckind dead_ckind.
-
-
-  Lemma death_propagation : 
-      forall k, dead_ckind k -> forall ec, dead_ckind (k+>ec).
-
-  Proof.
-    intuition.
-  Qed.
-
+  Hint Unfold dead_ckind.
 
   Inductive context (k1 : ckind) : ckind -> Set :=
   | empty : context k1 k1
@@ -165,7 +155,7 @@ Module MiniML <: RED_LANG.
       | pair_l v       => Pair (v : term) t
       | pair_r t2      => Pair t t2
       end.
-  Notation "ec :[ t ]" := (elem_plug t ec) (at level 0).
+  Notation "ec :[ t ]" := (elem_plug t ec) (at level 0, t at level 99).
 
 
   Lemma elem_plug_injective1 : forall ec {t0 t1}, ec:[t0] = ec:[t1] -> t0 = t1.
@@ -184,10 +174,36 @@ Module MiniML <: RED_LANG.
       | [.]    => t 
       | ec=:c' => plug ec:[t] c'
       end.
-  Notation "c [ t ]" := (plug t c) (at level 0).
+  Notation "c [ t ]" := (plug t c) (at level 0, t at level 99).
 
 
   Definition immediate_ec ec t := exists t', ec:[t'] = t.
+
+End MiniML_SX.
+
+
+
+
+Module MiniML_Ref_minus <: RED_REF_LANG_minus.
+
+  Module SX := MiniML_SX.
+
+  Module RSF := RED_SYNTAX_Facts SX.
+  Export SX.
+  Import RSF.
+
+
+
+  Definition init_ckind : ckind := ().
+  Hint Unfold init_ckind.
+
+
+  Lemma death_propagation : 
+      forall k, dead_ckind k -> forall ec, dead_ckind (k+>ec).
+
+  Proof.
+    intuition.
+  Qed.
 
 
   Parameter subst : var -> term -> term -> term.
@@ -206,7 +222,7 @@ Module MiniML <: RED_LANG.
       end.
   Notation contract' := (@contract ()).
 
-
+(*
   Inductive decomp (k : ckind) : Set :=
   | d_red : forall k', redex k' -> context k k' -> decomp k
   | d_val : value k -> decomp k.
@@ -219,36 +235,18 @@ Module MiniML <: RED_LANG.
       | d_val v => value_to_term v
       | d_red _ r c0 => c0[r]
       end.
-  Coercion decomp_to_term : decomp >-> term.
+  Coercion decomp_to_term : decomp >-> term.*)
 
 
-  Definition only_empty t k := 
-      forall t' {k'} (c : context k k'), c[t'] = t -> ~ dead_ckind k' -> 
-          k = k' /\ c ~= [.](k).
 
-  Definition only_trivial t k := 
-      forall t' {k'} (c : context k k'),  c[t'] = t -> ~ dead_ckind k' -> 
-          k = k' /\ c ~= [.](k) \/ exists (v : value k'), t' = v.
+  Lemma value_trivial1 : forall {k} (v : value k) ec t, 
+                             ~dead_ckind (k+>ec) -> ec:[t] = v ->
+                                 exists (v' : value (k+>ec)), t = v'.
 
-
-  Lemma value_trivial : forall {k} (v : value k), only_trivial v k.
-
-  Proof with auto.
-    intros k1 v t k2 c; revert t.
-
-    induction c; intros t H _.
-    - intuition.
-    - right.
-      simpl in H.
-      destruct (IHc _ H) as [(H1, H2) | (v0, H1)]...
-      + dep_subst.
-        simpl in H.
-        destruct ec0, k2, v; 
-            inversion H; 
-        solve [ eexists; eauto ].
-      + destruct ec0, k2, v0;
-            inversion H1; 
-        solve [ eexists; eauto ].
+  Proof.
+    intros k v ec t H H0.
+    destruct ec, v; inversion H0; subst; 
+    eauto.
   Qed.
 
 
@@ -259,7 +257,7 @@ Module MiniML <: RED_LANG.
   Qed.
 
 
-  Lemma ot_subterm_val : 
+  (*Lemma ot_subterm_val : 
       forall t t0 ec k, only_trivial t k -> ec:[t0] = t -> 
           exists v : value k, t0 = v.
 
@@ -320,7 +318,7 @@ Module MiniML <: RED_LANG.
       mlr (rFst v : redex').
     - ot_v t snd_c as v H0.
       mlr (rSnd v : redex').
-  Qed.
+  Qed.*)
 
 
   Lemma dead_context_dead : 
@@ -334,27 +332,11 @@ Module MiniML <: RED_LANG.
   Qed.
 
 
-  Lemma proper_death : forall k, dead_ckind k -> 
-                           ~ exists k' (c : context k k') (r : redex k'), True.
-
-  Proof with auto.
-    intros k H; destruct k...
-  Qed.
-
-End MiniML.
+  Lemma proper_death : forall k, dead_ckind k -> ~ exists (r : redex k), True.
+  Proof. auto. Qed.
 
 
-
-
-Module MiniML_Ref <: RED_REF_LANG.
-
-  Module R  := MiniML.
-  Module RF := RED_LANG_Facts R.
-  Export R.
-  Import RF.
-
-
-  Module DEC <: REF_STEP R.
+  Module ST <: STRATEGY_STEP SX.
 
     Inductive interm_dec k : Set :=
     | in_red  : redex k -> interm_dec k
@@ -453,43 +435,42 @@ Module MiniML_Ref <: RED_REF_LANG.
       auto.
     Qed.
 
-  End DEC.
+  End ST.
 
-  Export DEC.
+  Export ST.
 
 
-  Lemma redex_trivial : forall {k} (r : redex k), only_trivial r k.
+
+  
+  Definition only_empty t k := 
+      forall t' {k'} (c : context k k'), c[t'] = t -> ~ dead_ckind k' -> 
+          k = k' /\ c ~= [.](k).
+
+  Definition only_trivial t k := 
+      forall t' {k'} (c : context k k'),  c[t'] = t -> ~ dead_ckind k' -> 
+          k = k' /\ c ~= [.](k) \/ exists (v : value k'), t' = v.
+
+
+  Lemma redex_trivial1 : forall {k} (r : redex k) ec t,
+                             ~dead_ckind (k+>ec) -> ec:[t] = r -> 
+                                 exists (v : value (k+>ec)), t = v.
   Proof with auto.
-    intros k1 v t k2 c; revert t.
-
-    induction c; intros t H _.
-    - intuition.
-    - right.
-      simpl in H.
-      destruct (IHc _ H) as [(H1, H2) | (v0, H1)]...
-      + dep_subst.
-        simpl in H.
-        destruct ec0, k2, v; 
-            inversion H; 
-        solve [ eexists; eauto ].
-      + destruct ec0, k2, v0;
-            inversion H1; 
-        solve [ eexists; eauto ].
+    intros k r ec t H H0.
+    destruct ec, r; inversion H0; subst;
+    eauto.
   Qed.
 
 
-  Inductive subterm_one_step : term -> term -> Prop :=
-  | st_1 : forall t t0 ec, t = ec:[t0] -> subterm_one_step t0 t.
-
+  Definition subterm_one_step t0 t := exists ec, t = ec:[t0].
 
   Lemma wf_st1 : well_founded subterm_one_step.
   Proof.
-    RED_REF_LANG_Help.prove_st_wf.
+      RED_REF_LANG_Help.prove_st_wf.
   Qed.
 
 
   Definition subterm_order := clos_trans_1n term subterm_one_step.
-  Notation " a <| b " := (subterm_order a b) (at level 40, no associativity).
+  Notation "a <| b" := (subterm_order a b) (at level 40, no associativity).
   Definition wf_sto : well_founded subterm_order := wf_clos_trans_l _ _ wf_st1.
 
 
@@ -691,13 +672,14 @@ Module MiniML_Ref <: RED_REF_LANG.
       eexists; trivial ].
   Qed.
 
-End MiniML_Ref.
+End MiniML_Ref_minus.
 
 
+Module MiniML_Ref := mk_RedRefLang MiniML_Ref_minus.
 
 
 Require Import refocusing_semantics_derivation.
 Require Import refocusing_machine.
 
 Module MiniML_REF_SEM := RedRefSem MiniML_Ref.
-Module MiniML_EAM     := ProperEAMachine MiniML MiniML_REF_SEM.
+Module MiniML_EAM     := ProperEAMachine MiniML_Ref.R MiniML_REF_SEM.

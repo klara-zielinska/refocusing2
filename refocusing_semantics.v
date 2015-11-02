@@ -6,9 +6,9 @@ Require Export refocusing_step.
 
 Module Type RED_REF_SEM (R : RED_LANG).
 
-  Declare Module DEC : REF_STEP R.
+  Declare Module ST : STRATEGY_STEP R.
   Import R.
-  Export DEC.
+  Export ST.
 
 
   (** A decomposition function specified in terms of the atomic functions above *)

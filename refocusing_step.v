@@ -2,7 +2,7 @@ Require Import reduction_semantics.
 
 
 
-Module Type REF_STEP (R : RED_LANG).
+Module Type STRATEGY_STEP (R : RED_SYNTAX).
 
   Import R.
 
@@ -38,7 +38,7 @@ Module Type REF_STEP (R : RED_LANG).
       | in_red r      => t = r
       | in_val v      => t = v
       | in_term t' ec => t = ec:[t']
-      | in_dead       => dead_ckind k 
+      | in_dead       => dead_ckind k
       end.
 
   Axiom dec_term_from_dead : forall t k, 
@@ -64,4 +64,4 @@ Module Type REF_STEP (R : RED_LANG).
   Axiom dec_context_next_alive : forall ec k v {t0 ec0}, 
       dec_context ec k v = in_term t0 ec0 -> ~ dead_ckind (k+>ec0).
 
-End REF_STEP.
+End STRATEGY_STEP.

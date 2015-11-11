@@ -81,8 +81,9 @@ End RED_SYNTAX_Facts.
 
 Module RED_LANG_Facts (R : RED_LANG).
 
-  Module SXF := RED_SYNTAX_Facts R.
-  Export SXF.
+  (*Module SXF := RED_SYNTAX_Facts R.
+  Export SXF.*)
+  Include RED_SYNTAX_Facts R.
   Import R.
 
 
@@ -128,6 +129,10 @@ Module RED_LANG_Facts (R : RED_LANG).
     apply (proper_death_trans k1)...
   Qed.
 
+
+  Definition only_trivial t k :=
+      forall t' {k'} (c : context k k'), c[t'] = t -> ~ dead_ckind k' -> 
+          k = k' /\ c ~= [.](k) \/ exists (v : value k'), t' = v.
 
   Lemma value_trivial : forall {k} (v : value k), only_trivial v k.
 

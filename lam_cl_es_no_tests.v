@@ -1,16 +1,17 @@
-Require Import no_es_cl_ecca.
+Require Import lam_cl_es_no.
 Require Import abstract_machine_facts.
 
 
-Module Sim := DetAbstractMachine_Sim ECCa_es_cl_EAM_minus.
-
-Import ECCa_es_cl_EAM_minus.
-Import no_es_cl_ECCa.
-Import no_es_cl_ECCa_Ref.R.
 
 
+Module Sim := DetAbstractMachine_Sim Lam_ClES_NO_EAM_minus.
 
-Let t1 := Lam0 (App0 (Lam0 (Lam0 (Var0 1))) (Var0 0)).
+Import Lam_ClES_NO_EAM_minus.
+Import Lam_ClES_NO_PreLang Lam_ClES_NO_Ref.R.
+
+
+
+Example t1 := Lam0 (App0 (Lam0 (Lam0 (Var0 1))) (Var0 0)).
 
 
 Eval compute in 
@@ -33,13 +34,13 @@ Fixpoint nat_term0 n :=
     end.
 
 
-Let add_term0 := 
+Definition add_term0 := 
     Lam0 (Lam0 (Lam0 (Lam0 
         (App0 (App0 (Var0 3) 
             (Var0 1)) 
             (App0 (App0 (Var0 2) (Var0 1)) (Var0 0)))))).
 
-Let mul_term0 := 
+Definition mul_term0 := 
     Lam0 (Lam0 (Lam0 (Lam0
         (App0 (App0
 

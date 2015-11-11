@@ -2,28 +2,19 @@ Require Import Util.
 Require Import Program.
 Require Import refocusing_semantics.
 Require Import refocusing_semantics_derivation.
-Require Import abstract_machine.
 Require Import refocusing_machine.
 Require Import refocusing_machine_correct.
 Require Import reduction_semantics_facts.
-Require Import no_es_eccad.
+Require Import lam_ses_no.
 
 
 
-Module no_es_ECCaD_HandSem <: RED_SEM no_es_ECCaD.
 
-  Module RF := RED_LANG_Facts no_es_ECCaD.
-  Import no_es_ECCaD.
+Module Lam_SES_NO_HandSem <: RED_SEM Lam_SES_NO_Ref.R.
+
+  Module RF := RED_LANG_Facts Lam_SES_NO_Ref.R.
+  Import Lam_SES_NO_PreLang Lam_SES_NO_Ref.R.
   Import RF.
-
-
-  Lemma decompose : forall (t : term) k1, ~ dead_ckind k1 ->
-      (exists (v : value k1), t = v) \/
-      (exists k2 (r : redex k2) (c : context k1 k2), t = c[r]).
-
-  Proof.
-    apply no_es_ECCaD_REF_SEM.RS.decompose.
-  Qed.
 
 
   Inductive __dec : term -> forall {k1 k2}, context k1 k2 -> decomp k1 -> Prop :=
@@ -159,15 +150,15 @@ Module no_es_ECCaD_HandSem <: RED_SEM no_es_ECCaD.
 
 
   Lemma dec_val_self : forall {k2} (v : value k2) {k1} (c : context k1 k2) d, 
-      dec v c d <-> decctx v c d.
+                           dec (v : term) c d <-> decctx v c d.
 
-  Proof with auto. 
-    induction v using val_Ind with
+  Proof with auto.
+    induction v using Lam_SES_NO_Ref_minus.SX.val_Ind with
     (P := fun k2 (v : value k2) => forall (k1 : ckind) (c : context k1 k2)
-              (d : decomp k1), dec v c d <-> decctx v c d)
-    (P0:= fun v0 => forall (k1 k2 : ckind) (c : context k1 k2) (v : value k2)
-              (d : decomp k1), (v0 : term) = (v : term) -> 
-              (dec v c d <-> decctx v c d));
+              (d : decomp k1), dec (v : term) c d <-> decctx v c d)
+    (P0:= fun v0 : valCa => forall (k1 k2 : ckind) (c : context k1 k2) (v : value k2)
+              (d : decomp k1), (valCa_to_term v0 : term) = (v : term) -> 
+              (dec (v : term) c d <-> decctx v c d));
 
     intros;
     try match goal with [ H: (valCa_to_term ?v0) = (value_to_term ?v1) |- _ ] => 
@@ -335,17 +326,17 @@ Module no_es_ECCaD_HandSem <: RED_SEM no_es_ECCaD.
   | e_intro : forall {t} {d : decomp init_ckind} {v : value init_ckind}, 
                   decempty t d -> iter d v -> eval t v.
 
-End no_es_ECCaD_HandSem.
+End Lam_SES_NO_HandSem.
 
 
 
 
-Module no_es_ECCaD_REF_SEM_Check.
+Module Lam_SES_NO_RefSem_Check.
 
-  Import no_es_ECCaD_Ref.
+  Import Lam_SES_NO_PreLang Lam_SES_NO_Ref.R Lam_SES_NO_Ref.ST.
 
-  Module HS := no_es_ECCaD_HandSem.
-  Module RS := no_es_ECCaD_REF_SEM.
+  Module HS := Lam_SES_NO_HandSem.
+  Module RS := Lam_SES_NO_RefSem.
 
 
   Lemma HS_dec_imp_RS_dec : 
@@ -381,17 +372,17 @@ Module no_es_ECCaD_REF_SEM_Check.
     (P := fun t _ _ c d (_ : RS.dec t c d)    => HS.dec t c d)
     (P0:= fun _ v _ c d (_ : RS.decctx v c d) => HS.decctx v c d);
     try solve 
-  [ match goal with H : dec_term _ _ = _ |- _ =>
-    destruct t, k2; 
-    inversion H; subst; 
-    first [apply HS.d_AppD | constructor]; simpl; auto
-    end
-  | match goal with H : dec_context _ _ _ = _ |- _ =>
-    destruct ec0, k2; dependent destruction v; 
-    inversion H; subst; 
-    constructor; auto
-    end 
-  | constructor; auto ].
+    [ match goal with H : dec_term _ _ = _ |- _ =>
+      destruct t, k2; 
+      inversion H; subst; 
+      first [apply HS.d_AppD | constructor]; simpl; auto
+      end
+    | match goal with H : dec_context _ _ _ = _ |- _ =>
+      destruct ec0, k2; dependent destruction v; 
+      inversion H; subst; 
+      constructor; auto
+      end 
+    | constructor; auto ].
   Qed.
 
 
@@ -451,26 +442,26 @@ Module no_es_ECCaD_REF_SEM_Check.
     ] ].
   Qed.
 
-End no_es_ECCaD_REF_SEM_Check.
+End Lam_SES_NO_RefSem_Check.
 
 
 
 
-Module ECCaD_HandMachine <: ABSTRACT_MACHINE.
+Module Lam_SES_NO_HandMachine <: ABSTRACT_MACHINE.
 
-  Import ECCaD_EAM.
-  Import no_es_ECCaD.
+  Import Lam_SES_NO_EAM.
+  Import Lam_SES_NO_PreLang.
 
   Definition contextD := (context C C + context C ECa + context C D) %type.
   Definition contextC := (context C C + context C ECa) %type.
   Definition contextA := context C C.
 
   Notation "[$ t $]"       := (c_eval t  [.])    (t at level 99).
-  Notation "[: v :]"       := (c_apply [.] v)   (v at level 99).
-  Notation "[$ t , c $]"   := (c_eval t c)  (t, c at level 99).
-  Notation "[: c , v :]"   := (c_apply c v) (c, v at level 99).
+  Notation "[: v :]"       := (c_apply [.] v)    (v at level 99).
+  Notation "[$ t , c $]"   := (c_eval t c)       (t, c at level 99).
+  Notation "[: c , v :]"   := (c_apply c v)      (c, v at level 99).
 
-  Reserved Notation " a → b " (at level 40).
+  Reserved Notation "c1 → c2" (at level 40).
 
 
   Lemma pre_sub_CECaD_is_CECaD : forall k d, CECaD (k+>stag_c d) -> CECaD k.
@@ -571,29 +562,29 @@ Module ECCaD_HandMachine <: ABSTRACT_MACHINE.
   | t_apLam_cC     : forall (v : value C) {k1} (c : context k1 C), 
                        [: lam_c =: c, v :] → [: c, vCLam v :]
 
-  where " a → b " := (trans a b).
+  where "c1 → c2" := (trans c1 c2).
   Definition transition := trans.
 
 
   Lemma final_correct : forall v st, ~ c_final v → st.
-
-  Proof.
-    inversion 1.
-  Qed.
+  Proof. inversion 1. Qed.
 
 
-  Reserved Notation " a →+ b " (at level 40, no associativity).
+  Reserved Notation "c1 →+ c2" (at level 40, no associativity).
 
   Inductive trans_close : configuration -> configuration -> Prop :=
   | one_step   : forall {c0 c1 : configuration}, 
                    c0 → c1 -> trans_close c0 c1
   | multi_step : forall {c0 c1 c2 : configuration}, 
                    c0 → c1 -> trans_close c1 c2 -> trans_close c0 c2
-  where " a →+ b " := (trans_close a b).
+  where "c1 →+ c2" := (trans_close c1 c2).
 
+
+  Definition trans_ref_close c1 c2 := c1 = c2 \/ trans_close c1 c2.
+  Notation "c1 →* c2" := (trans_ref_close c1 c2).
 
   Inductive eval : term -> value init_ckind -> Prop :=
-  | e_intro : forall t v, trans_close (c_init t) (c_final v) -> eval t v.
+  | e_intro : forall t (v : val init_ckind), trans_close (c_init t) (c_final v) -> eval t v.
 
 
   Definition term          := term.
@@ -602,28 +593,31 @@ Module ECCaD_HandMachine <: ABSTRACT_MACHINE.
   Definition c_init        := c_init.
   Definition c_final       := c_final.
 
-End ECCaD_HandMachine.
+End Lam_SES_NO_HandMachine.
 
 
 
 
-Module ECCaD_Machine_Check.
+Module Lam_SES_NO_Machine_Check.
 
-  Module EAM := ECCaD_EAM.
-  Module HM  := ECCaD_HandMachine.
-  Import no_es_ECCaD.
-  Import no_es_ECCaD_Ref.DEC.
-  Import EAM.
-  Import HM.
+  Module EAM := Lam_SES_NO_EAM.
+  Module HM  := Lam_SES_NO_HandMachine.
+  Import EAM HM.
+  Import Lam_SES_NO_PreLang Lam_SES_NO_Strategy.
 
 
-  Notation " a >> b "  := (ECCaD_EAM.transition a b)  (at level 40, no associativity).
-  Notation " a >>+ b " := (ECCaD_EAM.trans_close a b) (at level 40, no associativity).
+  Notation "c1 >> c2"  := (Lam_SES_NO_EAM.transition c1 c2)  
+               (at level 40, no associativity).
+  Notation "c1 >>+ c2" := (Lam_SES_NO_EAM.trans_close c1 c2) 
+               (at level 40, no associativity).
+
 
 
   Lemma trans_EAM2HM : forall c0 c1,  c0 >> c1  ->  c0 → c1.
   Proof.
     inversion 1; subst;
+    capture_all ckind term context value redex @contract;
+    capture_all dec_term dec_context @in_red @in_val @in_term;
     match goal with
     | H : dec_term ?t ?k2 = _ |- _        => destruct t, k2; 
                                              inversion H; subst
@@ -681,4 +675,4 @@ Module ECCaD_Machine_Check.
   Qed.
 
 
-End ECCaD_Machine_Check.
+End Lam_SES_NO_Machine_Check.

@@ -107,8 +107,66 @@ Notation "# t" := (unit_is_everything t) (at level 0).
 
 (* Some tactics *)
 
-Ltac clean_eqs := repeat 
-                  match goal with [H : ?x = ?x |- _] => clear H end.
+Ltac clean_eqs  := repeat 
+                   match goal with [H : ?x = ?x |- _] => clear H end.
+
+
+Tactic Notation "capture_all" constr(t) := 
+    let x := fresh in 
+    set t as x in *; subst x.
+
+Tactic Notation "capture_all" constr(t1) constr(t2) :=
+    capture_all t1;
+    capture_all t2.
+
+Tactic Notation "capture_all" constr(t1) constr(t2) constr(t3) :=
+    capture_all t1;
+    capture_all t2;
+    capture_all t3.
+
+Tactic Notation "capture_all" constr(t1) constr(t2) constr(t3) constr(t4):=
+    capture_all t1;
+    capture_all t2;
+    capture_all t3;
+    capture_all t4.
+
+Tactic Notation "capture_all" constr(t1) constr(t2) constr(t3) constr(t4) 
+                              constr(t5) :=
+    capture_all t1;
+    capture_all t2;
+    capture_all t3;
+    capture_all t4;
+    capture_all t5.
+
+Tactic Notation "capture_all" constr(t1) constr(t2) constr(t3) constr(t4) 
+                              constr(t5) constr(t6):=
+    capture_all t1;
+    capture_all t2;
+    capture_all t3;
+    capture_all t4;
+    capture_all t5;
+    capture_all t6.
+
+Tactic Notation "capture_all" constr(t1) constr(t2) constr(t3) constr(t4) 
+                              constr(t5) constr(t6) constr(t7) :=
+    capture_all t1;
+    capture_all t2;
+    capture_all t3;
+    capture_all t4;
+    capture_all t5;
+    capture_all t6;
+    capture_all t7.
+
+Tactic Notation "capture_all" constr(t1) constr(t2) constr(t3) constr(t4) 
+                              constr(t5) constr(t6) constr(t7) constr(t8) :=
+    capture_all t1;
+    capture_all t2;
+    capture_all t3;
+    capture_all t4;
+    capture_all t5;
+    capture_all t6;
+    capture_all t7;
+    capture_all t8.
 
 
 Ltac join H L R := first [ assert (H := conj L R); clear L R

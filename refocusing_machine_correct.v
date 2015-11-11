@@ -1,10 +1,10 @@
 Require Import Util.
 Require Import Program.
 Require Import refocusing_semantics.
-Require Import refocusing_machine_sig.
 Require Import refocusing_machine.
 Require Import reduction_semantics_facts.
 Require Import refocusing_semantics_facts.
+
 
 
 

@@ -7,90 +7,12 @@ Require Import reduction_semantics_facts.
 
 
 
+
 Module MiniML_HandSem <: RED_SEM MiniML_Ref.R.
 
   Module RF := RED_LANG_Facts MiniML_Ref.R.
-  Import MiniML_SX MiniML_Ref.
+  Import MiniML_PreLang MiniML_Strategy MiniML_Ref.R MiniML_Extras.
   Import RF.
-
-(*
-  Lemma decompose : forall (t : term) k1, ~ dead_ckind k1 ->
-      (exists (v : value k1), t = v) \/
-      (exists k2 (r : redex k2) (c : context k1 k2), t = c[r]).
-
-  Proof with simpl; f_equal; eauto.
-    intros t () _.
-
-    induction t.
-
-    - left.
-      exists vZ...
-
-    - destruct IHt as [(v, ?) | ((), (r, (c, ?)))].
-      + left.
-        exists (vS v)...
-      + right.
-        exists () r (c ~+ s_c =: [.](())).
-        rewrite plug_compose...
-
-    - right; exists ().
-      destruct IHt1 as [(v1, ?) | ((), (r1, (c1, ?)))].
-      + destruct IHt2 as [(v2, ?) | ((), (r2, (c2, ?)))].
-        * exists (rApp v1 v2) [.](())...
-        * exists r2 (c2 ~+ ap_l v1 =: [.](())).
-          rewrite plug_compose...
-      + exists r1 (c1 ~+ ap_r t2 =: [.](())).
-        rewrite plug_compose...
-
-    - left.
-      eexists (vVar _)...
-
-    - left.
-      eexists (vLam _ _)...
-
-    - right.
-      destruct IHt1 as [(v1, ?) | ((), (r, (c, ?)))].
-      + eexists (), (rCase v1 _ _ _), [.]...
-      + eexists (), r, (c ~+  case_c _ _ _ =: [.]).
-        rewrite plug_compose...
-
-    - right.
-      destruct IHt1 as [(v1, ?) | ((), (r, (c, ?)))].
-      + eexists (), (rLet _ _ _), [.]...
-      + eexists (), r, (c ~+ let_c _ _ =: [.]).
-        rewrite plug_compose...
-
-    - right.
-      eexists (), (rFix _ _), [.]...
-
-    - destruct IHt1 as [(v1, ?) | ((), (r1, (c1, ?)))].
-      + destruct IHt2 as [(v2, ?) | ((), (r2, (c2, ?)))].
-        * left.
-          exists (vPair v1 v2)...
-        * right.
-          eexists (), r2, (c2 ~+ pair_l v1 =: [.]).
-          rewrite plug_compose...
-      + right.
-        eexists (), r1, (c1 ~+ pair_r t2 =: [.]).
-        rewrite plug_compose...
-
-    - right.
-      destruct IHt as [(v, ?) | ((), (r, (c, ?)))].
-      + eexists (), (rFst v), [.]... 
-      + eexists (), r, (c ~+ fst_c =: [.]).
-        rewrite plug_compose...
-
-    - right.
-      destruct IHt as [(v, ?) | ((), (r, (c, ?)))].
-      + eexists (), (rSnd v), [.]... 
-      + eexists (), r, (c ~+ snd_c =: [.]).
-        rewrite plug_compose...
-  Qed.*)
-
-  Notation value' := (value ()).
-  Notation context' := (context () ()).
-  Notation decomp' := (decomp ()).
-
 
   Inductive __dec : term -> context' -> decomp' -> Prop :=
 
@@ -300,7 +222,7 @@ Module MiniML_REF_SEM_Check.
   Import MiniML_Ref.
 
   Module HS := MiniML_HandSem.
-  Module RS := MiniML_REF_SEM.
+  Module RS := MiniML_RefSem.
 
 
   Lemma HS_dec_imp_RS_dec : 
@@ -408,15 +330,13 @@ End MiniML_REF_SEM_Check.
 
 Module MiniML_HandMachine <: ABSTRACT_MACHINE.
 
-  Import MiniML_SX.
+  Import MiniML_PreLang.
   Import MiniML_EAM.
-
-  Notation contract' := (@MiniML_Ref.R.contract ()).
 
   Notation "[$ t $]"     := (c_init t)    (t at level 99).
   Notation "[: v :]"     := (c_final v)   (v at level 99).
-  Notation "[$ t , c $]" := (@c_eval t () () c)  (t, c at level 99).
-  Notation "[: c , v :]" := (@c_apply () () c v) (c, v at level 99).
+  Notation "[$ t , c $]" := (@c_eval t () () c)  (t, c at level 20).
+  Notation "[: c , v :]" := (@c_apply () () c v) (c, v at level 20).
 
 
   Reserved Notation "c1 → c2" (at level 40).
@@ -436,37 +356,34 @@ Module MiniML_HandMachine <: ABSTRACT_MACHINE.
   | t_epar : forall t1 t2 c,     [$ Pair t1 t2, c $]      → [$ t1, pair_r t2 =: c $]
   | t_efst : forall t c,         [$ Fst t, c $]           → [$ t, fst_c =: c $]
   | t_esnd : forall t c,         [$ Snd t, c $]           → [$ t, snd_c =: c $]
-  | t_as   : forall v c,         [: s_c =: c, v :]        → [: c, vS v :]
+  | t_as   : forall v c,         [: (s_c =: c), v :]        → [: c, vS v :]
 
   | t_aa_r : forall v t (c : context'),       
-                                 [: ap_r t =: c, v :]     → [$ t, ap_l v =: c $]
+                                 [: (ap_r t =: c), v :]     → [$ t, ap_l v =: c $]
 
   | t_aa_l : forall v1 v2 t c, contract' (rApp v1 v2) = Some t -> 
-                            [: ap_l v1 =: c, v2 :]        → [$ t, c $]
+                            [: (ap_l v1 =: c), v2 :]        → [$ t, c $]
   | t_acas : forall v ez x es c t, contract' (rCase v ez x es) = Some t ->
-                            [: case_c ez x es =: c, v :]  → [$ t, c $]
+                            [: (case_c ez x es =: c), v :]  → [$ t, c $]
   | t_alet : forall v x e c t, contract' (rLet x v e) = Some t ->
-                            [: let_c x e =: c, v :]       → [$ t, c $]
+                            [: (let_c x e =: c), v :]       → [$ t, c $]
 
   | t_ap_r : forall v t (c : context'), 
-                                 [: pair_r t =: c, v :]   → [$ t, pair_l v =: c $]
+                                 [: (pair_r t =: c), v :]   → [$ t, pair_l v =: c $]
 
-  | t_ap_l : forall v1 v2 c,     [: pair_l v1 =: c, v2 :] → [: c, vPair v1 v2 :]
+  | t_ap_l : forall v1 v2 c,     [: (pair_l v1 =: c), v2 :] → [: c, vPair v1 v2 :]
 
   | t_afst : forall v c t, contract' (rFst v) = Some t ->
-                                 [: fst_c =: c, v :]      → [$ t, c $]
+                                 [: (fst_c =: c), v :]      → [$ t, c $]
   | t_asnd : forall v c t, contract' (rSnd v) = Some t ->
-                                 [: snd_c =: c, v :]      → [$ t, c $]
+                                 [: (snd_c =: c), v :]      → [$ t, c $]
 
   where "c1 → c2" := (trans c1 c2).
   Definition transition := trans.
 
 
   Lemma final_correct : forall v st, ~ c_final v → st.
-
-  Proof.
-    inversion 1.
-  Qed.
+  Proof. inversion 1. Qed.
 
 
   Reserved Notation "c1 →+ c2" (at level 40, no associativity).
@@ -500,9 +417,8 @@ Module MiniML_Machine_Check.
 
   Module EAM := MiniML_EAM.
   Module HM  := MiniML_HandMachine.
-  Import MiniML_Ref.ST.
-  Import EAM.
-  Import HM.
+  Import MiniML_Strategy.
+  Import EAM HM.
 
 
   Notation "a >> b"  := (MiniML_EAM.transition a b)  (at level 40, no associativity).

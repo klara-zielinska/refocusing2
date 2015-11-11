@@ -1,6 +1,6 @@
 Require Import Util.
 Require Import reduction_semantics.
-Require Export refocusing_step.
+Require Export strategy_step.
 Require Import refocusing_semantics.
 Require Export abstract_machine.
 Require Export refocusing_machine_sig.
@@ -211,7 +211,7 @@ Module ProperEAMachine (R : RED_LANG) (RS : RED_REF_SEM R) <: ABSTRACT_MACHINE.
   Definition c_final (v : value) := c_apply [.] v.
 
 
-  Reserved Notation " a → b " (at level 40, no associativity).
+  Reserved Notation "c1 → c2" (at level 40, no associativity).
 
   Inductive trans : configuration -> configuration -> Prop :=
 
@@ -394,7 +394,7 @@ Module ProperPEMachine (R : RED_LANG) (PERS : PE_REF_SEM R) <: ABSTRACT_MACHINE.
 
   Inductive conf : Set :=
   | c_eval  : term -> forall {k1 k2}, context k1 k2 -> conf
-  | c_fin : forall {k}, R.value k                   -> conf.
+  | c_fin : forall {k}, R.value k                -> conf.
   Definition configuration := conf.
 
   Definition c_init t            := c_eval t [.](init_ckind).

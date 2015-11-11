@@ -1,7 +1,6 @@
 Require Import reduction_semantics.
-Require Export refocusing_step.
 Require Import refocusing_semantics.
-Require Export abstract_machine.
+Require Import abstract_machine.
 
 
 
@@ -354,7 +353,7 @@ Module Type PROPER_PE_MACHINE (R : RED_LANG) (PERS : PE_REF_SEM R) <: DET_ABSTRA
 
   Inductive conf : Set :=
   | c_eval  : term -> forall {k1 k2}, context k1 k2 -> conf
-  | c_fin : forall {k}, R.value k                   -> conf.
+  | c_fin : forall {k}, R.value k                -> conf.
   Definition configuration := conf.
 
   Definition c_init t  := c_eval t [.](init_ckind).

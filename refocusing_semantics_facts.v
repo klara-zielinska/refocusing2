@@ -4,6 +4,8 @@ Require Import refocusing_semantics.
 Require Import reduction_semantics_facts.
 
 
+
+
 (* Refocusing semantics is deterministic. *)
 
 Module RedRefSemDet (R : RED_LANG) (RS : RED_REF_SEM R) : DET_RED_SEM R 

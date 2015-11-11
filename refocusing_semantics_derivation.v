@@ -6,9 +6,9 @@ Require Import reduction_semantics_facts.
 
 
 
+
 Module RedRefSem (R : RED_REF_LANG) <: RED_REF_SEM R.R.
 
-  Import R.R.
   Import R.
   Module RRF := RED_LANG_Facts R.R.
   Import RRF.

@@ -105,13 +105,14 @@ Module Type RED_SYNTAX.
      contexts. *)
 
   Parameter elem_plug : term -> elem_context -> term.
-  Notation "ec :[ t ]" := (elem_plug t ec) (at level 0, t at level 99).
+  Notation "ec :[ t ]" := (elem_plug t ec) (at level 0).
+
   Fixpoint plug (t : term) {k1 k2} (c : context k1 k2) : term :=
       match c with
       | [.]    => t 
       | ec=:c' => plug ec:[t] c'
       end.
-  Notation "c [ t ]" := (plug t c) (at level 0, t at level 99).
+  Notation "c [ t ]" := (plug t c) (at level 0).
 
   (* The following axiom, somehow, relates our representation of contexts to the 
      real eval. contexts, but generally we can instantiate the module with 
@@ -147,6 +148,14 @@ Module Type RED_SYNTAX.
                                             is not total you need to introduce at least
                                             one *)
 
+  (* The sink property: *)
+  Axiom death_propagation : 
+      forall k, dead_ckind k -> forall ec, dead_ckind (k+>ec).
+  (* A key property of sink non-terminals: *)
+  Axiom proper_death : 
+      forall k, dead_ckind k -> ~ exists (r : redex k), True.
+
+
 End RED_SYNTAX.
 
 
@@ -158,15 +167,10 @@ Module Type RED_LANG <: RED_SYNTAX.
   (* Preconditions: To instaniate this module you need to determinizethe grammar of 
      contextes. *)
 
+  (*Declare Module SX : RED_SYNTAX.
+  Export SX.*)
+
   Include RED_SYNTAX.
-
-
-  (* The sink property: *)
-  Axiom death_propagation : 
-      forall k, dead_ckind k -> forall ec, dead_ckind (k+>ec).
-  (* A key property of sink non-terminals: *)
-  Axiom proper_death : 
-      forall k, dead_ckind k -> ~ exists (r : redex k), True.
 
 
   Parameter  init_ckind : ckind.         (* start symbol in the grammar *)
@@ -194,12 +198,12 @@ Module Type RED_LANG <: RED_SYNTAX.
                         the symbol k.
      only_trivial t k - each proper decomposition of the term t from the symbol k is 
                         either empty or the component term is a value. *)
-  Definition only_empty t k :=
+(*  Definition only_empty t k :=
       forall t' {k'} (c : context k k'), c[t'] = t -> ~ dead_ckind k' -> 
           k = k' /\ c ~= [.](k).
   Definition only_trivial t k :=
       forall t' {k'} (c : context k k'), c[t'] = t -> ~ dead_ckind k' -> 
-          k = k' /\ c ~= [.](k) \/ exists (v : value k'), t' = v.
+          k = k' /\ c ~= [.](k) \/ exists (v : value k'), t' = v.*)
 
 
   (* Axioms of normal forms: *)
@@ -211,6 +215,7 @@ Module Type RED_LANG <: RED_SYNTAX.
   (*Axiom trivial_val_red : 
       forall k t, ~dead_ckind k -> only_trivial t k ->
          (exists (v : value k), t = v) \/ (exists (r : redex k), t = r).*)
+
 
   Axiom decompose : forall (t : term) k1, ~ dead_ckind k1 ->
       (exists (v : value k1), t = v) \/

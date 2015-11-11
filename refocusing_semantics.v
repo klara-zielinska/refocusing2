@@ -1,5 +1,5 @@
 Require Export reduction_semantics.
-Require Export refocusing_step.
+Require Export strategy_step.
 
 
 (* Refocusing semantics *)

@@ -2,7 +2,8 @@ Require Import Program.
 Require Import Util.
 Require Export reduction_semantics.
 Require Import reduction_semantics_facts.
-Require Export refocusing_step.
+Require Export strategy_step.
+
 
 
 
@@ -24,12 +25,15 @@ Module Type RED_REF_LANG.
 
 
   Definition subterm_order := clos_trans_1n term subterm_one_step.
-  Notation "t1 <| t2" := (subterm_order t1 t2) (at level 40, no associativity).
-  Definition wf_sto : well_founded subterm_order := wf_clos_trans_l _ _ wf_st1.
+  Notation "t1 <| t2" := (subterm_order t1 t2) (at level 70, no associativity).
+  Definition wf_sto : well_founded subterm_order
+
+             := wf_clos_trans_l _ _ wf_st1.
 
 
   Parameter ec_order : ckind -> term -> elem_context -> elem_context -> Prop.
-  Notation "k , t |~  ec1 << ec2 " := (ec_order k t ec1 ec2) (at level 40, no associativity).
+  Notation "k , t |~  ec1 << ec2 " := (ec_order k t ec1 ec2) 
+               (at level 70, t, ec1, ec2 at level 50, no associativity).
   Axiom wf_eco : forall k t, well_founded (ec_order k t).
 
   Axiom ec_order_antisym : forall k t ec ec0, 
@@ -40,13 +44,20 @@ Module Type RED_REF_LANG.
 
   Axiom ec_order_comp_if : 
       forall t ec0 ec1, immediate_ec ec0 t -> immediate_ec ec1 t -> 
-      forall k, ~ dead_ckind (k+>ec0) -> ~ dead_ckind (k+>ec1) ->
-          k, t |~ ec0 << ec1  \/  k, t |~ ec1 << ec0  \/  ec0 = ec1.
+          forall k, ~ dead_ckind (k+>ec0) -> ~ dead_ckind (k+>ec1) ->
+              k, t |~ ec0 << ec1  \/  k, t |~ ec1 << ec0  \/  ec0 = ec1.
 
   Axiom ec_order_comp_fi : forall k t ec0 ec1,
       k, t |~ ec0 << ec1  ->  immediate_ec ec0 t /\ immediate_ec ec1 t /\ 
                                   ~ dead_ckind (k+>ec0) /\ ~ dead_ckind (k+>ec1).
 
+  Definition only_empty t k :=
+      forall t' {k'} (c : context k k'), c[t'] = t -> ~ dead_ckind k' -> 
+          k = k' /\ c ~= [.](k).
+
+  Definition only_trivial t k :=
+      forall t' {k'} (c : context k k'), c[t'] = t -> ~ dead_ckind k' -> 
+          k = k' /\ c ~= [.](k) \/ exists (v : value k'), t' = v.
 
   Axiom dec_term_red_empty : 
       forall t k {r : redex k}, dec_term t k = in_red r -> only_empty t k.
@@ -82,46 +93,37 @@ End RED_REF_LANG.
 
 
 
+  Module Type __SIG1 (SX : RED_SYNTAX).
+
+    Import SX.
+
+    Parameter init_ckind : ckind.
+
+    Axiom value_trivial1 : forall {k} (v : value k) ec t, 
+                               ~dead_ckind (k+>ec) -> ec:[t] = v -> 
+                                   exists (v' : value (k+>ec)), t = v'.
+    Axiom value_redex    : forall {k} (v : value k) (r : redex k), 
+                               value_to_term v <> redex_to_term r.
+
+    Parameter contract : forall {k}, redex k -> option term.
+
+  End __SIG1.
+
 
 Module Type RED_REF_LANG_minus.
-
-  (* Inhered from RED_REF_LANG : *)
 
   Declare Module SX : RED_SYNTAX.
   Declare Module ST : STRATEGY_STEP SX.
   Export SX ST.
+  Declare Module RED_Props : __SIG1 SX.
 
 
-  Axiom death_propagation : 
-      forall k, dead_ckind k -> forall ec, dead_ckind (k+>ec).
-  Axiom proper_death : 
-      forall k, dead_ckind k -> ~ exists (r : redex k), True.
+
+    Axiom redex_trivial1 : forall {k} (r : redex k) ec t, 
+                               ~dead_ckind (k+>ec) -> ec:[t] = r -> 
+                                   exists (v : value (k+>ec)), t = v.
 
 
-  Parameter  init_ckind : ckind.
-
-
-  Axiom value_trivial1 : 
-      forall {k} (v : value k) ec t, 
-          ~dead_ckind (k+>ec) -> ec:[t] = v -> 
-              exists (v' : value (k+>ec)), t = v'.
-  Axiom value_redex    : forall {k} (v : value k) (r : redex k), 
-                             value_to_term v <> redex_to_term r.
-
-
-  Parameter contract : forall {k}, redex k -> option term.
-
-
-  Axiom redex_trivial1 : forall {k} (r : redex k) ec t, 
-                             ~dead_ckind (k+>ec) -> ec:[t] = r -> 
-                                 exists (v : value (k+>ec)), t = v.
-
-  Definition only_empty t k :=
-      forall t' {k'} (c : context k k'), c[t'] = t -> ~ dead_ckind k' -> 
-          k = k' /\ c ~= [.](k).
-  Definition only_trivial t k :=
-      forall t' {k'} (c : context k k'), c[t'] = t -> ~ dead_ckind k' -> 
-          k = k' /\ c ~= [.](k) \/ exists (v : value k'), t' = v.
 
 
   Definition subterm_one_step t0 t := exists ec, t = ec:[t0].
@@ -129,12 +131,13 @@ Module Type RED_REF_LANG_minus.
 
 
   Definition subterm_order := clos_trans_1n term subterm_one_step.
-  Notation "t1 <| t2" := (subterm_order t1 t2) (at level 40, no associativity).
+  Notation "t1 <| t2" := (subterm_order t1 t2) (at level 70, no associativity).
   Definition wf_sto : well_founded subterm_order := wf_clos_trans_l _ _ wf_st1.
 
 
   Parameter ec_order : ckind -> term -> elem_context -> elem_context -> Prop.
-  Notation "k , t |~  ec1 << ec2 " := (ec_order k t ec1 ec2) (at level 40, no associativity).
+  Notation "k , t |~  ec1 << ec2 " := (ec_order k t ec1 ec2) 
+               (at level 70, t, ec1, ec2 at level 50, no associativity).
   Axiom wf_eco : forall k t, well_founded (ec_order k t).
 
   Axiom ec_order_antisym : forall k t ec ec0, 
@@ -153,6 +156,13 @@ Module Type RED_REF_LANG_minus.
                                   ~ dead_ckind (k+>ec0) /\ ~ dead_ckind (k+>ec1).
 
 
+
+    Definition only_empty t k :=
+        forall t' {k'} (c : context k k'), c[t'] = t -> ~ dead_ckind k' -> 
+            k = k' /\ c ~= [.](k).
+    Definition only_trivial t k :=
+        forall t' {k'} (c : context k k'), c[t'] = t -> ~ dead_ckind k' -> 
+            k = k' /\ c ~= [.](k) \/ exists (v : value k'), t' = v.
 
   Axiom dec_term_red_empty : 
       forall t k {r : redex k}, dec_term t k = in_red r -> only_empty t k.
@@ -197,33 +207,26 @@ Module mk_RedRefLang (PR : RED_REF_LANG_minus) <: RED_REF_LANG.
   Module R <: RED_LANG.
 
     Include PR.SX.
+    Include PR.RED_Props.
 
-    Definition death_propagation : 
-        forall k, dead_ckind k -> forall ec, dead_ckind (k+>ec)
-
-        := PR.death_propagation.
-
-    Definition proper_death : 
-        forall k, dead_ckind k -> ~ exists (r : redex k), True
-
-        := PR.proper_death.
-
+(*
     Definition only_empty t k :=
         forall t' {k'} (c : context k k'), c[t'] = t -> ~ dead_ckind k' -> 
             k = k' /\ c ~= [.](k).
     Definition only_trivial t k :=
         forall t' {k'} (c : context k k'), c[t'] = t -> ~ dead_ckind k' -> 
-            k = k' /\ c ~= [.](k) \/ exists (v : value k'), t' = v.
-
+            k = k' /\ c ~= [.](k) \/ exists (v : value k'), t' = v.*)
+(*
     Definition value_trivial1 : 
         forall {k} (v : value k) ec t, 
             ~dead_ckind (k+>ec) -> ec:[t] = v -> 
                 exists (v' : value (k+>ec)), t = v'
 
-        := @PR.value_trivial1.
+        := @PR.RED_Props.value_trivial1.
+
     Definition value_redex   : forall {k} (v : value k) (r : redex k), 
                             value_to_term v <> redex_to_term r
-        := @PR.value_redex.
+        := @PR.RED_Props.value_redex.*)
 
 
     Lemma decompose : 
@@ -287,6 +290,13 @@ Module mk_RedRefLang (PR : RED_REF_LANG_minus) <: RED_REF_LANG.
       - intuition.
     Qed. 
 
+(*
+    Definition init_ckind := PR.RED_Props.init_ckind.
+
+    Definition contract := @PR.RED_Props.contract.
+    Arguments contract {k} _.*)
+
+
     Inductive decomp k : Set :=
     | d_red : forall {k'}, redex k' -> context k k' -> decomp k
     | d_val : value k -> decomp k.
@@ -300,30 +310,33 @@ Module mk_RedRefLang (PR : RED_REF_LANG_minus) <: RED_REF_LANG.
         end.
     Coercion decomp_to_term : decomp >-> term.
 
-
-    Definition contract {k} r := @PR.contract k r.
-
-    Definition init_ckind := PR.init_ckind.
-
   End R.
 
+  Export R.
 
+
+  Include PR.
+
+(*
   Module ST := PR.ST.
 
   Export R ST.
 
+
   Definition redex_trivial1 {k} := @PR.redex_trivial1 k.
+
   Definition subterm_one_step t0 t := exists ec, t = ec:[t0].
   Definition wf_st1 := PR.wf_st1.
 
 
   Definition subterm_order := clos_trans_1n term subterm_one_step.
-  Notation "t1 <| t2" := (subterm_order t1 t2) (at level 40, no associativity).
+  Notation "t1 <| t2" := (subterm_order t1 t2) (at level 70, no associativity).
   Definition wf_sto := wf_clos_trans_l _ _ wf_st1.
 
 
   Definition ec_order := PR.ec_order.
-  Notation "k , t |~  ec1 << ec2 " := (ec_order k t ec1 ec2) (at level 40, no associativity).
+  Notation "k , t |~  ec1 << ec2 " := (ec_order k t ec1 ec2) 
+               (at level 70, t, ec1, ec2 at level 50, no associativity).
   Definition wf_eco := PR.wf_eco.
 
   Definition ec_order_antisym := PR.ec_order_antisym.
@@ -341,7 +354,7 @@ Module mk_RedRefLang (PR : RED_REF_LANG_minus) <: RED_REF_LANG.
   Definition dec_context_term_next := PR.dec_context_term_next.
 
 
-  Definition elem_context_det := PR.elem_context_det.
+  Definition elem_context_det := PR.elem_context_det.*)
 
 End mk_RedRefLang.
 

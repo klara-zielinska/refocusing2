@@ -6,10 +6,72 @@ Require Export reduction_semantics.
 
 
 
-Module RED_SYNTAX_Facts (SX : RED_SYNTAX).
+Module Type PRE_RED_LANG.
 
-  Import SX.
+  Parameters term elem_context ckind : Set. 
+  Parameter  ckind_trans : ckind -> elem_context -> ckind.
+  Infix "+>" := ckind_trans (at level 50, left associativity).
+  Parameter dead_ckind : ckind -> Prop.
+
+
+  Inductive context (k1 : ckind) : ckind -> Set :=
+  | empty : context k1 k1
+  | ccons : forall (ec : elem_context) {k2}, context k1 k2 -> context k1 (k2+>ec).
+  Arguments empty {k1}. Arguments ccons {k1} _ {k2} _.
+
+  Notation "[.]"      := empty.
+  Notation "[.]( k )" := (@empty k).
+  Infix    "=:"       := ccons (at level 60, right associativity).
+
+
+  Parameter elem_plug : term -> elem_context -> term.
+  Notation "ec :[ t ]" := (elem_plug t ec) (at level 0).
+
+(*  
+
+  Axiom elem_plug_injective1 : forall ec {t0 t1}, ec:[t0] = ec:[t1] -> t0 = t1.*)
+
+  Definition immediate_ec ec t := exists t', ec:[t'] = t.
+
+  Parameters value redex : ckind -> Set.
+
+  Parameter value_to_term : forall {k}, value k -> term.
+  Coercion  value_to_term : value >-> term.
+  Parameter redex_to_term : forall {k}, redex k -> term.
+  Coercion  redex_to_term : redex >-> term.
+
+(*
+  Axiom value_to_term_injective : 
+      forall {k} (v v' : value k), value_to_term v = value_to_term v' -> v = v'.
+  Axiom redex_to_term_injective : 
+      forall {k} (r r' : redex k), redex_to_term r = redex_to_term r' -> r = r'.*)
+
+End PRE_RED_LANG.
+
+
+
+
+Module RED_LANG_Facts (R : PRE_RED_LANG).
+
+  Import R.
   
+
+  Fixpoint plug (t : term) {k1 k2} (c : context k1 k2) : term :=
+      match c with
+      | [.]    => t 
+      | ec=:c' => plug ec:[t] c'
+      end.
+  Notation "c [ t ]" := (plug t c) (at level 0).
+
+
+  Fixpoint compose {k1 k2} (c0 : context k1 k2) 
+                      {k3} (c1 : context k3 k1) : context k3 k2 := 
+      match c0 in context _ k2' return context k3 k2' with
+      | [.]     => c1
+      | ec=:c0' => ec =: compose c0' c1
+      end.
+  Infix "~+" := compose (at level 60, right associativity).
+
 
   Lemma ccons_inj : 
       forall ec {k1 k2} (c : context k1 k2) ec' {k2'} (c' : context k1 k2'), 
@@ -40,9 +102,7 @@ Module RED_SYNTAX_Facts (SX : RED_SYNTAX).
 
 
   Lemma plug_empty : forall t k, [.](k)[t] = t.
-  Proof.
-    intuition.
-  Qed.
+  Proof. intuition. Qed.
 
 
   Lemma compose_empty : forall {k1 k2} (c : context k1 k2), c = c ~+ [.].
@@ -74,17 +134,13 @@ Module RED_SYNTAX_Facts (SX : RED_SYNTAX).
   Qed.
 
 
-End RED_SYNTAX_Facts.
 
+  Section Death.
 
-
-
-Module RED_LANG_Facts (R : RED_LANG).
-
-  (*Module SXF := RED_SYNTAX_Facts R.
-  Export SXF.*)
-  Include RED_SYNTAX_Facts R.
-  Import R.
+  Axiom death_propagation : 
+      forall k, dead_ckind k -> forall ec, dead_ckind (k+>ec).
+  Axiom proper_death : 
+      forall k, dead_ckind k -> ~ exists (r : redex k), True.
 
 
   Lemma death_propagation2 : 
@@ -129,6 +185,15 @@ Module RED_LANG_Facts (R : RED_LANG).
     apply (proper_death_trans k1)...
   Qed.
 
+  End Death.
+
+
+
+  Section Values.
+
+  Axiom value_trivial1 : forall {k} (v : value k) ec {t}, 
+                             ~dead_ckind (k+>ec) -> ec:[t] = v -> 
+                                 exists (v' : value (k+>ec)), t = v'.
 
   Definition only_trivial t k :=
       forall t' {k'} (c : context k k'), c[t'] = t -> ~ dead_ckind k' -> 
@@ -147,6 +212,8 @@ Module RED_LANG_Facts (R : RED_LANG).
       [ eauto using death_propagation2 
       | try rec_subst H1; eauto using value_trivial1, death_propagation2 ].
   Qed.
+
+  End Values.
 
 End RED_LANG_Facts.
 

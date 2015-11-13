@@ -7,7 +7,7 @@ Require Import abstract_machine_facts.
 Module Sim := DetAbstractMachine_Sim Lam_ClES_NO_EAM_minus.
 
 Import Lam_ClES_NO_EAM_minus.
-Import Lam_ClES_NO_PreLang Lam_ClES_NO_Ref.R.
+Import Lam_ClES_NO_RefLang Lam_ClES_NO_Cal.RedLang.
 
 
 

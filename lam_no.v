@@ -6,7 +6,7 @@ Require Import reduction_semantics_facts.
 
 
 
-Module Lam_NO_PreLang <: RED_SYNTAX.
+Module Lam_NO_RefLang <: REF_LANG.
 
   Parameter var : Set.
 
@@ -237,6 +237,19 @@ Module Lam_NO_PreLang <: RED_SYNTAX.
   Qed.
 
 
+  Lemma redex_trivial1 : forall {k} (r : redex k) ec t,
+                             ~dead_ckind (k+>ec) -> ec:[t] = r -> 
+                                 exists (v : value (k+>ec)), t = v.
+  Proof with auto.
+    intros k r ec t H H0.
+    destruct ec, r; inversion H0; subst;
+    solve 
+    [ eexists (vECaLam _ _); reflexivity
+    | eauto using valCa_is_valECa
+    | destruct v; inversion H2 ].
+  Qed.
+
+
   Lemma value_redex : forall {k} (v : value k) (r : redex k), 
                           value_to_term v <> redex_to_term r.
   Proof.
@@ -259,14 +272,40 @@ Module Lam_NO_PreLang <: RED_SYNTAX.
     solve [inversion H].
   Qed.
 
-End Lam_NO_PreLang.
+
+  Inductive decomp k : Set :=
+  | d_red : forall {k'}, redex k' -> context k k' -> decomp k
+  | d_val : value k -> decomp k.
+  Arguments d_val {k} _. Arguments d_red {k} {k'} _ _.
+
+  Definition decomp_to_term {k} (d : decomp k) :=
+      match d with
+      | d_val v     => value_to_term v
+      | d_red _ r c => c[r]
+      end.
+  Coercion decomp_to_term : decomp >-> term.
+
+
+
+  Definition immediate_subterm t0 t := exists ec, t = ec:[t0].
+
+  Lemma wf_immediate_subterm : well_founded immediate_subterm.
+  Proof. REF_LANG_Help.prove_st_wf. Qed.
+
+
+  Definition subterm_order := clos_trans_1n term immediate_subterm.
+  Notation "t1 <| t2" := (subterm_order t1 t2) (at level 70, no associativity).
+  Definition wf_subterm_order : well_founded subterm_order 
+      := wf_clos_trans_l _ _ wf_immediate_subterm.
+
+End Lam_NO_RefLang.
 
 
 
 
-Module Lam_NO_Strategy <: STRATEGY_STEP Lam_NO_PreLang.
+Module Lam_NO_Strategy <: REF_STRATEGY Lam_NO_RefLang.
 
-  Import Lam_NO_PreLang.
+  Import Lam_NO_RefLang.
 
 
   Inductive interm_dec k : Set :=
@@ -399,50 +438,8 @@ Module Lam_NO_Strategy <: STRATEGY_STEP Lam_NO_PreLang.
     solve [ autof ].
   Qed.
 
-End Lam_NO_Strategy.
 
-
-
-
-Module Lam_NO_Ref_minus <: RED_REF_LANG_minus.
-
-  Module SX := Lam_NO_PreLang.
-  Module ST := Lam_NO_Strategy.
-  Module RED_Props := Lam_NO_PreLang.
-  Module RSF := RED_SYNTAX_Facts SX.
-  Export Lam_NO_PreLang Lam_NO_Strategy.
-  Import RSF.
-
-
-
-
-  Lemma redex_trivial1 : forall {k} (r : redex k) ec t,
-                             ~dead_ckind (k+>ec) -> ec:[t] = r -> 
-                                 exists (v : value (k+>ec)), t = v.
-  Proof with auto.
-    intros k r ec t H H0.
-    destruct ec, r; inversion H0; subst;
-    solve 
-    [ eexists (vECaLam _ _); reflexivity
-    | eauto using valCa_is_valECa
-    | destruct v; inversion H2 ].
-  Qed.
-
-
-
-
-  Definition subterm_one_step t0 t := exists ec, t = ec:[t0].
-
-  Lemma wf_st1 : well_founded subterm_one_step.
-  Proof. RED_REF_LANG_Help.prove_st_wf. Qed.
-
-
-  Definition subterm_order := clos_trans_1n term subterm_one_step.
-  Notation "t1 <| t2" := (subterm_order t1 t2) (at level 40, no associativity).
-  Definition wf_sto : well_founded subterm_order := wf_clos_trans_l _ _ wf_st1.
-
-
-  Definition ec_order (k : ckind) (t : term) (ec ec0 : elem_context) : Prop :=
+  Definition search_order (k : ckind) (t : term) (ec ec0 : elem_context) : Prop :=
       match k with
       | CBot => False
       | _      => match ec, ec0 with 
@@ -450,15 +447,15 @@ Module Lam_NO_Ref_minus <: RED_REF_LANG_minus.
                   | _, _           => False
                   end
       end.
-  Notation "k , t |~  ec1 << ec2 " := (ec_order k t ec1 ec2) 
-               (at level 40, no associativity).
+  Notation "k , t |~  ec1 << ec2 " := (search_order k t ec1 ec2) 
+               (at level 70, no associativity).
 
 
-  Lemma wf_eco : forall k t, well_founded (ec_order k t).
-  Proof. RED_REF_LANG_Help.prove_ec_wf. Qed.
+  Lemma wf_search : forall k t, well_founded (search_order k t).
+  Proof. REF_LANG_Help.prove_ec_wf. Qed.
 
 
-  Lemma ec_order_antisym : forall k t ec ec0, 
+  Lemma search_order_antisym : forall k t ec ec0, 
       k, t |~ ec << ec0 -> ~ k, t |~ ec0 << ec.
 
   Proof.
@@ -468,7 +465,7 @@ Module Lam_NO_Ref_minus <: RED_REF_LANG_minus.
   Qed.
 
 
-  Lemma ec_order_trans :  forall k t ec0 ec1 ec2, 
+  Lemma search_order_trans :  forall k t ec0 ec1 ec2, 
       k,t |~ ec0 << ec1 -> k,t |~ ec1 << ec2 -> 
       k,t |~ ec0 << ec2.
 
@@ -479,7 +476,7 @@ Module Lam_NO_Ref_minus <: RED_REF_LANG_minus.
   Qed.
 
 
-  Lemma ec_order_comp_if : forall t ec0 ec1, 
+  Lemma search_order_comp_if : forall t ec0 ec1, 
       immediate_ec ec0 t -> immediate_ec ec1 t -> 
       forall k, ~ dead_ckind (k+>ec0) -> ~ dead_ckind (k+>ec1) ->
           k,t |~ ec0 << ec1 \/ k,t |~ ec1 << ec0 \/ ec0 = ec1.
@@ -500,7 +497,7 @@ Module Lam_NO_Ref_minus <: RED_REF_LANG_minus.
   Qed.
 
 
-  Lemma ec_order_comp_fi :
+  Lemma search_order_comp_fi :
       forall k t ec0 ec1,  k, t |~ ec0 << ec1 ->
           immediate_ec ec0 t /\ immediate_ec ec1 t /\ 
           ~ dead_ckind (k+>ec0) /\ ~ dead_ckind (k+>ec1).
@@ -514,7 +511,7 @@ Module Lam_NO_Ref_minus <: RED_REF_LANG_minus.
 
 
 
-
+(*
   Definition only_empty t k := 
       forall t' {k'} (c : context k k'), c[t'] = t -> ~ dead_ckind k' -> 
           k = k' /\ c ~= [.](k).
@@ -532,47 +529,29 @@ Module Lam_NO_Ref_minus <: RED_REF_LANG_minus.
     apply H.
     apply death_propagation.
     assumption.
-  Qed.
+  Qed.*)
 
 
-  Lemma dec_term_red_empty : 
-      forall t k (r : redex k), dec_term t k = in_red r -> only_empty t k.
+  Lemma dec_term_red_atom : 
+      forall t k {r : redex k}, dec_term t k = in_red r -> 
+          ~exists ec, immediate_ec ec t /\ ~dead_ckind (k+>ec).
 
   Proof.
-    intros t k r H.
-    destruct t; 
-    inversion H; subst; clear H;
-
-    try solve
-    [ intros t0 k' c H H0; generalize dependent t0;
-
-      induction c;
-      intros; simpl in *;
-      [ intuition
-      | destruct (IHc (death_propagation2 _ _ H0) _ H);
-        dep_subst;
-        destruct k2, ec0;
-        solve [inversion H1; auto] 
-    ] ].
+    intros t k r H. 
+    destruct t, k; 
+    solve [inversion H].
   Qed.
 
 
-  Lemma dec_term_val_empty : forall t k (v : value k), 
-                                 dec_term t k = in_val v -> only_empty t k.
-  Proof with auto.
-    intros t k v H.
-    destruct t;
-    intros t0 k' c H0 H1; generalize dependent t0;
-    solve
-    [ induction c;
-      intros t0 H0; simpl in *;
-      [ intuition
-      | destruct (IHc (death_propagation2 _ _ H1) _ H0); dep_subst;
-        simpl in H;
-        destruct k2, ec0; 
-        inversion H; subst; 
-        solve [discriminate H | autof] 
-    ] ].
+  Lemma dec_term_val_atom : 
+      forall t k {v : value k}, dec_term t k = in_val v -> 
+          ~exists ec, immediate_ec ec t /\ ~dead_ckind (k+>ec).
+
+  Proof.
+    intros t k v H [ec [[t0 H0] H1]].
+    destruct t, k; inversion H; subst;
+    destruct ec; 
+    solve [autof].
   Qed.
 
 
@@ -596,7 +575,7 @@ Module Lam_NO_Ref_minus <: RED_REF_LANG_minus.
     [ autof
     | inversion H;
       intro G;
-      unfold ec_order in G; destruct G as (G, _);
+      unfold search_order in G; destruct G as (G, _);
       destruct G as (t1, G); inversion G; subst;
       destruct v0; 
       autof ].
@@ -645,7 +624,7 @@ Module Lam_NO_Ref_minus <: RED_REF_LANG_minus.
     subst.
 
     destruct k, ec0, ec'; autof;
-    unfold ec_order in H0; destruct H0 as (H, _);
+    unfold search_order in H0; destruct H0 as (H, _);
     destruct (valCa_is_valECa v) as (v0, H0);
 
     solve
@@ -655,16 +634,19 @@ Module Lam_NO_Ref_minus <: RED_REF_LANG_minus.
       trivial ].
   Qed.
 
-End Lam_NO_Ref_minus.
+End Lam_NO_Strategy.
 
 
 
-Module Lam_NO_Ref := mk_RedRefLang Lam_NO_Ref_minus.
-
+Module Lam_NO_Cal.
+  Module RefLang := Lam_NO_RefLang. 
+  Module RefStrategy := Lam_NO_Strategy. 
+  Module RedLang := RedRefLang Lam_NO_RefLang Lam_NO_Strategy.
+End Lam_NO_Cal.
 
 
 Require Import refocusing_semantics_derivation.
 Require Import refocusing_machine.
 
-Module Lam_NO_RefSem := RedRefSem Lam_NO_Ref.
-Module Lam_NO_EAM    := ProperEAMachine Lam_NO_Ref.R Lam_NO_RefSem.
+Module Lam_NO_RefSem := RedRefSem Lam_NO_Cal.
+Module Lam_NO_EAM    := ProperEAMachine Lam_NO_Cal.RedLang Lam_NO_RefSem.

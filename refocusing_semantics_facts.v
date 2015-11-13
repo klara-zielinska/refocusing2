@@ -8,13 +8,13 @@ Require Import reduction_semantics_facts.
 
 (* Refocusing semantics is deterministic. *)
 
-Module RedRefSemDet (R : RED_LANG) (RS : RED_REF_SEM R) : DET_RED_SEM R 
-                                                            with Module RS := RS.RS.
+Module RedRefSemDet (R : RED_LANG) (RS : RED_REF_SEM R) <: DET_RED_SEM R.
+
+  Include RS.
 
   Import R.
   Module RLF := RED_LANG_Facts R.
   Import RLF.
-  Export RS.
 
 
   Lemma dec_is_function : forall {t k} {d0 d1 : decomp k}, 
@@ -74,8 +74,5 @@ Module RedRefSemDet (R : RED_LANG) (RS : RED_REF_SEM R) : DET_RED_SEM R
     - apply H0.
     - erewrite dec_is_function...
   Qed.
-
-
-  Module RS := RS.RS.
 
 End RedRefSemDet.

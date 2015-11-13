@@ -50,27 +50,27 @@ Module PreAbstractMachine_Correct (R : RED_LANG) (RS : RED_REF_SEM R)
 
 
   Lemma iter_RS2PAM : forall {k} {d : decomp k} {v}, 
-                          RS.RS.iter d v -> PAM.iter d v.
+                          RS.iter d v -> PAM.iter d v.
   Proof with eauto.
     induction 1.
     - constructor...
     - econstructor...
       dependent destruction H0.
       apply dec_RS2PAM.
-      apply RS.RS.dec_plug in H0.
+      apply RS.dec_plug in H0.
       + erewrite (compose_empty _)...
       + eapply (proper_death2 [.])...
   Qed.
 
 
   Lemma iter_PAM2RS : forall {k} {d : decomp k} {v}, 
-                          PAM.iter d v -> RS.RS.iter d v.
+                          PAM.iter d v -> RS.iter d v.
   Proof with eauto.
     induction 1.
     - constructor.
     - econstructor...
       constructor.
-      apply RS.RS.dec_plug_rev.
+      apply RS.dec_plug_rev.
       + eapply (proper_death2 [.])...
       + rewrite <- compose_empty...
         apply dec_PAM2RS...
@@ -78,14 +78,14 @@ Module PreAbstractMachine_Correct (R : RED_LANG) (RS : RED_REF_SEM R)
 
 
   Lemma iter_eqv : forall {k} {d : decomp k} {v}, 
-                       RS.RS.iter d v <-> PAM.iter d v.
+                       RS.iter d v <-> PAM.iter d v.
 
   Proof with auto using iter_RS2PAM, iter_PAM2RS.
     intuition...
   Qed.
 
 
-  Lemma eval_RS2PAM : forall {t v}, RS.RS.eval t v -> PAM.eval t v.
+  Lemma eval_RS2PAM : forall {t v}, RS.eval t v -> PAM.eval t v.
   Proof with eauto.
     intros t v H.
     dependent destruction H; econstructor.
@@ -95,7 +95,7 @@ Module PreAbstractMachine_Correct (R : RED_LANG) (RS : RED_REF_SEM R)
   Qed.
 
 
-  Lemma eval_PAM2RS : forall {t v}, PAM.eval t v -> RS.RS.eval t v.
+  Lemma eval_PAM2RS : forall {t v}, PAM.eval t v -> RS.eval t v.
   Proof with eauto.
     intros t v H.
     dependent destruction H; econstructor.
@@ -105,7 +105,7 @@ Module PreAbstractMachine_Correct (R : RED_LANG) (RS : RED_REF_SEM R)
   Qed.
 
 
-  Theorem eval_OK : forall {t v} , RS.RS.eval t v <-> PAM.eval t v.
+  Theorem eval_OK : forall {t v} , RS.eval t v <-> PAM.eval t v.
 
   Proof with auto using eval_PAM2RS, eval_RS2PAM.
     intuition...
@@ -120,7 +120,7 @@ Module StagedAbstractMachine_Correct (R : RED_LANG) (RS : RED_REF_SEM R)
                                      (SAM : STAGED_ABSTRACT_MACHINE R RS).
 
   Module RF   := RED_LANG_Facts R.
-  Module RSF  := RED_SEM_Facts R RS.RS.
+  Module RSF  := RED_SEM_Facts R RS.
   Module RSD  := RedRefSemDet R RS.
   Module PAM := PreAbstractMachine R RS.
   Module PAMC := PreAbstractMachine_Correct R RS PAM.
@@ -181,7 +181,7 @@ Module StagedAbstractMachine_Correct (R : RED_LANG) (RS : RED_REF_SEM R)
       {
           rewrite <- PAMC.dec_eqv.
           dependent destruction H0.
-          apply RS.RS.dec_plug in H0...
+          apply RS.dec_plug in H0...
           rewrite <- compose_empty in H0.
           assumption.
       }
@@ -219,7 +219,7 @@ Module StagedAbstractMachine_Correct (R : RED_LANG) (RS : RED_REF_SEM R)
   Qed.
 
 
-  Theorem eval_OK : forall {t v}, RS.RS.eval t v <-> SAM.eval t v.
+  Theorem eval_OK : forall {t v}, RS.eval t v <-> SAM.eval t v.
 
   Proof with auto using PAMC.eval_OK, eval_SAM2PAM, eval_PAM2SAM.
     etransitivity...
@@ -299,7 +299,7 @@ Module EvalApplyMachine_Correct (R : RED_LANG) (RS : RED_REF_SEM R)
   Qed.
 
 
-  Theorem eval_OK : forall {t v}, RS.RS.eval t v <-> EAM.eval t v.
+  Theorem eval_OK : forall {t v}, RS.eval t v <-> EAM.eval t v.
   Proof with eauto using SAMC.eval_OK, eval_SAM_EAM.
     etransitivity...
   Qed.
@@ -387,7 +387,7 @@ Module ProperEAMachine_Correct (R : RED_LANG) (RS : RED_REF_SEM R)
   Qed.
 
 
-  Theorem eval_OK : forall {t v}, RS.RS.eval t v <-> PEAM.eval t v.
+  Theorem eval_OK : forall {t v}, RS.eval t v <-> PEAM.eval t v.
   Proof with auto using EAMC.eval_OK, eval_PEAM2EAM, eval_EAM2PEAM.
     etransitivity...
     intuition...
@@ -398,12 +398,12 @@ End ProperEAMachine_Correct.
 
 
 
-Module PushEnterMachine_Correct (R : RED_LANG) (PERS : PE_REF_SEM R) 
+Module PushEnterMachine_Correct (R : RED_LANG) (PERS : PE_RED_REF_SEM R) 
                                 (PEM : PUSH_ENTER_MACHINE R PERS).
 
-  Module RS   := PERS.RefSem.
-  Module EAM  := EvalApplyMachine R PERS.RefSem.
-  Module EAMC := EvalApplyMachine_Correct R PERS.RefSem EAM.
+  Module RS   := PERS.
+  Module EAM  := EvalApplyMachine R PERS.
+  Module EAMC := EvalApplyMachine_Correct R PERS EAM.
   Import R.
   Import PEM.ST.
 
@@ -476,7 +476,7 @@ Module PushEnterMachine_Correct (R : RED_LANG) (PERS : PE_REF_SEM R)
   Qed.
 
 
-  Theorem eval_OK : forall {t v}, RS.RS.eval t v <-> PEM.eval t v.
+  Theorem eval_OK : forall {t v}, RS.eval t v <-> PEM.eval t v.
   Proof with eauto using EAMC.eval_OK, eval_PEM2EAM, eval_EAM2PEM.
     etransitivity...
     intuition...
@@ -487,10 +487,10 @@ End PushEnterMachine_Correct.
 
 
 
-Module ProperPEMachine_Correct (R : RED_LANG) (PRS : PE_REF_SEM R) 
+Module ProperPEMachine_Correct (R : RED_LANG) (PRS : PE_RED_REF_SEM R) 
                                (PPEM : PROPER_PE_MACHINE R PRS).
 
-  Module RS   := PRS.RefSem.
+  Module RS   := PRS.
   Module PEM  := PushEnterMachine R PRS.
   Module PEMC := PushEnterMachine_Correct R PRS PEM.
   Import R.
@@ -537,7 +537,7 @@ Module ProperPEMachine_Correct (R : RED_LANG) (PRS : PE_REF_SEM R)
   Qed.
 
 
-  Theorem eval_OK : forall {t v}, RS.RS.eval t v <-> PPEM.eval t v.
+  Theorem eval_OK : forall {t v}, RS.eval t v <-> PPEM.eval t v.
   Proof with eauto using PEMC.eval_OK, eval_PEM2PPEM, eval_PPEM2PEM.
     etransitivity...
     intuition...

@@ -8,10 +8,10 @@ Require Import reduction_semantics_facts.
 
 
 
-Module MiniML_HandSem <: RED_SEM MiniML_Ref.R.
+Module MiniML_HandSem <: RED_SEM MiniML_Cal.RedLang.
 
-  Module RF := RED_LANG_Facts MiniML_Ref.R.
-  Import MiniML_PreLang MiniML_Strategy MiniML_Ref.R MiniML_Extras.
+  Module RF := RED_LANG_Facts MiniML_Cal.RedLang.
+  Import MiniML_RefLang MiniML_Strategy.
   Import RF.
 
   Inductive __dec : term -> context' -> decomp' -> Prop :=
@@ -128,12 +128,12 @@ Module MiniML_HandSem <: RED_SEM MiniML_Ref.R.
 
 
   Lemma dec_correct : forall {t k1 k2} {c : context k1 k2} {d}, 
-                          dec t c d -> c[t] = d.
+                          dec t c d -> c[t] = (d : term).
   Proof with auto.
     destruct k1, k2.
     induction 1 using dec_Ind with
-    (P  := fun t c d (_ : __dec t c d)  => c[t] = d)
-    (P0 := fun v c d (_ : decctx v c d) => c[v] = d)...
+    (P  := fun t c d (_ : __dec t c d)  => c[t] = (d : term))
+    (P0 := fun v c d (_ : decctx v c d) => c[v : term] = (d : term))...
   Qed.
 
 
@@ -219,7 +219,7 @@ End MiniML_HandSem.
 
 Module MiniML_REF_SEM_Check.
 
-  Import MiniML_Ref.
+  Import MiniML_RefLang MiniML_Strategy.
 
   Module HS := MiniML_HandSem.
   Module RS := MiniML_RefSem.
@@ -277,7 +277,7 @@ Module MiniML_REF_SEM_Check.
 
 
   Lemma decempty_eqv : 
-      forall t {k} (d : decomp k), HS.decempty t d <-> RS.RS.decempty t d.
+      forall t {k} (d : decomp k), HS.decempty t d <-> RS.decempty t d.
 
   Proof with auto.
     split; 
@@ -291,7 +291,7 @@ Module MiniML_REF_SEM_Check.
 
 
   Lemma iter_eqv : forall {k} (d : decomp k) v, 
-                           HS.iter d v <-> RS.RS.iter d v.
+                           HS.iter d v <-> RS.iter d v.
   Proof.
     split;
  
@@ -309,7 +309,7 @@ Module MiniML_REF_SEM_Check.
 
 
   Theorem eval_eqv : 
-      forall t v, HS.eval t v <-> RS.RS.eval t v.
+      forall t v, HS.eval t v <-> RS.eval t v.
 
   Proof with auto.
     split;
@@ -330,7 +330,7 @@ End MiniML_REF_SEM_Check.
 
 Module MiniML_HandMachine <: ABSTRACT_MACHINE.
 
-  Import MiniML_PreLang.
+  Import MiniML_RefLang.
   Import MiniML_EAM.
 
   Notation "[$ t $]"     := (c_init t)    (t at level 99).

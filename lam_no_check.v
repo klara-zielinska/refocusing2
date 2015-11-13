@@ -8,10 +8,10 @@ Require Import reduction_semantics_facts.
 
 
 
-Module Lam_NO_HandSem <: RED_SEM Lam_NO_Ref.R.
+Module Lam_NO_HandSem <: RED_SEM Lam_NO_Cal.RedLang.
 
-  Module RF := RED_LANG_Facts Lam_NO_Ref.R.
-  Import Lam_NO_PreLang Lam_NO_Ref.R.
+  Module RF := RED_LANG_Facts Lam_NO_Cal.RedLang.
+  Import Lam_NO_RefLang.
   Import RF.
 
 
@@ -111,7 +111,7 @@ Module Lam_NO_HandSem <: RED_SEM Lam_NO_Ref.R.
                            dec (v : term) c d <-> decctx v c d.
 
   Proof with auto. 
-    induction v using Lam_NO_Ref_minus.SX.val_Ind with
+    induction v using val_Ind with
     (P := fun k2 (v : value k2) => forall (k1 : ckind) (c : context k1 k2)
               (d : decomp k1), dec v c d <-> decctx v c d)
     (P0:= fun v0 : valCa => forall (k1 k2 : ckind) (c : context k1 k2) (v : value k2)
@@ -173,11 +173,11 @@ Module Lam_NO_HandSem <: RED_SEM Lam_NO_Ref.R.
   (* Signature entries: *)
 
   Lemma dec_correct : forall {t k1 k2} {c : context k1 k2} {d}, 
-                          dec t c d -> c[t] = d.
+                          dec t c d -> c[t] = (d : term).
   Proof with auto.
     induction 1 using dec_Ind with
-    (P  := fun t _ _ c d (_ : dec t c d)    => c[t] = d)
-    (P0 := fun _ v _ c d (_ : decctx v c d) => c[v] = d)...
+    (P  := fun t _ _ c d (_ : dec t c d)    => c[t] = (d : term))
+    (P0 := fun _ v _ c d (_ : decctx v c d) => c[v : term] = (d : term))...
   Qed.
 
 
@@ -273,7 +273,7 @@ End Lam_NO_HandSem.
 
 Module no_ECCa_REF_SEM_Check.
 
-  Import Lam_NO_PreLang Lam_NO_Ref.R Lam_NO_Ref.ST.
+  Import Lam_NO_RefLang Lam_NO_Strategy.
 
   Module HS := Lam_NO_HandSem.
   Module RS := Lam_NO_RefSem.
@@ -332,7 +332,7 @@ Module no_ECCa_REF_SEM_Check.
 
 
   Lemma decempty_eqv : 
-      forall t {k} (d : decomp k), HS.decempty t d <-> RS.RS.decempty t d.
+      forall t {k} (d : decomp k), HS.decempty t d <-> RS.decempty t d.
 
   Proof with auto.
     split; 
@@ -346,7 +346,7 @@ Module no_ECCa_REF_SEM_Check.
 
 
   Lemma iter_eqv : forall {k} (d : decomp k) v, 
-                           HS.iter d v <-> RS.RS.iter d v.
+                           HS.iter d v <-> RS.iter d v.
   Proof.
     split;
  
@@ -364,7 +364,7 @@ Module no_ECCa_REF_SEM_Check.
 
 
   Theorem eval_eqv : 
-      forall t v, HS.eval t v <-> RS.RS.eval t v.
+      forall t v, HS.eval t v <-> RS.eval t v.
 
   Proof with auto.
     split;
@@ -385,8 +385,7 @@ End no_ECCa_REF_SEM_Check.
 
 Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
 
-  Import Lam_NO_EAM.
-  Import Lam_NO_PreLang.
+  Import Lam_NO_EAM Lam_NO_RefLang.
 
 
   Notation "[$ t $]"     := (c_init t)    (t at level 99).
@@ -480,7 +479,7 @@ Module Lam_NO_Machine_Check.
   Module EAM := Lam_NO_EAM.
   Module HM  := Lam_NO_HandMachine.
   Import EAM HM.
-  Import Lam_NO_PreLang Lam_NO_Strategy.
+  Import Lam_NO_RefLang Lam_NO_Strategy.
 
 
   Notation "c1 >> c2"  := (Lam_NO_EAM.transition c1 c2)  

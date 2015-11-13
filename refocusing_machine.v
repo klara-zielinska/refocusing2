@@ -1,6 +1,6 @@
 Require Import Util.
 Require Import reduction_semantics.
-Require Export strategy_step.
+Require Export reduction_strategy.
 Require Import refocusing_semantics.
 Require Export abstract_machine.
 Require Export refocusing_machine_sig.
@@ -12,8 +12,8 @@ Module PreAbstractMachine (R : RED_LANG) (RS : RED_REF_SEM R)
            : PRE_ABSTRACT_MACHINE R RS.
 
   Module ST := RS.ST.
-  Import R.
   Export ST.
+  Import R.
 
 
   Inductive dec : term -> forall {k1 k2}, context k1 k2 -> decomp k1 -> Prop :=
@@ -141,8 +141,8 @@ Module EvalApplyMachine (R : RED_LANG) (RS : RED_REF_SEM R)
            : EVAL_APPLY_MACHINE R RS.
 
   Module ST := RS.ST.
-  Import R.
   Export ST.
+  Import R.
 
 
   Inductive dec : term -> forall {k1 k2}, context k1 k2 -> value k1 -> Prop :=
@@ -332,12 +332,12 @@ End ProperEAMachine.
 
 
 
-Module PushEnterMachine (R : RED_LANG) (PERS : PE_REF_SEM R)
+Module PushEnterMachine (R : RED_LANG) (PERS : PE_RED_REF_SEM R)
            : PUSH_ENTER_MACHINE R PERS.
 
-  Module ST := PERS.RefSem.ST.
-  Import R.
+  Module ST := PERS.ST.
   Export ST.
+  Import R.
 
 
   Axiom dec_context_not_val : 
@@ -382,10 +382,10 @@ End PushEnterMachine.
 
 
 
-Module ProperPEMachine (R : RED_LANG) (PERS : PE_REF_SEM R) <: ABSTRACT_MACHINE.
+Module ProperPEMachine (R : RED_LANG) (PERS : PE_RED_REF_SEM R) <: ABSTRACT_MACHINE.
 
   Import R.
-  Import PERS.RefSem.ST.
+  Import PERS.ST.
 
 
   Definition term  := term.
@@ -393,8 +393,8 @@ Module ProperPEMachine (R : RED_LANG) (PERS : PE_REF_SEM R) <: ABSTRACT_MACHINE.
 
 
   Inductive conf : Set :=
-  | c_eval  : term -> forall {k1 k2}, context k1 k2 -> conf
-  | c_fin : forall {k}, R.value k                -> conf.
+  | c_eval : term -> forall {k1 k2}, context k1 k2 -> conf
+  | c_fin  : forall {k}, R.value k                 -> conf.
   Definition configuration := conf.
 
   Definition c_init t            := c_eval t [.](init_ckind).
@@ -425,7 +425,7 @@ Module ProperPEMachine (R : RED_LANG) (PERS : PE_REF_SEM R) <: ABSTRACT_MACHINE.
                dec_term t k2 = in_term t0 ec ->
                c_eval t c → c_eval t0 (ec=:c)
 
-  where " a →  b " := (trans a b).
+  where "c1 → c2" := (trans c1 c2).
   Definition transition := trans.
   Hint Unfold transition.
 

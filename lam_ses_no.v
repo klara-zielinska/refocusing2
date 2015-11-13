@@ -8,7 +8,7 @@ Require Import reduction_semantics_facts.
 
 (* Lambda calculus with simple explicit substitution for the normal-order strategy *)
 
-Module Lam_SES_NO_PreLang <: RED_SYNTAX.
+Module Lam_SES_NO_RefLang <: REF_LANG.
 
   Require Export Peano_dec Compare_dec.
 
@@ -288,14 +288,96 @@ Module Lam_SES_NO_PreLang <: RED_SYNTAX.
   Qed.
 
 
-End Lam_SES_NO_PreLang.
+  Lemma value_trivial1 : forall {k} (v : value k) ec t, 
+                             ~dead_ckind (k+>ec) -> ec:[t] = v ->
+                                 exists (v' : value (k+>ec)), t = v'.
+  Proof.
+    intros k v ec t H H0.
+    destruct ec, v; destruct_all sub_tag; destruct_all substitut; 
+    inversion H0; subst;
+    solve
+    [ eautof
+    | auto using valCa_is_valECa ].
+  Qed.
+
+
+  Lemma value_redex : forall {k} (v : value k) (r : redex k), 
+                          value_to_term v <> redex_to_term r.
+  Proof.
+    intros k v r.
+
+    dependent destruction r; dependent destruction v; 
+    simpl;
+    try match goal with 
+    | |- App (valCa_to_term ?v) _ <> _ => dependent_destruction2 v
+    end;
+    destruct_all sub_tag; destruct_all substitut;
+      
+    solve [ discriminate | tauto ].
+  Qed.
+
+
+  Lemma redex_trivial1 : forall {k} (r : redex k) ec t,
+                             ~dead_ckind (k+>ec) -> ec:[t] = r -> 
+                                 exists (v : value (k+>ec)), t = v.
+  Proof.
+    intros k r ec t H H0.
+    destruct ec, r; destruct_all sub_tag; destruct_all substitut; destruct_all_CECaD;
+    inversion H0; subst;
+    try solve 
+    [ eexists (vECaLam _); simpl; eauto
+    | eexists (vCLam _); simpl; eauto
+    | eexists (vDLam _); simpl; eauto
+    | eexists (vECaApp _ _); simpl; eauto
+    | eexists (vCApp _ _); simpl; eauto
+    | eexists (vDApp _ _); simpl; eauto
+    | eexists (vECaVar _); simpl; eauto
+    | eexists (vCVar _); simpl; eauto
+    | eexists (vDVar _); simpl; eauto
+    | match goal with v: valCa |- _ => destruct v; discriminate end ].
+  Qed.
 
 
 
 
-Module Lam_SES_NO_Strategy <: STRATEGY_STEP Lam_SES_NO_PreLang.
+  Definition immediate_subterm t0 t := exists ec, t = ec:[t0].
+  Lemma wf_immediate_subterm : well_founded immediate_subterm.
+  Proof.
+    REF_LANG_Help.prove_st_wf;
 
-  Import Lam_SES_NO_PreLang.
+    solve (*rest with*)
+    [ destruct_all sub_tag; destruct_all substitut;
+      inversion H1; subst; 
+      auto ].
+  Qed.
+
+
+  Definition subterm_order := clos_trans_1n term immediate_subterm.
+  Notation "t1 <| t2" := (subterm_order t1 t2) (at level 70, no associativity).
+  Definition wf_subterm_order : well_founded subterm_order 
+      := wf_clos_trans_l _ _ wf_immediate_subterm.
+
+  Inductive decomp k : Set :=
+  | d_red : forall {k'}, redex k' -> context k k' -> decomp k
+  | d_val : value k -> decomp k.
+  Arguments d_val {k} _. Arguments d_red {k} {k'} _ _.
+
+  Definition decomp_to_term {k} (d : decomp k) :=
+      match d with
+      | d_val v     => value_to_term v
+      | d_red _ r c => c[r]
+      end.
+  Coercion decomp_to_term : decomp >-> term.
+  Notation decomp'   := (@decomp ()).
+
+End Lam_SES_NO_RefLang.
+
+
+
+
+Module Lam_SES_NO_Strategy <: REF_STRATEGY Lam_SES_NO_RefLang.
+
+  Import Lam_SES_NO_RefLang.
 
 
   Inductive interm_dec k : Set :=
@@ -453,110 +535,10 @@ Module Lam_SES_NO_Strategy <: STRATEGY_STEP Lam_SES_NO_PreLang.
     solve [ autof ].
   Qed.
 
-End Lam_SES_NO_Strategy.
 
 
 
-
-Module Lam_SES_NO_Ref_minus <: RED_REF_LANG_minus.
-
-  Module SX := Lam_SES_NO_PreLang.
-  Module ST := Lam_SES_NO_Strategy.
-  Module SXF := RED_SYNTAX_Facts SX.
-  Export Lam_SES_NO_PreLang Lam_SES_NO_Strategy.
-  Import SXF.
-
-
-
-  Module RED_Props.
-
-    Include Lam_SES_NO_PreLang.
-
-    Lemma value_trivial1 : forall {k} (v : value k) ec t, 
-                               ~dead_ckind (k+>ec) -> ec:[t] = v ->
-                                   exists (v' : value (k+>ec)), t = v'.
-    Proof.
-      intros k v ec t H H0.
-      destruct ec, v; destruct_all sub_tag; destruct_all substitut; 
-      inversion H0; subst;
-      solve
-      [ eautof
-      | auto using valCa_is_valECa ].
-    Qed.
-
-
-    Lemma value_redex : forall {k} (v : value k) (r : redex k), 
-                            value_to_term v <> redex_to_term r.
-    Proof.
-      intros k v r.
-
-      dependent destruction r; dependent destruction v; 
-      simpl;
-      try match goal with 
-      | |- App (valCa_to_term ?v) _ <> _ => dependent_destruction2 v
-      end;
-      destruct_all sub_tag; destruct_all substitut;
-      
-      solve [ discriminate | tauto ].
-    Qed.
-
-  End RED_Props.
-
-
-
-
-  Lemma dead_context_dead : 
-      forall {k1 k2}, context k1 k2 -> dead_ckind k1 -> dead_ckind k2.
-
-  Proof with auto.
-    intros ? ? c H; revert c.
-    induction 1.
-    - trivial.
-    - apply death_propagation...
-  Qed.
-
-
-  Lemma redex_trivial1 : forall {k} (r : redex k) ec t,
-                             ~dead_ckind (k+>ec) -> ec:[t] = r -> 
-                                 exists (v : value (k+>ec)), t = v.
-  Proof.
-    intros k r ec t H H0.
-    destruct ec, r; destruct_all sub_tag; destruct_all substitut; destruct_all_CECaD;
-    inversion H0; subst;
-    try solve 
-    [ eexists (vECaLam _); simpl; eauto
-    | eexists (vCLam _); simpl; eauto
-    | eexists (vDLam _); simpl; eauto
-    | eexists (vECaApp _ _); simpl; eauto
-    | eexists (vCApp _ _); simpl; eauto
-    | eexists (vDApp _ _); simpl; eauto
-    | eexists (vECaVar _); simpl; eauto
-    | eexists (vCVar _); simpl; eauto
-    | eexists (vDVar _); simpl; eauto
-    | match goal with v: valCa |- _ => destruct v; discriminate end ].
-  Qed.
-
-
-
-
-  Definition subterm_one_step t0 t := exists ec, t = ec:[t0].
-  Lemma wf_st1 : well_founded subterm_one_step.
-  Proof.
-    RED_REF_LANG_Help.prove_st_wf;
-
-    solve
-    [ destruct_all sub_tag; destruct_all substitut;
-      inversion H1; subst; 
-      auto ].
-  Qed.
-
-
-  Definition subterm_order := clos_trans_1n term subterm_one_step.
-  Notation "t1 <| t2" := (subterm_order t1 t2) (at level 70, no associativity).
-  Definition wf_sto : well_founded subterm_order := wf_clos_trans_l _ _ wf_st1.
-
-
-  Definition ec_order (k : ckind) (t : term) (ec ec0 : elem_context) : Prop :=
+  Definition search_order (k : ckind) (t : term) (ec ec0 : elem_context) : Prop :=
       match k with
       | CBot | D => False
       | _        => match ec, ec0 with 
@@ -564,15 +546,15 @@ Module Lam_SES_NO_Ref_minus <: RED_REF_LANG_minus.
                     | _, _           => False
                     end
       end.
-  Notation "k , t |~  ec1 << ec2 " := (ec_order k t ec1 ec2) 
+  Notation "k , t |~  ec1 << ec2 " := (search_order k t ec1 ec2) 
                (at level 70, t, ec1, ec2 at level 50, no associativity).
 
 
-  Lemma wf_eco : forall k t, well_founded (ec_order k t).
-  Proof. RED_REF_LANG_Help.prove_ec_wf. Qed.
+  Lemma wf_search : forall k t, well_founded (search_order k t).
+  Proof. REF_LANG_Help.prove_ec_wf. Qed.
 
 
-  Lemma ec_order_antisym : forall k t ec ec0, 
+  Lemma search_order_antisym : forall k t ec ec0, 
       k, t |~ ec << ec0 -> ~ k, t |~ ec0 << ec.
 
   Proof.
@@ -582,7 +564,7 @@ Module Lam_SES_NO_Ref_minus <: RED_REF_LANG_minus.
   Qed.
 
 
-  Lemma ec_order_trans :  forall k t ec0 ec1 ec2, 
+  Lemma search_order_trans :  forall k t ec0 ec1 ec2, 
       k,t |~ ec0 << ec1 -> k,t |~ ec1 << ec2 -> 
       k,t |~ ec0 << ec2.
 
@@ -593,7 +575,7 @@ Module Lam_SES_NO_Ref_minus <: RED_REF_LANG_minus.
   Qed.
 
 
-  Lemma ec_order_comp_if : forall t ec0 ec1, 
+  Lemma search_order_comp_if : forall t ec0 ec1, 
       immediate_ec ec0 t -> immediate_ec ec1 t -> 
       forall k, ~ dead_ckind (k+>ec0) -> ~ dead_ckind (k+>ec1) ->
           k,t |~ ec0 << ec1 \/ k,t |~ ec1 << ec0 \/ ec0 = ec1.
@@ -615,7 +597,7 @@ Module Lam_SES_NO_Ref_minus <: RED_REF_LANG_minus.
   Qed.
 
 
-  Lemma ec_order_comp_fi :
+  Lemma search_order_comp_fi :
       forall k t ec0 ec1,  k, t |~ ec0 << ec1 ->
           immediate_ec ec0 t /\ immediate_ec ec1 t /\ 
           ~ dead_ckind (k+>ec0) /\ ~ dead_ckind (k+>ec1).
@@ -629,67 +611,28 @@ Module Lam_SES_NO_Ref_minus <: RED_REF_LANG_minus.
   Qed.
 
 
-  Lemma death_propagation2 : 
-      forall k ec, ~ dead_ckind (k+>ec) -> ~ dead_ckind k.
+
+  Lemma dec_term_red_atom : 
+      forall t k {r : redex k}, dec_term t k = in_red r -> 
+          ~exists ec, immediate_ec ec t /\ ~dead_ckind (k+>ec).
 
   Proof.
-    intuition.
-    apply H.
-    apply death_propagation.
-    assumption.
+    intros t k r H [ec [[t' H0] H1]]. 
+    destruct t, k, ec; 
+    inversion H0; subst; 
+    solve [autof].
   Qed.
 
 
+  Lemma dec_term_val_atom : 
+      forall t k {v : value k}, dec_term t k = in_val v -> 
+          ~exists ec, immediate_ec ec t /\ ~dead_ckind (k+>ec).
 
-
-  Definition only_empty t k := 
-      forall t' {k'} (c : context k k'), c[t'] = t -> ~ dead_ckind k' -> 
-          k = k' /\ c ~= [.](k).
-
-  Definition only_trivial t k := 
-      forall t' {k'} (c : context k k'),  c[t'] = t -> ~ dead_ckind k' -> 
-          k = k' /\ c ~= [.](k) \/ exists (v : value k'), t' = v.
-
-
-  Lemma dec_term_red_empty : 
-      forall t k (r : redex k), dec_term t k = in_red r -> only_empty t k.
-
-  Proof with auto.
-    intros t k r H.
-    destruct t; 
-    inversion H; subst; clear H;
-
-    solve
-    [ intros t0 k' c H H0; generalize dependent t0;
-
-      induction c;
-      intros; simpl in *;
-      [ intuition
-      | destruct (IHc (death_propagation2 _ _ H0) _ H);
-        dep_subst;
-        destruct k2, ec0;
-        solve [inversion H1; auto] 
-    ] ].
-  Qed.
-
-
-  Lemma dec_term_val_empty : forall t k (v : value k), 
-                                 dec_term t k = in_val v -> only_empty t k.
-  Proof with auto.
-    intros t k v H.
-    destruct t;
-    intros t0 k' c H0 H1; generalize dependent t0;
-    solve
-    [ induction c;
-      intros t0 H0; simpl in *;
-      [ intuition
-      | destruct (IHc (death_propagation2 _ _ H1) _ H0); dep_subst;
-        simpl in H;
-        destruct k2, ec0; 
-        destruct_all sub_tag; destruct_all substitut;
-        inversion H; subst; 
-        solve [discriminate H | autof] 
-    ] ].
+  Proof.
+    intros t k r H [ec [[t' H0] H1]]. 
+    destruct t, k, ec; destruct_all sub_tag; destruct_all substitut;
+    inversion H0; subst; 
+    try solve [autof].
   Qed.
 
 
@@ -713,7 +656,7 @@ Module Lam_SES_NO_Ref_minus <: RED_REF_LANG_minus.
     [ autof
     | inversion H;
       intro G;
-      unfold ec_order in G; destruct G as (G, _);
+      unfold search_order in G; destruct G as (G, _);
       destruct G as (t1, G); inversion G; subst;
       destruct v0; 
       autof ].
@@ -762,7 +705,7 @@ Module Lam_SES_NO_Ref_minus <: RED_REF_LANG_minus.
     subst.
 
     destruct k, ec0, ec'; autof;
-    unfold ec_order in H0; destruct H0 as (H, _);
+    unfold search_order in H0; destruct H0 as (H, _);
     destruct (valCa_is_valECa v) as (v0, H0);
 
     solve
@@ -772,11 +715,15 @@ Module Lam_SES_NO_Ref_minus <: RED_REF_LANG_minus.
       trivial ].
   Qed.
 
-End Lam_SES_NO_Ref_minus.
+End Lam_SES_NO_Strategy.
 
 
 
-Module Lam_SES_NO_Ref := mk_RedRefLang Lam_SES_NO_Ref_minus.
+Module Lam_SES_NO_Cal.
+  Module RefLang := Lam_SES_NO_RefLang.
+  Module RefStrategy := Lam_SES_NO_Strategy.
+  Module RedLang := RedRefLang RefLang RefStrategy.
+End Lam_SES_NO_Cal.
 
 
 
@@ -785,7 +732,7 @@ Module Lam_SES_NO_Ref := mk_RedRefLang Lam_SES_NO_Ref_minus.
 
 Module Lam_SES_NO_AlterContexts.
 
-  Import Lam_SES_NO_PreLang.
+  Import Lam_SES_NO_RefLang.
 
   Inductive ckind_IO := Aio | Cio | Dio.
 
@@ -967,5 +914,5 @@ End Lam_SES_NO_AlterContexts.
 Require Import refocusing_semantics_derivation.
 Require Import refocusing_machine.
 
-Module Lam_SES_NO_RefSem := RedRefSem Lam_SES_NO_Ref.
-Module Lam_SES_NO_EAM    := ProperEAMachine Lam_SES_NO_Ref.R Lam_SES_NO_RefSem.
+Module Lam_SES_NO_RefSem := RedRefSem Lam_SES_NO_Cal.
+Module Lam_SES_NO_EAM    := ProperEAMachine Lam_SES_NO_Cal.RedLang Lam_SES_NO_RefSem.

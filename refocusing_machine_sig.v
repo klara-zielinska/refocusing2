@@ -8,8 +8,8 @@ Require Import abstract_machine.
 Module Type PRE_ABSTRACT_MACHINE (R : RED_LANG) (RS : RED_REF_SEM R).
 
   Module ST := RS.ST.
-  Import R.
   Export ST.
+  Import R.
 
 
   Inductive dec : term -> forall {k1 k2}, context k1 k2 -> decomp k1 -> Prop :=
@@ -135,8 +135,8 @@ End STAGED_ABSTRACT_MACHINE.
 Module Type EVAL_APPLY_MACHINE (R : RED_LANG) (RS : RED_REF_SEM R).
 
   Module ST := RS.ST.
-  Import R.
   Export ST.
+  Import R.
 
 
   Inductive dec : term -> forall {k1 k2}, context k1 k2 -> value k1 -> Prop :=
@@ -292,11 +292,11 @@ End PROPER_EA_MACHINE.
 
 
 
-Module Type PUSH_ENTER_MACHINE (R : RED_LANG) (PERS : PE_REF_SEM R).
+Module Type PUSH_ENTER_MACHINE (R : RED_LANG) (PERS : PE_RED_REF_SEM R).
 
-  Module ST := PERS.RefSem.ST.
-  Import R.
+  Module ST := PERS.ST.
   Export ST.
+  Import R.
 
 
   Axiom dec_context_not_val : 
@@ -341,10 +341,10 @@ End PUSH_ENTER_MACHINE.
 
 
 
-Module Type PROPER_PE_MACHINE (R : RED_LANG) (PERS : PE_REF_SEM R) <: DET_ABSTRACT_MACHINE.
+Module Type PROPER_PE_MACHINE (R : RED_LANG) (PERS : PE_RED_REF_SEM R) <: DET_ABSTRACT_MACHINE.
 
   Import R.
-  Import PERS.RefSem.ST.
+  Import PERS.ST.
 
 
   Definition term  := term.

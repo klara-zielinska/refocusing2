@@ -10,10 +10,10 @@ Require Import lam_ses_no.
 
 
 
-Module Lam_SES_NO_HandSem <: RED_SEM Lam_SES_NO_Ref.R.
+Module Lam_SES_NO_HandSem <: RED_SEM Lam_SES_NO_Cal.RedLang.
 
-  Module RF := RED_LANG_Facts Lam_SES_NO_Ref.R.
-  Import Lam_SES_NO_PreLang Lam_SES_NO_Ref.R.
+  Module RF := RED_LANG_Facts Lam_SES_NO_RefLang.
+  Import Lam_SES_NO_RefLang.
   Import RF.
 
 
@@ -153,7 +153,7 @@ Module Lam_SES_NO_HandSem <: RED_SEM Lam_SES_NO_Ref.R.
                            dec (v : term) c d <-> decctx v c d.
 
   Proof with auto.
-    induction v using Lam_SES_NO_Ref_minus.SX.val_Ind with
+    induction v using val_Ind with
     (P := fun k2 (v : value k2) => forall (k1 : ckind) (c : context k1 k2)
               (d : decomp k1), dec (v : term) c d <-> decctx v c d)
     (P0:= fun v0 : valCa => forall (k1 k2 : ckind) (c : context k1 k2) (v : value k2)
@@ -333,7 +333,7 @@ End Lam_SES_NO_HandSem.
 
 Module Lam_SES_NO_RefSem_Check.
 
-  Import Lam_SES_NO_PreLang Lam_SES_NO_Ref.R Lam_SES_NO_Ref.ST.
+  Import Lam_SES_NO_RefLang Lam_SES_NO_Strategy.
 
   Module HS := Lam_SES_NO_HandSem.
   Module RS := Lam_SES_NO_RefSem.
@@ -396,7 +396,7 @@ Module Lam_SES_NO_RefSem_Check.
 
 
   Lemma decempty_eqv : 
-      forall t {k} (d : decomp k), HS.decempty t d <-> RS.RS.decempty t d.
+      forall t {k} (d : decomp k), HS.decempty t d <-> RS.decempty t d.
 
   Proof with auto.
     split; 
@@ -410,7 +410,7 @@ Module Lam_SES_NO_RefSem_Check.
 
 
   Lemma iter_eqv : forall {k} (d : decomp k) v, 
-                           HS.iter d v <-> RS.RS.iter d v.
+                           HS.iter d v <-> RS.iter d v.
   Proof.
     split;
  
@@ -428,7 +428,7 @@ Module Lam_SES_NO_RefSem_Check.
 
 
   Theorem eval_eqv : 
-      forall t v, HS.eval t v <-> RS.RS.eval t v.
+      forall t v, HS.eval t v <-> RS.eval t v.
 
   Proof with auto.
     split;
@@ -450,7 +450,7 @@ End Lam_SES_NO_RefSem_Check.
 Module Lam_SES_NO_HandMachine <: ABSTRACT_MACHINE.
 
   Import Lam_SES_NO_EAM.
-  Import Lam_SES_NO_PreLang.
+  Import Lam_SES_NO_RefLang.
 
   Definition contextD := (context C C + context C ECa + context C D) %type.
   Definition contextC := (context C C + context C ECa) %type.
@@ -603,7 +603,7 @@ Module Lam_SES_NO_Machine_Check.
   Module EAM := Lam_SES_NO_EAM.
   Module HM  := Lam_SES_NO_HandMachine.
   Import EAM HM.
-  Import Lam_SES_NO_PreLang Lam_SES_NO_Strategy.
+  Import Lam_SES_NO_RefLang Lam_SES_NO_Strategy.
 
 
   Notation "c1 >> c2"  := (Lam_SES_NO_EAM.transition c1 c2)  

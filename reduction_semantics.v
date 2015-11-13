@@ -54,11 +54,15 @@ Require Import Program.
 
 
 
-Module Type RED_SYNTAX.
+(* Signature for languages with reduction semantics and multiple kinds of contextes. *)
 
-  Parameters term : Set.
+Module Type RED_LANG.
+
+  (* Preconditions: To instaniate this module you need to determinizethe grammar of 
+     contextes. *)
 
 
+  Parameter term : Set.
   Parameter elem_context : Set.
   Parameter ckind : Set. (* kinds of contexts, that is, non-terminal context symbols 
                             in the grammar *)
@@ -88,6 +92,18 @@ Module Type RED_SYNTAX.
   Notation "[.]"      := empty.
   Notation "[.]( k )" := (@empty k).
   Infix    "=:"       := ccons (at level 60, right associativity).
+
+
+  (* Note: Contexts are reversed, because during evaluation by refocusing we always 
+     access the elem. context nearest to the hole of a context. *)
+
+
+  (* Definition: The hole of a context is >dead< if its kind is a sink symbol. *)
+
+  (* Definition: A context is >proper< if its hole is not dead. 
+     (Context with dead holes are contexts that cannot be generated in the orginal
+     grammar.) *)
+
 
 
   (* Standard contexts composition: *)
@@ -144,6 +160,8 @@ Module Type RED_SYNTAX.
 
 
 
+
+  Parameter  init_ckind : ckind.         (* start symbol in the grammar *)
   Parameter  dead_ckind : ckind -> Prop. (* set of sink symbols; if your grammar
                                             is not total you need to introduce at least
                                             one *)
@@ -156,54 +174,10 @@ Module Type RED_SYNTAX.
       forall k, dead_ckind k -> ~ exists (r : redex k), True.
 
 
-End RED_SYNTAX.
-
-
-
-(* Signature for languages with reduction semantics and multiple kinds of contextes. *)
-
-Module Type RED_LANG <: RED_SYNTAX.
-
-  (* Preconditions: To instaniate this module you need to determinizethe grammar of 
-     contextes. *)
-
-  (*Declare Module SX : RED_SYNTAX.
-  Export SX.*)
-
-  Include RED_SYNTAX.
-
-
-  Parameter  init_ckind : ckind.         (* start symbol in the grammar *)
-
-
-  (* Note: Contexts are reversed, because during evaluation by refocusing we always 
-     access the elem. context nearest to the hole of a context. *)
-
-
-  (* Definition: The hole of a context is >dead< if its kind is a sink symbol. *)
-
-  (* Definition: A context is >proper< if its hole is not dead. 
-     (Context with dead holes are contexts that cannot be generated in the orginal
-     grammar.) *)
-
-
-
-
 
 
   (* Definition: A decomposition c[t] is empty if c is empty. *)
   (* Definition: A decomposition c[t] is proper if c is proper. *)
-
-  (* only_empty t k   - the term t has only empty or improper decompositions from 
-                        the symbol k.
-     only_trivial t k - each proper decomposition of the term t from the symbol k is 
-                        either empty or the component term is a value. *)
-(*  Definition only_empty t k :=
-      forall t' {k'} (c : context k k'), c[t'] = t -> ~ dead_ckind k' -> 
-          k = k' /\ c ~= [.](k).
-  Definition only_trivial t k :=
-      forall t' {k'} (c : context k k'), c[t'] = t -> ~ dead_ckind k' -> 
-          k = k' /\ c ~= [.](k) \/ exists (v : value k'), t' = v.*)
 
 
   (* Axioms of normal forms: *)
@@ -257,8 +231,7 @@ Module Type RED_SEM (R : RED_LANG).
 
   (* Decomposition relation 
      dec t c d - the term c[t] can be decomposed to d. *)
-  Parameter dec : 
-      term -> forall {k1 k2}, context k1 k2 -> decomp k1 -> Prop.
+  Parameter dec : term -> forall {k1 k2}, context k1 k2 -> decomp k1 -> Prop.
 
   Axiom dec_correct  : forall {t k1 k2} {c : context k1 k2} {d}, 
                            dec t c d -> c[t] = d.
@@ -309,12 +282,10 @@ End RED_SEM.
 
 (* Signature for deterministic reduction semantics *)
 
-Module Type DET_RED_SEM (R : RED_LANG).
+Module Type DET_RED_SEM (R : RED_LANG) <: RED_SEM R.
 
-  Declare Module RS : RED_SEM R.
-
+  Include RED_SEM R.
   Import R.
-  Export RS.
 
 
   Axiom dec_is_function  : forall {t k} {d d0 : decomp k}, 

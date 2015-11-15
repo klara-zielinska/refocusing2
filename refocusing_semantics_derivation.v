@@ -326,7 +326,7 @@ Module RedRefSem (R : REF_CALCULI) <: RED_REF_SEM (R.RedLang).
       assert (H := dec_redex_self_e r);
       generalize c.
 
-      (* induction on H *) Print dec_Ind.
+      (* induction on H *)
       apply dec_Ind with
 
       (P  := fun t k1' k2' c0 d (_ : dec t c0 d) => 
@@ -374,6 +374,77 @@ Module RedRefSem (R : REF_CALCULI) <: RED_REF_SEM (R.RedLang).
     Qed.
 
 
+
+  Lemma dec_under_redex : 
+      forall ec t {k} (r : redex k), ec:[t] = r -> ~dead_ckind (k+>ec) -> 
+          forall {k0} (c : context k0 k), dec t (ec=:c) (d_red r c).
+  Proof.
+    intros ec t k r H H0 k0 c.
+    assert (exists (v : value (k+>ec)), t = v) as [v H1];
+              eauto using redex_trivial1.
+    subst.
+    apply val_dec.
+    induction ec using (well_founded_ind (wf_search k r)).
+    remember (dec_context ec _ v) as D eqn:HeqD; destruct D;
+    assert (H2 := dec_context_correct ec _ v);
+    rewrite <- HeqD in H2.
+    - constructor 2. 
+      assert (r = r0). 
+      { apply redex_to_term_injective; congruence. }
+      congruence.
+    - econstructor 4.
+      symmetry; apply HeqD.
+      assert (exists (v' : value (k+>e)), t = v') as [v' H3].
+      { rewrite H2 in H; eauto using redex_trivial1, dec_context_next_alive. }
+      subst. 
+      apply val_dec.
+      apply H1.
+      + symmetry in HeqD; destruct (dec_context_term_next _ _ _ HeqD) as [H3 _].
+        congruence. 
+      + eauto using dec_context_next_alive.
+      + congruence.
+    - assert ((v0 : term) = r).
+      { congruence. }
+      exfalso; eauto using (value_redex v0 r).
+    - autof.
+  Qed.
+
+
+  Lemma dec_under_value : 
+      forall ec t {k} (v : value k), ec:[t] = v -> ~dead_ckind (k+>ec) -> 
+          forall {k0} (c : context k0 k) d, decctx v c d -> dec t (ec=:c) d.
+  Proof.
+    intros ec t k v H H0 k0 c d H1.
+    assert (exists (v : value (k+>ec)), t = v) as [v0 H2];
+              eauto using value_trivial1.
+    subst.
+    apply val_dec.
+    induction ec using (well_founded_ind (wf_search k v)).
+    remember (dec_context ec _ v0) as D eqn:HeqD; destruct D;
+    assert (H3 := dec_context_correct ec _ v0);
+    rewrite <- HeqD in H3.
+    - assert ((v : term) = r).
+      { congruence. }
+      exfalso; eauto using (value_redex v r).
+    - econstructor 4.
+      + symmetry; apply HeqD.
+      + assert (exists (v' : value (k+>e)), t = v') as [v' H4].
+        { rewrite H3 in H; eauto using value_trivial1, dec_context_next_alive. }
+        subst. 
+        apply val_dec.
+        apply H2.
+        * symmetry in HeqD; destruct (dec_context_term_next _ _ _ HeqD) as [H4 _].
+          congruence. 
+        * eauto using dec_context_next_alive.
+        * congruence.
+    - assert (v = v1).
+      { apply value_to_term_injective; congruence. }
+      subst.
+      econstructor 3; eauto.
+    - autof.
+  Qed.
+
+
   Lemma dec_plug : 
       forall {k1 k2} (c : context k1 k2) {k3} {c0 : context k3 k1} {t d}, 
           ~ dead_ckind k2 -> dec c[t] c0 d -> dec t (c~+c0) d.
@@ -389,12 +460,10 @@ Module RedRefSem (R : REF_CALCULI) <: RED_REF_SEM (R.RedLang).
             rewrite H6 in hh.
 
         + dep_subst.
-          contradiction (dec_term_red_atom _ _ H6).
-          solve [unfold immediate_ec; eauto].
+          auto using dec_under_redex.
 
         + dep_subst.
-          contradiction (dec_term_val_atom _ _ H6).
-          solve [unfold immediate_ec; eauto].
+          eauto using dec_under_value.
 
         + dep_subst.
           destruct search_order_comp_if with ec:[t] ec0 ec k2 as [H2 | [H2 | H2]].
@@ -450,16 +519,44 @@ Module RedRefSem (R : REF_CALCULI) <: RED_REF_SEM (R.RedLang).
 
       - trivial.
 
-      - apply IHc; clear IHc.
-        eapply death_propagation2...
-        remember (dec_term ec:[t] k2) as i.
-        destruct i;
-        assert (hh := dec_term_correct ec:[t] k2);
-        rewrite <- Heqi in hh;
-        symmetry in Heqi.
+      - apply IHc; clear IHc;
+            eauto using death_propagation2.
 
-        + destruct (dec_term_red_atom _ _ Heqi).
-          solve [unfold immediate_ec; eauto ].
+        remember (dec_term ec:[t] k2) as D;
+        symmetry in HeqD;
+        destruct D;
+        assert (DTC2 := dec_term_correct ec:[t] k2);
+        rewrite HeqD in DTC2;
+        subst.
+        + cut (d = d_red r (c~+c0)).
+          { intro; subst; constructor; auto. }
+
+          destruct (redex_trivial1 _ _ _ H DTC2) as [v ?]; subst t.
+          eapply dec_val in H0.
+
+          clear HeqD.
+          induction ec using (well_founded_ind (wf_search k2 r)).
+
+          dependent destruction H0; dep_subst; 
+          simpl in x; inversion_ccons x;
+          assert (DCC := dec_context_correct ec k2 v);
+          rewrite H0 in DCC.
+          * assert (r = r0).
+            { apply redex_to_term_injective; congruence. }
+            subst.
+            constructor...
+          * assert ((v0 : term) = r).
+            { congruence. }
+            exfalso; eauto using (value_redex v0 r).
+          * assert (H3 := dec_context_next_alive _ _ _ H0).
+            destruct (redex_trivial1 r ec1 t) as [v' ?]; 
+                try solve [auto | congruence].
+            subst t.
+            eapply (H1 ec1);
+            solve
+            [ rewrite <- DTC2; destruct (dec_context_term_next _ _ _ H0); auto
+            | eauto using dec_val
+            | congruence ].
 
         + destruct search_order_comp_if with ec:[t] e ec k2 as [H1 | [H1 | H1]].
               compute...
@@ -467,35 +564,35 @@ Module RedRefSem (R : REF_CALCULI) <: RED_REF_SEM (R.RedLang).
               eapply dec_term_next_alive...
               assumption.
 
-          * contradict (dec_term_term_top _ _ Heqi _ H1).
+          * contradict (dec_term_term_top _ _ HeqD _ H1).
 
-          * destruct (elem_context_det _ _ hh _ _ H1) as (v, H2)...
+          * destruct (elem_context_det _ _ DTC2 _ _ H1) as (v, H2)...
             subst t0.
             econstructor 3; eauto.
             {
-              clear H Heqi; generalize dependent v; generalize dependent e.
+              clear H HeqD; generalize dependent v; generalize dependent e.
               induction e using (well_founded_ind (wf_search k2 ec:[t])); intros.
 
               apply val_dec.
-              remember (dec_context e _ v).
-              destruct i;
-                  symmetry in Heqi;
+              remember (dec_context e _ v) as D.
+              destruct D;
+                  symmetry in HeqD;
                   assert (ht := dec_context_correct e _ v); 
-                  rewrite Heqi in ht.
+                  rewrite HeqD in ht.
 
-              - rewrite hh in H1;
-                contradiction (dec_context_red_bot _ _ _ Heqi _ H1).
+              - rewrite DTC2 in H1;
+                contradiction (dec_context_red_bot _ _ _ HeqD _ H1).
 
-              - destruct (dec_context_term_next _ _ _ Heqi) as (H3, H4).
+              - destruct (dec_context_term_next _ _ _ HeqD) as (H3, H4).
                 econstructor 4...
-                rewrite <- hh in ht.
+                rewrite <- DTC2 in ht.
                 destruct search_order_comp_if with ec:[t] e0 ec k2 as [H5 | [H5 | H5]].
                     compute...
                     compute...
                     apply (search_order_comp_fi _ _ _ _ H3).
                     apply (search_order_comp_fi _ _ _ _ H1).
 
-                + rewrite hh in H1; 
+                + rewrite DTC2 in H1; 
                   contradiction (H4 ec H1). 
                   congruence.
                 + destruct (elem_context_det _ _ ht _ _ H5) as (v0, H6)...
@@ -506,23 +603,48 @@ Module RedRefSem (R : REF_CALCULI) <: RED_REF_SEM (R.RedLang).
                   assert (H5 := elem_plug_injective1 _ ht).
                   subst...
 
-              - rewrite hh in H1;
-                contradiction (dec_context_val_bot _ _ _ Heqi _ H1).
+              - rewrite DTC2 in H1;
+                contradiction (dec_context_val_bot _ _ _ HeqD _ H1).
 
               - contradict ht.
                 eapply search_order_comp_fi...
             }
 
           * subst.
-            assert (H5 := elem_plug_injective1 _ hh).
+            assert (H5 := elem_plug_injective1 _ DTC2).
             subst.
             econstructor 3...
 
-        + destruct (dec_term_val_atom _ _ Heqi).
-          solve [unfold immediate_ec; eauto].
+        + cut (decctx v (c~+c0) d).
+          { intro; econstructor; eauto. }
+          
+          destruct (value_trivial1 _ _ H DTC2) as [v' ?]; subst t.
+          capture_all value @value_to_term.
+          eapply dec_val in H0.
 
-        + contradict H...
-          apply death_propagation...
+          clear HeqD.
+          induction ec using (well_founded_ind (wf_search k2 v)).
+
+          assert (DCC := dec_context_correct ec k2 v').
+          dependent destruction H0; simpl in x; inversion_ccons x;
+          rewrite H0 in DCC.
+          * exfalso.
+            assert ((v : term) = r).
+            { congruence. }
+            eauto using (value_redex v r).
+          * replace v0 with v in * by (apply value_to_term_injective; congruence).
+            eauto.
+          * destruct (@value_trivial1 _ v ec1 t) as [v'' ?];
+                try solve [eauto using dec_context_next_alive | congruence].
+            capture_all value @value_to_term.
+            subst t.
+            apply (H1 ec1) with (v':=v'');
+            solve
+            [ destruct (dec_context_term_next ec k2 v' H0); rewrite <- DTC2; eauto
+            | eauto using dec_context_next_alive, dec_val
+            | congruence ].
+
+        + exfalso; eauto using death_propagation.
   Qed.
 
 

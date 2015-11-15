@@ -142,6 +142,7 @@ Module Type RED_STRATEGY_STEP (R : RED_STRATEGY_LANG).
       | in_dead       => dead_ckind (k+>ec) 
       end.
 
+
   Axiom dec_context_from_dead : forall ec k (v : value (k+>ec)), 
       dead_ckind (k+>ec) -> dec_context ec k v = in_dead.
 
@@ -170,13 +171,13 @@ Module Type RED_STRATEGY (R : RED_STRATEGY_LANG).
                (at level 70, t, ec1, ec2 at level 50, no associativity).
 
 
-  Axiom dec_term_red_atom : 
+(*  Axiom dec_term_red_atom : 
       forall t k {r : redex k}, dec_term t k = in_red r -> 
           ~exists ec, immediate_ec ec t /\ ~dead_ckind (k+>ec).
 
   Axiom dec_term_val_atom : 
       forall t k {v : value k}, dec_term t k = in_val v -> 
-          ~exists ec, immediate_ec ec t /\ ~dead_ckind (k+>ec).
+          ~exists ec, immediate_ec ec t /\ ~dead_ckind (k+>ec).*)
 
   Axiom dec_term_term_top : 
       forall t k {t' ec}, dec_term t k = in_term t' ec -> 

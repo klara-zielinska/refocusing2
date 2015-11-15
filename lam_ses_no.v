@@ -612,7 +612,7 @@ Module Lam_SES_NO_Strategy <: REF_STRATEGY Lam_SES_NO_RefLang.
 
 
 
-  Lemma dec_term_red_atom : 
+(*  Lemma dec_term_red_atom : 
       forall t k {r : redex k}, dec_term t k = in_red r -> 
           ~exists ec, immediate_ec ec t /\ ~dead_ckind (k+>ec).
 
@@ -633,7 +633,7 @@ Module Lam_SES_NO_Strategy <: REF_STRATEGY Lam_SES_NO_RefLang.
     destruct t, k, ec; destruct_all sub_tag; destruct_all substitut;
     inversion H0; subst; 
     try solve [autof].
-  Qed.
+  Qed.*)
 
 
   Lemma dec_term_term_top : forall t k {t' ec}, 

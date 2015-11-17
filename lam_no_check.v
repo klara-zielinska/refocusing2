@@ -16,28 +16,28 @@ Module Lam_NO_HandSem <: RED_SEM Lam_NO_Cal.RedLang.
 
 
 
-  Inductive __dec : term -> forall {k1 k2}, context k1 k2 -> decomp k1 -> Prop :=
+  Inductive dec' : term -> forall {k1 k2}, context k1 k2 -> decomp k1 -> Prop :=
 
   | d_VarC   : forall x {k1} (c : context k1 C) d,
                  decctx (vCVar x) c d ->
-                 __dec (Var x) c d 
+                 dec' (Var x) c d 
   | d_VarECa : forall x {k1} (c : context k1 ECa) d,
                  decctx (vECaVar x) c d ->
-                 __dec (Var x) c d 
+                 dec' (Var x) c d 
 
   | d_LamC   : forall x t {k1} (c : context k1 C) d,
-                 __dec t (lam_c x =: c) d -> (*!*)
-                 __dec (Lam x t) c d
+                 dec' t (lam_c x =: c) d -> (*!*)
+                 dec' (Lam x t) c d
   | d_LamECa : forall x t {k1} (c : context k1 ECa) d,
                  decctx (vECaLam x t) c d -> (*!*)
-                 __dec (Lam x t) c d
+                 dec' (Lam x t) c d
 
   | d_AppC   : forall t1 t2 {k1} (c : context k1 C) d,
-                 __dec t1 (ap_r t2 =: c) d ->
-                 __dec (App t1 t2) c d
+                 dec' t1 (ap_r t2 =: c) d ->
+                 dec' (App t1 t2) c d
   | d_AppECa : forall t1 t2 {k1} (c : context k1 ECa) d,
-                 __dec t1 (ap_r t2 =: c) d ->
-                 __dec (App t1 t2) c d
+                 dec' t1 (ap_r t2 =: c) d ->
+                 dec' (App t1 t2) c d
 
 
   with decctx : forall {k2}, value k2 -> 
@@ -53,17 +53,17 @@ Module Lam_NO_HandSem <: RED_SEM Lam_NO_Cal.RedLang.
                       decctx (vECaLam x t0) (ap_r t =: c) (d_red (rECaApp x t0 t) c)
 
   | dc_ap_rVarC   : forall x t {k1} (c : context k1 C) d,
-                      __dec t (ap_l (vCaVar x) =: c) d ->
+                      dec' t (ap_l (vCaVar x) =: c) d ->
                       decctx (vECaVar x) (ap_r t =: c) d
   | dc_ap_rVarECa : forall x t {k1} (c : context k1 ECa) d,
-                      __dec t (ap_l (vCaVar x) =: c) d ->
+                      dec' t (ap_l (vCaVar x) =: c) d ->
                       decctx (vECaVar x) (ap_r t =: c) d
 
   | dc_ap_rAppC   : forall v1 v2 t {k1} (c : context k1 C) d,
-                      __dec t (ap_l (vCaApp v1 v2) =: c) d ->
+                      dec' t (ap_l (vCaApp v1 v2) =: c) d ->
                       decctx (vECaApp v1 v2) (ap_r t =: c) d
   | dc_ap_rAppECa : forall v1 v2 t {k1} (c : context k1 ECa) d,
-                      __dec t (ap_l (vCaApp v1 v2) =: c) d ->
+                      dec' t (ap_l (vCaApp v1 v2) =: c) d ->
                       decctx (vECaApp v1 v2) (ap_r t =: c) d
 
   | dc_ap_lC      : forall v1 v2 {k1} (c : context k1 C) d,
@@ -77,9 +77,9 @@ Module Lam_NO_HandSem <: RED_SEM Lam_NO_Cal.RedLang.
                       decctx (vCLam x v) c d ->
                       decctx v (lam_c x =: c) d.
 
-  Definition dec := __dec. Arguments dec t {k1 k2} c d.
+  Definition dec := dec'. Arguments dec t {k1 k2} c d.
 
-  Scheme dec_Ind    := Induction for __dec Sort Prop
+  Scheme dec_Ind    := Induction for dec' Sort Prop
     with decctx_Ind := Induction for decctx Sort Prop.
 
 

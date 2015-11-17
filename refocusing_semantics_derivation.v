@@ -262,8 +262,6 @@ Module RedRefSem (R : REF_CALCULI) <: RED_REF_SEM (R.RedLang).
   Qed.
 
 
-
-
   Lemma dec_redex_self_e : forall {k} (r : redex k), dec r [.] (d_red r [.]).
   Proof with eauto.
     intros; 
@@ -354,7 +352,6 @@ Module RedRefSem (R : REF_CALCULI) <: RED_REF_SEM (R.RedLang).
   Qed.
 
 
-
   Lemma dec_correct : 
       forall t {k1 k2} (c : context k1 k2) d, dec t c d -> c[t] = d.
 
@@ -372,7 +369,6 @@ Module RedRefSem (R : REF_CALCULI) <: RED_REF_SEM (R.RedLang).
       rewrite hh;
       solve [auto].
     Qed.
-
 
 
   Lemma dec_under_redex : 
@@ -680,15 +676,6 @@ Module RedRefSem (R : REF_CALCULI) <: RED_REF_SEM (R.RedLang).
 
 
   Module ST := R.RefStrategy.
-
-  (*Definition dec_term    := dec_term.
-  Definition dec_context := dec_context.
-
-  Definition dec_term_correct      := dec_term_correct.
-  Definition dec_context_correct   := dec_context_correct.
-  Definition dec_term_next_alive   := dec_term_next_alive.
-  Definition dec_term_from_dead    := dec_term_from_dead.
-  Definition dec_context_from_dead := dec_context_from_dead.*)
 
 End RedRefSem.
 

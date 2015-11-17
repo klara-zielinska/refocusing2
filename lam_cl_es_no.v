@@ -30,13 +30,13 @@ Module Lam_ClES_NO_RefLang <: REF_LANG.
   Notation "t @ s" := (Cl t s) (at level 10).
 
 
-  Inductive __term : Set := 
-  | Var   : nat               -> __term
-  | Lam   : __term            -> __term
-  | App   : __term -> __term  -> __term
-  | Cl_t  : closure           -> __term
-  | OpVar : nat -> env -> nat -> __term.
-  Definition term := __term.
+  Inductive term' : Set := 
+  | Var   : nat               -> term'
+  | Lam   : term'             -> term'
+  | App   : term' -> term'    -> term'
+  | Cl_t  : closure           -> term'
+  | OpVar : nat -> env -> nat -> term'.
+  Definition term := term'.
   Hint Unfold term.
 
 
@@ -778,9 +778,11 @@ Require Import refocusing_semantics_derivation.
 Require Import refocusing_machine.
 
 Module Lam_ClES_NO_RefSem := RedRefSem Lam_ClES_NO_Cal.
-Module Lam_ClES_NO_EAM    := ProperEAMachine Lam_ClES_NO_Cal.RedLang Lam_ClES_NO_RefSem.
+Module Lam_ClES_NO_EAM    := RefEvalApplyMachine Lam_ClES_NO_Cal.RedLang Lam_ClES_NO_RefSem.
 
 
+
+Require Import abstract_machine.
 
 Module Lam_ClES_NO_EAM_safe <: AM_SAFE_REGION Lam_ClES_NO_EAM.
 

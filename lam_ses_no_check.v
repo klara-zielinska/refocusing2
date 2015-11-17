@@ -2,8 +2,8 @@ Require Import Util.
 Require Import Program.
 Require Import refocusing_semantics.
 Require Import refocusing_semantics_derivation.
+Require Import abstract_machine.
 Require Import refocusing_machine.
-Require Import refocusing_machine_correct.
 Require Import reduction_semantics_facts.
 Require Import lam_ses_no.
 
@@ -17,37 +17,37 @@ Module Lam_SES_NO_HandSem <: RED_SEM Lam_SES_NO_Cal.RedLang.
   Import RF.
 
 
-  Inductive __dec : term -> forall {k1 k2}, context k1 k2 -> decomp k1 -> Prop :=
+  Inductive dec' : term -> forall {k1 k2}, context k1 k2 -> decomp k1 -> Prop :=
 
   | d_Var    : forall n {k1 k2} (c : context k1 k2) d, CECaD k2 ->
                  decctx (vVar n k2) c d ->
-                 __dec (Var n) c d
+                 dec' (Var n) c d
 
   | d_LamC   : forall t {k1} (c : context k1 C) d,
-                 __dec t (lam_c =: c) d -> (*!*)
-                 __dec (Lam t) c d
+                 dec' t (lam_c =: c) d -> (*!*)
+                 dec' (Lam t) c d
   | d_LamECa : forall t {k1} (c : context k1 ECa) d,
                  decctx (vECaLam t) c d -> (*!*)
-                 __dec (Lam t) c d
+                 dec' (Lam t) c d
   | d_LamD  : forall t {k1} (c : context k1 D) d,
                  decctx (vDLam t) c d -> (*!*)
-                 __dec (Lam t) c d
+                 dec' (Lam t) c d
 
   | d_App    : forall t1 t2 {k1 k2} (c : context k1 k2) d, CECa k2 ->
-                 __dec t1 (ap_r t2 =: c) d ->
-                 __dec (App t1 t2) c d
+                 dec' t1 (ap_r t2 =: c) d ->
+                 dec' (App t1 t2) c d
 
   | d_AppD   : forall t1 t2 {k1} (c : context k1 D) d,
                  decctx (vDApp t1 t2) c d ->
-                 __dec (App t1 t2) c d
+                 dec' (App t1 t2) c d
 
   | d_Sub    : forall t1 n t2 {k1 k2} (c : context k1 k2) d, CECaD k2 ->
-                 __dec t1 (stag_c (n, st_sub t2) =: c) d ->
-                 __dec (Sub t1 n t2) c d
+                 dec' t1 (stag_c (n, st_sub t2) =: c) d ->
+                 dec' (Sub t1 n t2) c d
 
   | d_Shift  : forall t1 n m {k1 k2} (c : context k1 k2) d, CECaD k2 ->
-                 __dec t1 (stag_c (n, st_shift m) =: c) d ->
-                 __dec (Shift t1 n m) c d
+                 dec' t1 (stag_c (n, st_shift m) =: c) d ->
+                 dec' (Shift t1 n m) c d
 
 
   with decctx : forall {k2}, value k2 -> 
@@ -63,17 +63,17 @@ Module Lam_SES_NO_HandSem <: RED_SEM Lam_SES_NO_Cal.RedLang.
                       decctx (vECaLam t0) (ap_r t =: c) (d_red (rECaApp t0 t) c)
 
   | dc_ap_rVarC   : forall n t {k1} (c : context k1 C) d,
-                      __dec t (ap_l (vCaVar n) =: c) d ->
+                      dec' t (ap_l (vCaVar n) =: c) d ->
                       decctx (vECaVar n) (ap_r t =: c) d
   | dc_ap_rVarECa : forall n t {k1} (c : context k1 ECa) d,
-                      __dec t (ap_l (vCaVar n) =: c) d ->
+                      dec' t (ap_l (vCaVar n) =: c) d ->
                       decctx (vECaVar n) (ap_r t =: c) d
 
   | dc_ap_rAppC   : forall v1 v2 t {k1} (c : context k1 C) d,
-                      __dec t (ap_l (vCaApp v1 v2) =: c) d ->
+                      dec' t (ap_l (vCaApp v1 v2) =: c) d ->
                       decctx (vECaApp v1 v2) (ap_r t =: c) d
   | dc_ap_rAppECa : forall v1 v2 t {k1} (c : context k1 ECa) d,
-                      __dec t (ap_l (vCaApp v1 v2) =: c) d ->
+                      dec' t (ap_l (vCaApp v1 v2) =: c) d ->
                       decctx (vECaApp v1 v2) (ap_r t =: c) d
 
   | dc_ap_lC      : forall v1 v2 {k1} (c : context k1 C) d,
@@ -111,16 +111,16 @@ Module Lam_SES_NO_HandSem <: RED_SEM Lam_SES_NO_Cal.RedLang.
                        decctx (vDApp t1 t2) (stag_c d =: c) 
                                   (d_red (rSubApp D I t1 t2 d) c).
 
-  Definition dec := __dec. Arguments dec t {k1 k2} c d.
+  Definition dec := dec'. Arguments dec t {k1 k2} c d.
 
-  Scheme dec_Ind    := Induction for __dec Sort Prop
+  Scheme dec_Ind    := Induction for dec' Sort Prop
     with decctx_Ind := Induction for decctx Sort Prop.
 
 
   (* Non-signature entries (helpers): *)
 
   Lemma dead_dec_dead : 
-      forall {k1} (c : context k1 CBot) v d, ~ __dec v c d.
+      forall {k1} (c : context k1 CBot) v d, ~ dec v c d.
 
   Proof with autof.
     intros; intro H.
@@ -184,12 +184,12 @@ Module Lam_SES_NO_HandSem <: RED_SEM Lam_SES_NO_Cal.RedLang.
       rewrite H2 in H1;
       rewrite IHv in H1; auto;
       dependent destruction H1;
-      match goal with v0 : val _ |- _ => match goal with H : __dec (_ v0) _ _ |- _ =>
+      match goal with v0 : val _ |- _ => match goal with H : dec' (_ v0) _ _ |- _ =>
       rewrite IHv0 in H;
       dependent_destruction2 H;
       auto
       end end end 
-    | match goal with H : __dec _ _ _ |- _ =>
+    | match goal with H : dec' _ _ _ |- _ =>
       contradiction (dead_dec_dead _ _ _ H)
       end
     | match goal with H : Var _ = _ |- _ => 

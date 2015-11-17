@@ -14,81 +14,83 @@ Module MiniML_HandSem <: RED_SEM MiniML_Cal.RedLang.
   Import MiniML_RefLang MiniML_Strategy.
   Import RF.
 
-  Inductive __dec : term -> context' -> decomp' -> Prop :=
+  Inductive dec' : term -> context' -> decomp' -> Prop :=
 
-  | d_z   : forall c d, __decctx vZ c d             -> __dec Z c d
+  | d_z   : forall c d, decctx' vZ c d             -> dec' Z c d
 
-  | d_s   : forall t c d, __dec t (s_c =: c) d      -> __dec (S t) c d
+  | d_s   : forall t c d, dec' t (s_c =: c) d      -> dec' (S t) c d
 
   | d_case: forall t ez x es c d, 
-              __dec t (case_c ez x es =: c) d       -> __dec (Case t ez x es) c d
+              dec' t (case_c ez x es =: c) d       -> dec' (Case t ez x es) c d
 
-  | d_var : forall x c d, __decctx (vVar x) c d     -> __dec (Var x) c d
+  | d_var : forall x c d, decctx' (vVar x) c d     -> dec' (Var x) c d
 
-  | d_lam : forall x t c d, __decctx (vLam x t) c d -> __dec (Lam x t) c d
+  | d_lam : forall x t c d, decctx' (vLam x t) c d -> dec' (Lam x t) c d
 
   | d_app : forall t1 t2 c d, 
-              __dec t1 (ap_r t2 =: c) d             -> __dec (App t1 t2) c d
+              dec' t1 (ap_r t2 =: c) d             -> dec' (App t1 t2) c d
 
   | d_let : forall x t e c d, 
-              __dec t (let_c x e =: c) d            -> __dec (Letv x t e) c d
+              dec' t (let_c x e =: c) d            -> dec' (Letv x t e) c d
 
   | d_fix : forall x t c, 
-              __dec (Fix x t) c (d_red (rFix x t) c)
+              dec' (Fix x t) c (d_red (rFix x t) c)
 
   | d_pair: forall t1 t2 c d, 
-              __dec t1 (pair_r t2 =: c) d           -> __dec (Pair t1 t2) c d
+              dec' t1 (pair_r t2 =: c) d           -> dec' (Pair t1 t2) c d
 
-  | d_fst : forall t c d, __dec t (fst_c =: c) d    -> __dec (Fst t) c d
+  | d_fst : forall t c d, dec' t (fst_c =: c) d    -> dec' (Fst t) c d
 
-  | d_snd : forall t c d, __dec t (snd_c =: c) d    -> __dec (Snd t) c d
+  | d_snd : forall t c d, dec' t (snd_c =: c) d    -> dec' (Snd t) c d
 
 
-  with __decctx : value' -> context' -> decomp' -> Prop :=
+  with decctx' : value' -> context' -> decomp' -> Prop :=
 
   | dc_em : forall v,
-              __decctx v [.] (d_val v)
+              decctx' v [.] (d_val v)
 
-  | dc_s  : forall v c d, __decctx (vS v) c d       -> __decctx v (s_c =: c) d
+  | dc_s  : forall v c d, decctx' (vS v) c d       -> decctx' v (s_c =: c) d
 
   | dc_cs : forall v x ez es (c : context'),
-              __decctx v (case_c ez x es =: c) (d_red (rCase v ez x es) c)
+              decctx' v (case_c ez x es =: c) (d_red (rCase v ez x es) c)
 
   | dc_apr: forall v t (c : context') d, 
-              __dec t (ap_l v =: c) d               -> __decctx v (ap_r t =: c) d
+              dec' t (ap_l v =: c) d               -> decctx' v (ap_r t =: c) d
 
   | dc_apl: forall v v0 (c : context'),
-              __decctx v (ap_l v0 =: c) (d_red (rApp v0 v) c)
+              decctx' v (ap_l v0 =: c) (d_red (rApp v0 v) c)
 
   | dc_let: forall v x e (c : context'),
-              __decctx v (let_c x e =: c) (d_red (rLet x v e) c)
+              decctx' v (let_c x e =: c) (d_red (rLet x v e) c)
 
   | dc_p_r: forall t v (c : context') d, 
-              __dec t (pair_l v =: c) d             -> __decctx v (pair_r t =: c) d
+              dec' t (pair_l v =: c) d             -> decctx' v (pair_r t =: c) d
 
   | dc_p_l: forall v v0 c d, 
-              __decctx (vPair v0 v) c d             -> __decctx v (pair_l v0 =: c) d
+              decctx' (vPair v0 v) c d             -> decctx' v (pair_l v0 =: c) d
 
   | dc_fst: forall v (c : context'), 
-              __decctx v (fst_c =: c) (d_red (rFst v) c)
+              decctx' v (fst_c =: c) (d_red (rFst v) c)
 
   | dc_snd: forall v (c : context'),
-              __decctx v (snd_c =: c) (d_red (rSnd v) c).
+              decctx' v (snd_c =: c) (d_red (rSnd v) c).
 
 
   Definition dec : 
-      term -> forall {k1 k2 : ckind}, context k1 k2 -> decomp k1 -> Prop := 
-      fun t => ##(__dec t).
+      term -> forall {k1 k2 : ckind}, context k1 k2 -> decomp k1 -> Prop 
+
+      := fun t => ##(dec' t).
 
   Definition decctx : 
-      forall {k2}, value k2 -> forall {k1}, context k1 k2 -> decomp k1 -> Prop :=
-      #(fun v => #(__decctx v)).
+      forall {k2}, value k2 -> forall {k1}, context k1 k2 -> decomp k1 -> Prop 
 
-  Scheme dec_Ind    := Induction for __dec    Sort Prop
-    with decctx_Ind := Induction for __decctx Sort Prop.
+      := #(fun v => #(decctx' v)).
+
+  Scheme dec_Ind    := Induction for dec'    Sort Prop
+    with decctx_Ind := Induction for decctx' Sort Prop.
 
 
-  Lemma dec_val_self : forall (v : value') c d, __dec v c d <-> __decctx v c d.
+  Lemma dec_val_self : forall (v : value') c d, dec' v c d <-> decctx' v c d.
   Proof.
     induction v;
         intros c d; split; intro H;
@@ -132,7 +134,7 @@ Module MiniML_HandSem <: RED_SEM MiniML_Cal.RedLang.
   Proof with auto.
     destruct k1, k2.
     induction 1 using dec_Ind with
-    (P  := fun t c d (_ : __dec t c d)  => c[t] = (d : term))
+    (P  := fun t c d (_ : dec t c d)  => c[t] = (d : term))
     (P0 := fun v c d (_ : decctx v c d) => c[v : term] = (d : term))...
   Qed.
 
@@ -231,7 +233,7 @@ Module MiniML_REF_SEM_Check.
   Proof.
     intros t () () c d H.
     induction H using HS.dec_Ind with
-    (P := fun t c d (_ : HS.__dec t c d)  =>  RS.dec t c d)
+    (P := fun t c d (_ : HS.dec t c d)  =>  RS.dec t c d)
     (P0:= fun v c d (_ : HS.decctx v c d) =>  RS.decctx v c d);
     
     solve 
@@ -421,8 +423,10 @@ Module MiniML_Machine_Check.
   Import EAM HM.
 
 
-  Notation "a >> b"  := (MiniML_EAM.transition a b)  (at level 40, no associativity).
-  Notation "a >>+ b" := (MiniML_EAM.trans_close a b) (at level 40, no associativity).
+  Notation "st1 >> st2"  := (MiniML_EAM.transition st1 st2)  
+               (at level 40, no associativity).
+  Notation "st1 >>+ st2" := (MiniML_EAM.trans_close st1 st2) 
+               (at level 40, no associativity).
 
 
   Lemma trans_EAM2HM : forall c0 c1,  c0 >> c1  ->  c0 → c1.

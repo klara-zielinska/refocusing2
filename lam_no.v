@@ -649,4 +649,4 @@ Require Import refocusing_semantics_derivation.
 Require Import refocusing_machine.
 
 Module Lam_NO_RefSem := RedRefSem Lam_NO_Cal.
-Module Lam_NO_EAM    := ProperEAMachine Lam_NO_Cal.RedLang Lam_NO_RefSem.
+Module Lam_NO_EAM    := RefEvalApplyMachine Lam_NO_Cal.RedLang Lam_NO_RefSem.

@@ -448,42 +448,6 @@ Module MiniML_Strategy <: REF_STRATEGY MiniML_RefLang.
   Qed.
 
 
-
-
-(*  Definition only_empty t k := 
-      forall t' {k'} (c : context k k'), c[t'] = t -> ~ dead_ckind k' -> 
-          k = k' /\ c ~= [.](k).
-
-  Definition only_trivial t k := 
-      forall t' {k'} (c : context k k'),  c[t'] = t -> ~ dead_ckind k' -> 
-          k = k' /\ c ~= [.](k) \/ exists (v : value k'), t' = v.*)
-
-
-
-(*  Lemma dec_term_red_atom : 
-      forall t k {r : redex k}, dec_term t k = in_red r -> 
-          ~exists ec, immediate_ec ec t /\ ~dead_ckind (k+>ec).
-
-  Proof.
-    intros t k r H [ec [[t' H0] H1]]. 
-    destruct t, k, ec; 
-    inversion H0; subst; 
-    solve [autof].
-  Qed.
-
-
-  Lemma dec_term_val_atom : 
-      forall t k {v : value k}, dec_term t k = in_val v -> 
-          ~exists ec, immediate_ec ec t /\ ~dead_ckind (k+>ec).
-
-  Proof.
-    intros t k r H [ec [[t' H0] H1]]. 
-    destruct t, k, ec; 
-    inversion H0; subst; 
-    solve [autof].
-  Qed.*)
-
-
   Lemma dec_term_term_top : forall t k {t' ec}, 
             dec_term t k = in_term t' ec -> forall ec', ~ k, t |~ ec << ec'.
 
@@ -586,4 +550,4 @@ Require Import refocusing_semantics_derivation.
 Require Import refocusing_machine.
 
 Module MiniML_RefSem := RedRefSem MiniML_Cal.
-Module MiniML_EAM    := ProperEAMachine MiniML_Cal.RedLang MiniML_RefSem.
+Module MiniML_EAM    := RefEvalApplyMachine MiniML_Cal.RedLang MiniML_RefSem.

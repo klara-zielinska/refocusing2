@@ -13,13 +13,13 @@ Module Lam_SES_NO_RefLang <: REF_LANG.
   Require Export Peano_dec Compare_dec.
 
 
-  Inductive __term :=
-  | Var   : nat                     -> __term
-  | Lam   : __term                  -> __term
-  | App   : __term -> __term        -> __term
-  | Sub   : __term -> nat -> __term -> __term
-  | Shift : __term -> nat -> nat    -> __term.
-  Definition term := __term.
+  Inductive term__ :=
+  | Var   : nat                     -> term__
+  | Lam   : term__                  -> term__
+  | App   : term__ -> term__        -> term__
+  | Sub   : term__ -> nat -> term__ -> term__
+  | Shift : term__ -> nat -> nat    -> term__.
+  Definition term := term__.
 
 
   Inductive substitut := 
@@ -611,31 +611,6 @@ Module Lam_SES_NO_Strategy <: REF_STRATEGY Lam_SES_NO_RefLang.
   Qed.
 
 
-
-(*  Lemma dec_term_red_atom : 
-      forall t k {r : redex k}, dec_term t k = in_red r -> 
-          ~exists ec, immediate_ec ec t /\ ~dead_ckind (k+>ec).
-
-  Proof.
-    intros t k r H [ec [[t' H0] H1]]. 
-    destruct t, k, ec; 
-    inversion H0; subst; 
-    solve [autof].
-  Qed.
-
-
-  Lemma dec_term_val_atom : 
-      forall t k {v : value k}, dec_term t k = in_val v -> 
-          ~exists ec, immediate_ec ec t /\ ~dead_ckind (k+>ec).
-
-  Proof.
-    intros t k r H [ec [[t' H0] H1]]. 
-    destruct t, k, ec; destruct_all sub_tag; destruct_all substitut;
-    inversion H0; subst; 
-    try solve [autof].
-  Qed.*)
-
-
   Lemma dec_term_term_top : forall t k {t' ec}, 
             dec_term t k = in_term t' ec -> forall ec', ~ k, t |~ ec << ec'.
 
@@ -915,4 +890,4 @@ Require Import refocusing_semantics_derivation.
 Require Import refocusing_machine.
 
 Module Lam_SES_NO_RefSem := RedRefSem Lam_SES_NO_Cal.
-Module Lam_SES_NO_EAM    := ProperEAMachine Lam_SES_NO_Cal.RedLang Lam_SES_NO_RefSem.
+Module Lam_SES_NO_EAM    := RefEvalApplyMachine Lam_SES_NO_Cal.RedLang Lam_SES_NO_RefSem.

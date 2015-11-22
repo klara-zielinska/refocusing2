@@ -13,13 +13,13 @@ Module Lam_SES_NO_RefLang <: REF_LANG.
   Require Export Peano_dec Compare_dec.
 
 
-  Inductive term__ :=
-  | Var   : nat                     -> term__
-  | Lam   : term__                  -> term__
-  | App   : term__ -> term__        -> term__
-  | Sub   : term__ -> nat -> term__ -> term__
-  | Shift : term__ -> nat -> nat    -> term__.
-  Definition term := term__.
+  Inductive term' :=
+  | Var   : nat                   -> term'
+  | Lam   : term'                 -> term'
+  | App   : term' -> term'        -> term'
+  | Sub   : term' -> nat -> term' -> term'
+  | Shift : term' -> nat -> nat   -> term'.
+  Definition term := term'.
 
 
   Inductive substitut := 

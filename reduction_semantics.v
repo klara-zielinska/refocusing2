@@ -216,7 +216,6 @@ Module Type RED_LANG.
       end.
   Coercion decomp_to_term : decomp >-> term.
 
-
 End RED_LANG.
 
 

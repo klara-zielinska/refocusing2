@@ -20,6 +20,7 @@ Module RefEvalApplyMachine_Facts (R : RED_LANG) (RS : RED_REF_SEM R)
   Import EAM.
 
 
+
   Local Hint Constructors EAM.trans EAM.trans_close.
   Local Hint Constructors RNS.dec RNS.decctx.
 
@@ -150,10 +151,10 @@ Module RefEvalApplyMachine_Facts (R : RED_LANG) (RS : RED_REF_SEM R)
 
   Theorem decctx_iter_composition : forall {k1 k2} {c : context k1 k2} {v0 v1},
 
-          (exists d, RS.decctx v0 c d /\ RS.iter d v1) <-> 
+      (exists d, RS.decctx v0 c d /\ RS.iter d v1) <-> 
 
-          c_apply c v0 →+ c_apply [.] v1 \/
-          c_apply c v0 = c_apply [.] v1 /\ ~dead_ckind k1.
+      c_apply c v0 →+ c_apply [.] v1 \/
+      c_apply c v0 = c_apply [.] v1 /\ ~dead_ckind k1.
 
   Proof.
     etransitivity; eauto using decctx_RNS_eqv_EAM, RNSF.decctx_iter_composition.
@@ -184,7 +185,7 @@ Module PushEnterMachine_Facts (R : RED_LANG) (PERS : PE_RED_REF_SEM R)
 
 
   Lemma dec_PENS_eqv_PEM : forall {t} {k1 k2} {c : context k1 k2} {v}, 
-                           PENS.dec t c v <-> c_eval t c →+ c_fin v.
+                               PENS.dec t c v <-> c_eval t c →+ c_fin v.
   Proof with eauto.
     intros t k1 k2 v; split; intro H.
 

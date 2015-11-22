@@ -25,19 +25,19 @@ Module RedRefSem (R : REF_CALCULI) <: RED_REF_SEM (R.RedLang).
   Import RF.
 
 
-  Inductive dec__ : term -> forall {k1 k2}, context k1 k2 -> decomp k1 -> Prop :=
+  Inductive dec' : term -> forall {k1 k2}, context k1 k2 -> decomp k1 -> Prop :=
 
   | d_dec  : forall t {k1 k2} (c : context k1 k2) {r},
                dec_term t k2 = in_red r -> 
-               dec__ t c (d_red r c)
+               dec' t c (d_red r c)
   | d_v    : forall t {k1 k2} {c : context k1 k2} {v d},
                dec_term t k2 = in_val v ->
                decctx v c d ->
-               dec__ t c d
+               dec' t c d
   | d_term : forall t {t0 k1 k2} {c : context k1 k2} {ec d},
                dec_term t k2 = in_term t0 ec ->
-               dec__ t0 (ec=:c) d ->
-               dec__ t c d
+               dec' t0 (ec=:c) d ->
+               dec' t c d
 
   with decctx : forall {k2}, value k2 -> 
                     forall {k1}, context k1 k2 -> decomp k1 -> Prop :=
@@ -56,13 +56,13 @@ Module RedRefSem (R : REF_CALCULI) <: RED_REF_SEM (R.RedLang).
   | dc_term : forall ec {ec0 k2} (v : value (k2+>ec)) 
                             {k1} {c : context k1 k2} {t d},
                 dec_context ec k2 v = in_term t ec0 ->
-                dec__ t (ec0=:c) d ->
+                dec' t (ec0=:c) d ->
                 decctx v (ec=:c) d.
 
-  Scheme dec_Ind    := Induction for dec__ Sort Prop
+  Scheme dec_Ind    := Induction for dec' Sort Prop
     with decctx_Ind := Induction for decctx Sort Prop.
 
-  Definition dec := dec__. Arguments dec _ {k1 k2} _ _.
+  Definition dec := dec'. Arguments dec _ {k1 k2} _ _.
 
 
   Lemma sto_trans : forall t t0 t1,  t <| t0  ->  t0 <| t1  ->  t <| t1.

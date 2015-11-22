@@ -298,6 +298,7 @@ Module Lam_NO_RefLang <: REF_LANG.
   Definition wf_subterm_order : well_founded subterm_order 
       := wf_clos_trans_l _ _ wf_immediate_subterm.
 
+
 End Lam_NO_RefLang.
 
 
@@ -508,51 +509,6 @@ Module Lam_NO_Strategy <: REF_STRATEGY Lam_NO_RefLang.
     inversion H;
     solve [auto].
   Qed.
-
-
-
-(*
-  Definition only_empty t k := 
-      forall t' {k'} (c : context k k'), c[t'] = t -> ~ dead_ckind k' -> 
-          k = k' /\ c ~= [.](k).
-
-  Definition only_trivial t k := 
-      forall t' {k'} (c : context k k'),  c[t'] = t -> ~ dead_ckind k' -> 
-          k = k' /\ c ~= [.](k) \/ exists (v : value k'), t' = v.
-
-
-  Lemma death_propagation2 : 
-      forall k ec, ~ dead_ckind (k+>ec) -> ~ dead_ckind k.
-
-  Proof.
-    intuition.
-    apply H.
-    apply death_propagation.
-    assumption.
-  Qed.*)
-
-
-(*  Lemma dec_term_red_atom : 
-      forall t k {r : redex k}, dec_term t k = in_red r -> 
-          ~exists ec, immediate_ec ec t /\ ~dead_ckind (k+>ec).
-
-  Proof.
-    intros t k r H. 
-    destruct t, k; 
-    solve [inversion H].
-  Qed.
-
-
-  Lemma dec_term_val_atom : 
-      forall t k {v : value k}, dec_term t k = in_val v -> 
-          ~exists ec, immediate_ec ec t /\ ~dead_ckind (k+>ec).
-
-  Proof.
-    intros t k v H [ec [[t0 H0] H1]].
-    destruct t, k; inversion H; subst;
-    destruct ec; 
-    solve [autof].
-  Qed.*)
 
 
   Lemma dec_term_term_top : forall t k {t' ec}, 

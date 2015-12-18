@@ -82,14 +82,11 @@ endif
 
 VFILES:=Util.v\
   reduction_semantics.v\
-  reduction_semantics_facts.v\
-  reduction_semantics_props.v\
+  reduction_languages_facts.v\
   reduction_strategy.v\
   abstract_machine.v\
   abstract_machine_facts.v\
   refocusing_lang.v\
-  refocusing_semantics.v\
-  refocusing_semantics_facts.v\
   refocusing_semantics_derivation.v\
   refocusing_natural_semantics.v\
   refocusing_natural_semantics_facts.v\

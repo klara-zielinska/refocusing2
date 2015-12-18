@@ -1,3 +1,4 @@
+Require Import Relations.
 Require Import Program.
 
 
@@ -56,7 +57,7 @@ Require Import Program.
 
 (* Signature for languages with reduction semantics and multiple kinds of contextes. *)
 
-Module Type RED_LANG.
+Module Type RED_SEM.
 
   (* Preconditions: To instaniate this module you need to determinizethe grammar of 
      contextes. *)
@@ -191,16 +192,6 @@ Module Type RED_LANG.
          (exists (v : value k), t = v) \/ (exists (r : redex k), t = r).*)
 
 
-  Axiom decompose : forall (t : term) k1, ~ dead_ckind k1 ->
-      (exists (v : value k1), t = v) \/
-      (exists k2 (r : redex k2) (c : context k1 k2), t = c[r]).
-
-
-  (* Reduction of a redex (it may get stuck): *)
-  Parameter contract : forall {k}, redex k -> option term.
-
-
-
   (* decomp k  - decomposition of a term t from the symbol k to a redex.
      d_red r c  means: t = c[r].
      d_val v    means: t has no redexes and so it is a value, t = v. *)
@@ -209,90 +200,44 @@ Module Type RED_LANG.
   | d_val : value k -> decomp k.
   Arguments d_val {k} _. Arguments d_red {k} {k'} _ _.
 
+
   Definition decomp_to_term {k} (d : decomp k) :=
       match d with
-      | d_val v     => value_to_term v
+      | d_val v   => value_to_term v
       | d_red _ r c => c[r]
       end.
   Coercion decomp_to_term : decomp >-> term.
 
-End RED_LANG.
+
+  Definition dec (t : term) k (d : decomp k) : Prop := 
+      ~dead_ckind k /\ t = d.
 
 
+  Axiom decompose : forall (t : term) k, ~dead_ckind k -> 
+                        exists d : decomp k, dec t k d.
 
 
-(* Signature for reduction semantics *)
-
-Module Type RED_SEM (R : RED_LANG).
-
-  Import R.
+  (* Reduction of a redex (it may get stuck): *)
+  Parameter contract : forall {k}, redex k -> option term.
 
 
-  (* Decomposition relation 
-     dec t c d - the term c[t] can be decomposed to d. *)
-  Parameter dec : term -> forall {k1 k2}, context k1 k2 -> decomp k1 -> Prop.
-
-  Axiom dec_correct  : forall {t k1 k2} {c : context k1 k2} {d}, 
-                           dec t c d -> c[t] = d.
+  Definition reduce k t1 t2 := 
+      exists {k'} (c : context k k') (r : redex k') t,  dec t1 k (d_red r c) /\
+          contract r = Some t /\ t2 = c[t].
 
 
-  (* Following two axioms say that  dec t c d  is equivalnet to  dec c[t] [.] d. *)
-  Axiom dec_plug : 
-      forall {k1 k2} (c : context k1 k2) {k3} {c0 : context k3 k1} {t d}, 
-          ~ dead_ckind k2 -> dec c[t] c0 d -> dec t (c ~+ c0) d.
-
-  Axiom dec_plug_rev : 
-      forall {k1 k2} (c : context k1 k2) {k3} {c0 : context k3 k1} {t d}, 
-          ~ dead_ckind k2 -> dec t (c ~+ c0) d -> dec c[t] c0 d.
-
-
-
-  (* Together with the previous axioms this ensures that dec contains every 
-     decomposition to a redex. (We care only about non-dead k2, but this is 
-     implied by the existance of a redex k2.) *)
-  Axiom dec_redex_self : forall {k2} (r : redex k2) {k1} (c : context k1 k2), 
-                             dec r c (d_red r c).
-
-  (* All proper values need to be in dec. *)
-  Axiom dec_value_self : forall {k} (v : value k), 
-                             ~ dead_ckind k -> dec v [.] (d_val v).
-
-
-  (* Decomposition of a term *)
-  Inductive decempty : term -> forall {k}, decomp k -> Prop :=
-  | d_intro : forall {t k} {d : decomp k}, dec t [.] d -> decempty t d.
-
-  (* An evaluation process - starting from a "decomp" *)
-  Inductive iter : forall {k}, decomp k -> value k -> Prop :=
-  | i_val : forall {k} (v : value k), iter (d_val v) v
-  | i_red : forall {k2} (r : redex k2) {t k1} (c : context k1 k2) {d v},
-                contract r = Some t -> decempty c[t] d -> iter d v ->
-                iter (d_red r c) v.
-
-  (* An effective evaluation process - starting from a term *)
-  Inductive eval : term -> value init_ckind -> Prop :=
-  | e_intro : forall {t} {d : decomp init_ckind} {v : value init_ckind}, 
-                  decempty t d -> iter d v -> eval t v.
+  Notation "k |~ t1 → t2"  := (reduce k t1 t2)           (no associativity, at level 70).
+  Notation "k |~ t1 →+ t2" := (clos_trans_1n _ (reduce k) t1 t2) 
+                                                         (no associativity, at level 70).
+  Notation "k |~ t1 →* t2" := (clos_refl_trans_1n _ (reduce k) t1 t2) 
+                                                         (no associativity, at level 70).
 
 End RED_SEM.
 
 
 
 
-(* Signature for deterministic reduction semantics *)
-
-Module Type DET_RED_SEM (R : RED_LANG) <: RED_SEM R.
-
-  Include RED_SEM R.
-  Import R.
-
-
-  Axiom dec_is_function  : forall {t k} {d d0 : decomp k}, 
-                               decempty t d -> decempty t d0 -> d = d0.
-  Axiom iter_is_function : forall {k} {d : decomp k} {v v0}, 
-                               iter d v -> iter d v0 -> v = v0.
-  Axiom eval_is_function : forall {t} {v v0 : value init_ckind}, 
-                               eval t v -> eval t v0 -> v = v0.
-
-End DET_RED_SEM.
-
+Module Type RED_SEM_DET (R : RED_SEM).  Import R.
+  Axiom dec_is_pfunction : forall {t k} {d d0 : decomp k}, 
+                               dec t k d -> dec t k d0 -> d = d0.
+End RED_SEM_DET.

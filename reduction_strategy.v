@@ -80,10 +80,14 @@ Module Type RED_STRATEGY_LANG.
 
   Definition decomp_to_term {k} (d : decomp k) :=
       match d with
-      | d_val v     => value_to_term v
+      | d_val v   => value_to_term v
       | d_red _ r c => c[r]
       end.
   Coercion decomp_to_term : decomp >-> term.
+
+
+  Definition dec (t : term) k (d : decomp k) : Prop := 
+      ~dead_ckind k /\ t = d.
 
 
 End RED_STRATEGY_LANG.

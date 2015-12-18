@@ -1,44 +1,52 @@
-
-Module Type ABSTRACT_MACHINE.
-
-  Parameters term configuration value : Set.
-
-  Parameter c_init  : term -> configuration.
-  Parameter c_final : value -> configuration.
-
-  Parameter transition : configuration -> configuration -> Prop.
-  Notation "c1 → c2" := (transition c1 c2) (at level 40, no associativity).
-
-  Axiom final_correct : forall v c, ~ c_final v → c.
+Require Import Util.
+Require Import rewriting_system.
+Require Import Entropy.
 
 
-  Reserved Notation "c1 →+ c2" (at level 40, no associativity).
-  Reserved Notation "c1 →* c2" (at level 40, no associativity).
 
-  Inductive trans_close : configuration -> configuration -> Prop :=
-  | one_step   : forall c1 c2,     c1 → c2  ->  c1 →+ c2
-  | multi_step : forall c1 c2 c3,  c1 → c2  ->  c2 →+ c3  ->  c1 →+ c3
-  where "c1 →+ c2" := (trans_close c1 c2).
 
-  Definition trans_ref_close c1 c2 := c1 = c2 \/ trans_close c1 c2.
-  Notation "c1 →* c2" := (trans_ref_close c1 c2).
 
-  Inductive eval : term -> value -> Prop :=
-  | e_intro : forall t v, trans_close (c_init t) (c_final v) -> eval t v.
+Module Type ABSTRACT_MACHINE <: REWRITING_SYSTEM.
+
+  Parameters 
+  (term          : Set)
+  (configuration : Set)
+  (value         : Set)
+
+  (load          : term -> configuration)
+  (value_to_conf : value -> configuration)
+  (final         : configuration -> option value)
+  (transition    : configuration -> configuration -> Prop)
+  (next_conf     : entropy -> configuration -> option configuration).
+
+  Coercion value_to_conf : value >-> configuration.
+
+  Notation "c1 → c2"  := (transition c1 c2)              (no associativity, at level 70).
+  Notation "t1 →+ t2" := (clos_trans_1n _ transition t1 t2) 
+                                                         (no associativity, at level 70).
+  Notation "t1 →* t2" := (clos_refl_trans_1n _ transition t1 t2) 
+                                                         (no associativity, at level 70).
+
+  Axioms
+  (final_correct :                                                              forall c,
+       final c <> None -> ~exists c', c → c')
+  (trans_computable :                                                       forall c1 c2,
+       c1 → c2 <-> exists e, next_conf e c1 = Some c2)
+  (finals_are_vals :                                                          forall c v,
+       final c = Some v <-> c = v).
 
 End ABSTRACT_MACHINE.
 
 
 
 
-Module Type DET_ABSTRACT_MACHINE <: ABSTRACT_MACHINE.
+Module Type ABSTRACT_MACHINE_DET (AM : ABSTRACT_MACHINE).
 
-  Include ABSTRACT_MACHINE.
+  Include AM.
 
-  Parameter next_conf : configuration -> option configuration.
-  Axiom next_correct  : forall c1 c2, next_conf c1 = Some c2 <-> c1 → c2.
+  Axiom trans_det : forall c1 c2 c3, c1 → c2 -> c1 → c3 -> c2 = c3.
 
-End DET_ABSTRACT_MACHINE.
+End ABSTRACT_MACHINE_DET.
 
 
 
@@ -49,9 +57,11 @@ Module Type AM_SAFE_REGION (AM : ABSTRACT_MACHINE).
 
   Parameter safe : configuration -> Prop.
 
-  Axiom preservation : forall c1 c2, safe c1 -> c1 → c2 -> safe c2.
-  Axiom progress     : forall c, safe c -> 
-                           (exists v, c = c_final v) \/ (exists c', c → c').
+  Axioms
+  (preservation :                                                           forall c1 c2,
+       safe c1 -> c1 → c2 -> safe c2)
+  (progress :                                                                   forall c,
+       safe c -> (exists v, c = v) \/ (exists c', c → c')).
 
 End AM_SAFE_REGION.
 
@@ -62,8 +72,7 @@ Module Type AM_PROGRESS (AM : ABSTRACT_MACHINE).
 
   Import AM.
 
-  Axiom progress : forall t c, c_init t →* c ->
-                       (exists v, c = c_final v) \/ (exists c', c → c').
+  Axiom progress :                                                            forall t c,
+      (load t →* c) -> (exists v, c = v) \/ (exists c', c → c').
 
 End AM_PROGRESS.
-

@@ -8,148 +8,30 @@ Require Import refocusing_natural_semantics.
 
 
 
-Module PreRefNaturalSem_Facts (R : RED_LANG) (RS : RED_REF_SEM R)
-                                      (PNS : PRE_REF_NATURAL_SEM R RS). 
-
-  Import R.
-  Module RF := RED_LANG_Facts R.
-  Import RF.
-
-
-  Theorem dec_preserved : forall {t k1 k2} {c : context k1 k2} {d}, 
-                              RS.dec t c d <-> PNS.dec t c d.
-  Proof.
-    intros t k1 k2 c d; split; intro H.
-
-  (* -> *) {
-    induction H using RS.dec_Ind with 
-    (P := fun t _ _ c d (_ : RS.dec t c d)    => PNS.dec t c d)
-    (P0:= fun _ v _ c d (_ : RS.decctx v c d) => PNS.decctx v c d);
-    solve 
-    [ econstructor; eauto
-    | eapply PNS.d_term; eauto
-    | eapply PNS.dc_term; eauto ].
-  }
-
-  (* <- *) {
-    induction H using PNS.dec_Ind with 
-    (P := fun t _ _ c d (_ : PNS.dec t c d)    => RS.dec t c d)
-    (P0:= fun _ v _ c d (_ : PNS.decctx v c d) => RS.decctx v c d);
-    solve
-    [ econstructor; eauto
-    | eapply RS.d_term; eauto
-    | eapply RS.dc_term; eauto ].
-  }
-  Qed.
-
-
-
-  Theorem decctx_preserved : forall {k1 k2} {v : value k2} {c : context k1 k2} {d}, 
-                                 RS.decctx v c d <-> PNS.decctx v c d.
-  Proof.
-    intros k1 k2 v c d; split; intro H.
-
-  (* -> *) {
-    induction H using RS.decctx_Ind with 
-    (P  := fun t _ _ c d (_ : RS.dec t c d)    => PNS.dec t c d)
-    (P0 := fun _ v _ c d (_ : RS.decctx v c d) => PNS.decctx v c d);
-    solve 
-    [ econstructor; eauto
-    | eapply PNS.d_term; eauto
-    | eapply PNS.dc_term; eauto ].
-  }
-
-  (* <- *) {
-    induction H using PNS.decctx_Ind with 
-    (P := fun t _ _ c d (_ : PNS.dec t c d)    => RS.dec t c d)
-    (P0:= fun _ v _ c d (_ : PNS.decctx v c d) => RS.decctx v c d);
-    solve
-    [ econstructor; eauto
-    | eapply RS.d_term; eauto
-    | eapply RS.dc_term; eauto ].
-  }
-  Qed.
-
-
-
-  Theorem iter_preserved : forall {k} {d : decomp k} {v}, 
-                               RS.iter d v <-> PNS.iter d v.
-  Proof with eauto.
-    intros k d v; split; intro H.
-
-  (* -> *) {
-    induction H.
-    - constructor...
-    - econstructor...
-      dependent destruction H0.
-      apply dec_preserved.
-      apply RS.dec_plug in H0.
-      + erewrite (compose_empty _)...
-      + eapply (proper_death2 [.])...
-  }
-
-  (* <- *) {
-    induction H.
-    - constructor.
-    - econstructor...
-      constructor.
-      apply RS.dec_plug_rev.
-      + eapply (proper_death2 [.])...
-      + rewrite <- compose_empty...
-        apply dec_preserved...
-  }
-  Qed.
-
-
-  Theorem eval_preserved : forall {t v}, RS.eval t v <-> PNS.eval t v.
-
-  Proof with eauto.
-    intros t v; split; intro H.
-
-  (* -> *) {
-    dependent destruction H; econstructor.
-    - dependent destruction H. apply dec_preserved...
-    - apply iter_preserved...
-  }
-
-  (* <- *) {
-    dependent destruction H; econstructor.
-    - constructor. eapply dec_preserved...
-    - apply iter_preserved...
-  }
-  Qed.
-
-End PreRefNaturalSem_Facts.
-
-
-
-
 Module StagedRefNaturalSem_Facts (R : RED_LANG) (RS : RED_REF_SEM R)
                                      (SNS : STAGED_REF_NATURAL_SEM R RS).
 
   Module RF   := RED_LANG_Facts R.
   Module RSF  := RED_SEM_Facts R RS.
   Module RSD  := RedRefSemDet R RS.
-  Module PNS  := PreRefNaturalSem R RS.
-  Module PNSF := PreRefNaturalSem_Facts R RS PNS.
   Import R.
   Import RF.
   Import RSF.
 
 
 
-  Local Hint Constructors PNS.dec PNS.decctx PNS.iter.
+  Local Hint Constructors RS.dec' RS.decctx.
 
 
-  Lemma dec_PNS2SNS : 
+  Lemma dec_RS2SNS : 
       forall {t k1 k2} {c : context k1 k2} {d v},
-          PNS.dec t c d -> SNS.iter d v -> SNS.dec t c v.
+          RS.dec t c d -> SNS.iter d v -> SNS.dec t c v.
 
   Proof.
-    induction 1 using PNS.dec_Ind with
-    (P  := fun t _ _ c d (_ : PNS.dec t c d)    => 
+    induction 1 using RS.dec_Ind with
+    (P  := fun t _ _ c d (_ : RS.dec t c d)    => 
                forall v,  SNS.iter d v  -> SNS.dec t c v)
-    (P0 := fun _ v _ c d (_ : PNS.decctx v c d) => 
+    (P0 := fun _ v _ c d (_ : RS.decctx v c d) => 
                forall v', SNS.iter d v' -> SNS.decctx v c v');
     intros; simpl; solve 
     [ econstructor; eauto
@@ -161,15 +43,15 @@ Module StagedRefNaturalSem_Facts (R : RED_LANG) (RS : RED_REF_SEM R)
 
 
 
-  Lemma decctx_PNS2SNS : 
+  Lemma decctx_RS2SNS : 
       forall {k1 k2} {c : context k1 k2} {d v0 v1},
-          PNS.decctx v0 c d -> SNS.iter d v1 -> SNS.decctx v0 c v1.
+          RS.decctx v0 c d -> SNS.iter d v1 -> SNS.decctx v0 c v1.
 
   Proof.
-    induction 1 using PNS.decctx_Ind with
-    (P  := fun t _ _ c d (_ : PNS.dec t c d)    => 
+    induction 1 using RS.decctx_Ind with
+    (P  := fun t _ _ c d (_ : RS.dec t c d)    => 
                forall v,  SNS.iter d v  -> SNS.dec t c v)
-    (P0 := fun _ v _ c d (_ : PNS.decctx v c d) => 
+    (P0 := fun _ v _ c d (_ : RS.decctx v c d) => 
                forall v', SNS.iter d v' -> SNS.decctx v c v');
     intros; simpl; solve 
     [ econstructor; eauto
@@ -180,21 +62,34 @@ Module StagedRefNaturalSem_Facts (R : RED_LANG) (RS : RED_REF_SEM R)
   Qed.
 
 
+  Import RS.
+  Require Import Relations.
 
-  Lemma dec_SNS2PNS : 
+  Hint Constructors context clos_refl_trans_1n.
+
+  Lemma dec_SNS2RS : 
       forall {t k1 k2} {c : context k1 k2} {v},
-          SNS.dec t c v -> exists d, PNS.dec t c d /\ PNS.iter d v.
+          SNS.dec t c v -> k1 |~ c[t] ->* v.
 
   Proof with eauto using proper_death2, (proper_death2 [.]).
-    intros k1 k2 v0 c v1 H.
+    intros t k1 k2 c v H.
 
     induction H using SNS.dec_Ind with
-    (P  := fun t _ _ c v  (_ : SNS.dec t c v)     => 
-               exists d, PNS.dec t c d /\ PNS.iter d v)
-    (P0 := fun _ v _ c v' (_ : SNS.decctx v c v') => 
-               exists d, PNS.decctx v c d /\ PNS.iter d v')
-    (P1 := fun _ d v      (_ : SNS.iter d v)      => 
-               PNS.iter d v);
+    (P  := fun t k1 _ c v  (_ : SNS.dec t c v)     => 
+               k1 |~ c[t] ->* v)
+    (P0 := fun _ v k1 c v' (_ : SNS.decctx v c v') => 
+               k1 |~ c[v] ->* v')
+    (P1 := fun k1 d v      (_ : SNS.iter d v)      => 
+               k1 |~ d ->* v);
+        try (remember (v:term) as v' eqn:G; destruct IHdec; simpl in G);
+
+    try solve [
+    destruct (value_trivial v c r) as [v' H0]; eauto using proper_death2;
+    symmetry in H0; apply value_redex in H0;
+    autof].
+
+    subst.
+    econstructor 2. eauto.
 
     solve
     [ try destruct IHdec; eexists; intuition eauto

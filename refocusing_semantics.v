@@ -82,34 +82,31 @@ Module Type RED_REF_SEM <: RED_SEM.
 
   Inductive dec_proc {k1} : forall {k2}, term -> context k1 k2 -> decomp k1 -> Prop :=
 
-  | d_dec  : forall t {k2} (c : context k1 k2) {r : redex k2},
+  | d_dec  : forall t {k2} (c : context k1 k2) r,
                dec_term t k2 = in_red r -> 
                dec_proc t c (d_red r c)
-  | d_v    : forall t {k2} {c : context k1 k2} {v d},
+  | d_v    : forall t {k2} (c : context k1 k2) d v,
                dec_term t k2 = in_val v ->
                decctx_proc v c d ->
                dec_proc t c d
-  | d_term : forall t {t0 k2} {c : context k1 k2} {ec d},
+  | d_term : forall t {k2} (c : context k1 k2) d t0 ec,
                dec_term t k2 = in_term t0 ec ->
                dec_proc t0 (ec=:c) d ->
                dec_proc t c d
 
-  with decctx_proc {k1} : forall {k2}, value k2 -> 
-                              context k1 k2 -> decomp k1 -> Prop :=
+  with decctx_proc {k1} : forall {k2}, value k2 -> context k1 k2 -> decomp k1 -> Prop :=
 
   | dc_end  : forall (v : value k1),
                 ~ dead_ckind k1 ->
                 decctx_proc v [.] (d_val v)
-  | dc_dec  : forall ec {k2} (v : value (k2+>ec)) (c : context k1 k2) {r},
+  | dc_dec  : forall ec {k2} (c : context k1 k2) (v : value (k2+>ec)) r,
                 dec_context ec k2 v = in_red r ->
                 decctx_proc v (ec=:c) (d_red r c)
-  | dc_val  : forall {k2} {v0 : value k2} ec (v : value (k2+>ec)) 
-                     {c  : context k1 k2} {d},
+  | dc_val  : forall ec {k2} (c  : context k1 k2) (v : value (k2+>ec)) d v0,
                 dec_context ec k2 v = in_val v0 ->
                 decctx_proc v0 c d ->
                 decctx_proc v (ec=:c) d
-  | dc_term : forall ec {ec0 k2} (v : value (k2+>ec)) 
-                            {c : context k1 k2} {t d},
+  | dc_term : forall ec {k2} (c : context k1 k2) (v : value (k2+>ec)) d t ec0,
                 dec_context ec k2 v = in_term t ec0 ->
                 dec_proc t (ec0=:c) d ->
                 decctx_proc v (ec=:c) d.
@@ -305,37 +302,33 @@ Module RedRefSem (RL : REF_LANG) (ST : REF_STRATEGY RL) <: RED_REF_SEM.
 
 
 
-
   Inductive dec_proc {k1} : forall {k2}, term -> context k1 k2 -> decomp k1 -> Prop :=
 
-  | d_dec  : forall t {k2} (c : context k1 k2) {r : redex k2},
+  | d_dec  : forall t {k2} (c : context k1 k2) r,
                dec_term t k2 = in_red r -> 
                dec_proc t c (d_red r c)
-  | d_v    : forall t {k2} {c : context k1 k2} {v d},
+  | d_v    : forall t {k2} (c : context k1 k2) d v,
                dec_term t k2 = in_val v ->
                decctx_proc v c d ->
                dec_proc t c d
-  | d_term : forall t {t0 k2} {c : context k1 k2} {ec d},
+  | d_term : forall t {k2} (c : context k1 k2) d t0 ec,
                dec_term t k2 = in_term t0 ec ->
                dec_proc t0 (ec=:c) d ->
                dec_proc t c d
 
-  with decctx_proc {k1} : forall {k2}, value k2 -> 
-                              context k1 k2 -> decomp k1 -> Prop :=
+  with decctx_proc {k1} : forall {k2}, value k2 -> context k1 k2 -> decomp k1 -> Prop :=
 
   | dc_end  : forall (v : value k1),
                 ~ dead_ckind k1 ->
                 decctx_proc v [.] (d_val v)
-  | dc_dec  : forall ec {k2} (v : value (k2+>ec)) (c : context k1 k2) {r},
+  | dc_dec  : forall ec {k2} (c : context k1 k2) (v : value (k2+>ec)) r,
                 dec_context ec k2 v = in_red r ->
                 decctx_proc v (ec=:c) (d_red r c)
-  | dc_val  : forall {k2} {v0 : value k2} ec (v : value (k2+>ec)) 
-                     {c  : context k1 k2} {d},
+  | dc_val  : forall ec {k2} (c  : context k1 k2) (v : value (k2+>ec)) d v0,
                 dec_context ec k2 v = in_val v0 ->
                 decctx_proc v0 c d ->
                 decctx_proc v (ec=:c) d
-  | dc_term : forall ec {ec0 k2} (v : value (k2+>ec)) 
-                            {c : context k1 k2} {t d},
+  | dc_term : forall ec {k2} (c : context k1 k2) (v : value (k2+>ec)) d t ec0,
                 dec_context ec k2 v = in_term t ec0 ->
                 dec_proc t (ec0=:c) d ->
                 decctx_proc v (ec=:c) d.
@@ -425,8 +418,8 @@ Module RedRefSem (RL : REF_LANG) (ST : REF_STRATEGY RL) <: RED_REF_SEM.
 
       + contradiction (value_redex v r); congruence.
 
-      + assert (v0 = v).
-        { apply (value_to_term_injective v0 v); congruence. }
+      + assert (v1 = v).
+        { apply (value_to_term_injective v1 v); congruence. }
         subst...
 
       + assert (~ dead_ckind (k2+>ec1)).
@@ -457,7 +450,7 @@ Module RedRefSem (RL : REF_LANG) (ST : REF_STRATEGY RL) <: RED_REF_SEM.
 
     - contradict (value_redex _ _ hh).
 
-    - apply (d_term _ Heqi).
+    - apply (d_term _ _ _ _ _ Heqi).
 
       assert (~ dead_ckind (k2+>e)) as Hndk.
       { eapply dec_term_next_alive... }
@@ -488,7 +481,7 @@ Module RedRefSem (RL : REF_LANG) (ST : REF_STRATEGY RL) <: RED_REF_SEM.
             try solve [simpl; congruence];
             subst t.
 
-        apply dc_term with e0 (x0:R.term)...
+        apply dc_term with (x0:R.term) e0...
         apply (H1 e0)...
         * rewrite hh; eapply dec_context_term_next...
         * compute; congruence.
@@ -771,9 +764,9 @@ Module RedRefSem (RL : REF_LANG) (ST : REF_STRATEGY RL) <: RED_REF_SEM.
             { apply redex_to_term_injective; congruence. }
             subst.
             constructor...
-          * assert ((v0 : term) = r).
+          * assert ((v1 : term) = r).
             { compute; congruence. }
-            exfalso; eauto using (value_redex v0 r).
+            exfalso; eauto using (value_redex v1 r).
           * assert (H3 := dec_context_next_alive _ _ _ H).
             destruct (redex_trivial1 r ec1 t) as [v' ?]; 
                 try solve [auto | congruence].
@@ -858,7 +851,7 @@ Module RedRefSem (RL : REF_LANG) (ST : REF_STRATEGY RL) <: RED_REF_SEM.
             assert ((v : term) = r).
             { congruence. }
             eauto using (value_redex v r).
-          * replace v0 with v in * by (apply value_to_term_injective; congruence).
+          * replace v1 with v in * by (apply value_to_term_injective; congruence).
             eauto.
           * destruct (@value_trivial1 _ v ec1 t) as [v'' ?];
                 try solve [eauto using dec_context_next_alive | congruence].

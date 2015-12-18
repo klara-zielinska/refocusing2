@@ -81,27 +81,18 @@ endif
 ######################
 
 VFILES:=Util.v\
+  Entropy.v\
   reduction_semantics.v\
   reduction_languages_facts.v\
+  reduction_semantics_facts.v\
   reduction_strategy.v\
+  rewriting_system.v\
   abstract_machine.v\
-  abstract_machine_facts.v\
-  refocusing_lang.v\
-  refocusing_semantics_derivation.v\
-  refocusing_natural_semantics.v\
-  refocusing_natural_semantics_facts.v\
+  refocusing_semantics.v\
   refocusing_machine.v\
   refocusing_machine_facts.v\
-  refocusing_machine_safe_reg.v\
-  lam_cl_es_no.v\
-  lam_cl_es_no_tests.v\
-  lam_kes_cbn.v\
   lam_no.v\
-  lam_no_check.v\
-  lam_ses_no.v\
-  lam_ses_no_check.v\
-  miniml.v\
-  miniml_check.v
+  lam_no_check.v
 
 -include $(addsuffix .d,$(VFILES))
 .SECONDARY: $(addsuffix .d,$(VFILES))

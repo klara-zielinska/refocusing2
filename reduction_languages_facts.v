@@ -241,24 +241,21 @@ Module RedDecProcEqvDec (R : RED_MINI_LANG_WD).
   (dec_proc_correct :                             forall t {k1 k2} (c : context k1 k2) d,
        dec_proc t c d -> c[t] = d)
 
-  (dec_proc_plug :      forall {k1 k2} (c : context k1 k2) {k3} (c0 : context k3 k1) t d, 
+  (dec_proc_plug :      forall {k1 k2} (c : context k1 k2) {k3} (c0 : context k3 k1) t d,
        ~dead_ckind k2 -> dec_proc c[t] c0 d -> dec_proc t (c ~+ c0) d)
 
-  (dec_proc_plug_rev :  forall {k1 k2} (c : context k1 k2) {k3} (c0 : context k3 k1) t d, 
+  (dec_proc_plug_rev :  forall {k1 k2} (c : context k1 k2) {k3} (c0 : context k3 k1) t d,
        dec_proc t (c ~+ c0) d -> dec_proc c[t] c0 d)
 
   (dec_proc_redex_self :             forall {k2} (r : redex k2) {k1} (c : context k1 k2),
        dec_proc r c (d_red r c))
 
-  (dec_proc_value_self :                                        forall {k} (v : value k), 
+  (dec_proc_value_self :                                        forall {k} (v : value k),
        ~dead_ckind k -> dec_proc v [.] (d_val v)).
 
-  (*dec_proc_alive :                 forall t {k1 k2} (c : context k1 k2) (d : decomp k1),
-       dec_proc t c d -> ~dead_ckind k1*)
 
 
-
-  Theorem dec_proc_eqv_dec :                      forall t {k1 k2} (c : context k1 k2) d, 
+  Theorem dec_proc_eqv_dec :                      forall t {k1 k2} (c : context k1 k2) d,
       ~dead_ckind k2 -> (dec_proc t c d <-> dec c[t] k1 d).
 
   Proof with eauto using (proper_death2 [.]), dead_context_dead.

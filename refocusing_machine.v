@@ -72,7 +72,7 @@ Module Type REF_EVAL_APPLY_MACHINE (R : RED_REF_SEM) <: ABSTRACT_MACHINE.
                                                          (no associativity, at level 70).
 
 
-  Definition next_conf (_ : entropy) st :=
+  Definition next_conf0 st :=
       match st with
       | c_eval t k c  => 
             match dec_term t k with
@@ -91,6 +91,8 @@ Module Type REF_EVAL_APPLY_MACHINE (R : RED_REF_SEM) <: ABSTRACT_MACHINE.
       | c_apply _ [.] v => 
             None
       end.
+  Definition next_conf (_ : entropy) := next_conf0.
+
 
   Axioms
   (final_correct :                                                              forall c,
@@ -288,7 +290,7 @@ Module RefEvalApplyMachine (R : RED_REF_SEM) <: REF_EVAL_APPLY_MACHINE R.
                                                          (no associativity, at level 70).
 
 
-  Definition next_conf (_ : entropy) st :=
+  Definition next_conf0 st :=
       match st with
       | c_eval t k c  => 
             match dec_term t k with
@@ -307,6 +309,7 @@ Module RefEvalApplyMachine (R : RED_REF_SEM) <: REF_EVAL_APPLY_MACHINE R.
       | c_apply _ [.] v => 
             None
       end.
+  Definition next_conf (_ : entropy) := next_conf0.
 
 
   Lemma final_correct :                                                         forall c,

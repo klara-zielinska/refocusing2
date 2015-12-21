@@ -6,7 +6,7 @@ Require Import reduction_languages_facts.
 
 
 
-Module Lam_NO_RefLang <: REF_LANG.
+Module Lam_NO_RefLang <: PRE_REF_SEM.
 
   Parameter var : Set.
 

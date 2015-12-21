@@ -1,5 +1,6 @@
 Require Import Program.
 Require Import Util.
+Require Import rewriting_system.
 Require Export reduction_semantics.
 Require Import reduction_languages_facts.
 Require Export reduction_strategy.
@@ -7,7 +8,7 @@ Require Export reduction_strategy.
 
 
 
-Module Type REF_LANG <: RED_STRATEGY_LANG.
+Module Type PRE_REF_SEM <: RED_STRATEGY_LANG.
 
   Include RED_STRATEGY_LANG.
 
@@ -22,41 +23,42 @@ Module Type REF_LANG <: RED_STRATEGY_LANG.
           contract r = Some t /\ t2 = c[t].
 
   Notation "t1 <| t2"      := (subterm_order t1 t2)      (at level 70, no associativity).
-  Notation "k |~ t1 → t2"  := (reduce k t1 t2)           (no associativity, at level 70).
+  Notation "k |~ t1 → t2"  := (reduce k t1 t2) 
+                                         (no associativity, at level 70, t1 at level 69).
   Notation "k |~ t1 →+ t2" := (clos_trans_1n _ (reduce k) t1 t2) 
-                                                         (no associativity, at level 70).
+                                         (no associativity, at level 70, t1 at level 69).
   Notation "k |~ t1 →* t2" := (clos_refl_trans_1n _ (reduce k) t1 t2) 
-                                                         (no associativity, at level 70).
+                                         (no associativity, at level 70, t1 at level 69).
 
   (* A property of deterministic reduction semantics: *)
   Axioms
-  (redex_trivial1 :                                        forall {k} (r : redex k) ec t, 
+  (redex_trivial1 :                                        forall {k} (r : redex k) ec t,
        ~dead_ckind (k+>ec) -> ec:[t] = r -> exists (v : value (k+>ec)), t = v)
   (wf_immediate_subterm : well_founded immediate_subterm)
   (wf_subterm_order     : well_founded subterm_order).
 
-End REF_LANG.
+End PRE_REF_SEM.
 
 
 
 
-Module Type REF_STRATEGY (R : REF_LANG) <: RED_STRATEGY R.
+Module Type REF_STRATEGY (PR : PRE_REF_SEM) <: RED_STRATEGY PR.
 
-  Import R.
+  Import PR.
 
-  Include RED_STRATEGY R.
+  Include RED_STRATEGY PR.
 
   Axioms 
-  (wf_search :                                                                forall k t, 
+  (wf_search :                                                                forall k t,
        well_founded (search_order k t))
 
-  (search_order_antisym :                                              forall k t ec ec0, 
+  (search_order_antisym :                                              forall k t ec ec0,
        k, t |~ ec << ec0 -> ~ k, t |~ ec0 << ec)
 
   (search_order_trans :                                           forall k t ec0 ec1 ec2,
        k, t |~ ec0 << ec1 -> k, t |~ ec1 << ec2 -> k,t |~ ec0 << ec2)
 
-  (search_order_comp_if :                                             forall t ec0 ec1 k, 
+  (search_order_comp_if :                                             forall t ec0 ec1 k,
        immediate_ec ec0 t -> immediate_ec ec1 t -> 
        ~dead_ckind (k+>ec0) -> ~dead_ckind (k+>ec1) ->
            k, t |~ ec0 << ec1  \/  k, t |~ ec1 << ec0  \/  ec0 = ec1)
@@ -126,123 +128,39 @@ End RED_REF_SEM.
 
 
 
-Module Type PE_RED_REF_SEM <: RED_REF_SEM.
+Module Type RED_PE_REF_SEM <: RED_REF_SEM.
 
   Include RED_REF_SEM.
   Import R.
 
   Axioms
-  (dec_context_not_val :                                 forall ec {k} (v1 : value k) v0, 
+  (dec_context_not_val :                                 forall ec {k} (v1 : value k) v0,
        dec_context ec k v0 <> in_val v1)
-  (dec_term_value :                                             forall {k} (v : value k), 
+  (dec_term_value :                                             forall {k} (v : value k),
        dec_term v k = in_val v).
 
-End PE_RED_REF_SEM.
+End RED_PE_REF_SEM.
 
 
 
 
-(*Module Type `RED_REF_SEM_filter (R : REF_LANG) (ST : REF_STRATEGY R) <: RED_SEM.
-
-  Import R ST.
-
-  Include R.
-
-  Axiom decompose : forall (t : term) k, ~dead_ckind k -> 
-                        exists (d : decomp k), dec t k d.
 
 
-  Inductive dec_proc : term -> forall {k1 k2}, context k1 k2 -> decomp k1 -> Prop :=
+Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
 
-  | d_dec  : forall t {k1 k2} (c : context k1 k2) {r : redex k2},
-               dec_term t k2 = in_red r -> 
-               dec_proc t c (d_red r c)
-  | d_v    : forall t {k1 k2} {c : context k1 k2} {v d},
-               dec_term t k2 = in_val v ->
-               decctx_proc v c d ->
-               dec_proc t c d
-  | d_term : forall t {t0 k1 k2} {c : context k1 k2} {ec d},
-               dec_term t k2 = in_term t0 ec ->
-               dec_proc t0 (ec=:c) d ->
-               dec_proc t c d
+  Module RLF := RED_LANG_Facts PR.
+  Import PR RLF.
 
-  with decctx_proc : forall {k2}, value k2 -> 
-                         forall {k1}, context k1 k2 -> decomp k1 -> Prop :=
-
-  | dc_end  : forall {k} (v : value k) (H : ~ dead_ckind k),
-                decctx_proc v [.] (d_val H v)
-  | dc_dec  : forall ec {k2} (v : value (k2+>ec)) {k1} (c : context k1 k2) {r},
-                dec_context ec k2 v = in_red r ->
-                decctx_proc v (ec=:c) (d_red r c)
-  | dc_val  : forall {k2} {v0 : value k2} ec (v : value (k2+>ec)) 
-                     {k1} {c  : context k1 k2} {d},
-                dec_context ec k2 v = in_val v0 ->
-                decctx_proc v0 c d ->
-                decctx_proc v (ec=:c) d
-  | dc_term : forall ec {ec0 k2} (v : value (k2+>ec)) 
-                            {k1} {c : context k1 k2} {t d},
-                dec_context ec k2 v = in_term t ec0 ->
-                dec_proc t (ec0=:c) d ->
-                decctx_proc v (ec=:c) d.
-
-  Scheme dec_proc_Ind    := Induction for dec_proc    Sort Prop
-    with decctx_proc_Ind := Induction for decctx_proc Sort Prop.
-
-
-  Axioms
-  (dec_not_dead : forall {t k1 k2} {c : context k1 k2} {d},
-                           dec_proc t c d -> ~ dead_ckind k2)
-  (decctx_not_dead : forall {k1 k2} {c : context k1 k2} {v d},
-                              decctx_proc v c d -> ~ dead_ckind k2)
-  (dec_correct : 
-      forall t {k1 k2} (c : context k1 k2) d, dec_proc t c d -> c[t] = d)
-  (dec_val : forall {k2} (v : value k2) {k1} {c : context k1 k2} {d},
-                      dec_proc v c d -> decctx_proc v c d)
-  (val_dec : forall {k2} {v : value k2} {k1} {c : context k1 k2} {d},
-                      decctx_proc v c d -> dec_proc v c d)
-  (dec_redex_self_e : forall {k} (r : redex k), dec_proc r [.] (d_red r [.]))
-  (dec_redex_self : forall {k2} (r : redex k2) {k1} (c : context k1 k2), 
-                             dec_proc r c (d_red r c))
-  (dec_under_redex : 
-      forall ec t {k} (r : redex k), ec:[t] = r -> ~dead_ckind (k+>ec) -> 
-          forall {k0} (c : context k0 k), dec_proc t (ec=:c) (d_red r c))
-  (dec_under_value : 
-      forall ec t {k} (v : value k), ec:[t] = v -> ~dead_ckind (k+>ec) -> 
-          forall {k0} (c : context k0 k) d, decctx_proc v c d -> dec_proc t (ec=:c) d)
-  (dec_plug : 
-      forall {k1 k2} (c : context k1 k2) {k3} {c0 : context k3 k1} {t d}, 
-          ~ dead_ckind k2 -> dec_proc c[t] c0 d -> dec_proc t (c~+c0) d)
-  (dec_plug_rev : 
-      forall {k1 k2} (c : context k1 k2) {k3} {c0 : context k3 k1} {t d}, 
-          dec_proc t (c~+c0) d -> dec_proc c[t] c0 d)
-  (dec_value_self : forall {k} (v : value k) (H : ~ dead_ckind k), 
-                             dec_proc v [.] (d_val H v))
-  (dec_proc_val_eqv_decctx :                       forall {k2} (v : value k2) {k1}
-                                                                   (c : context k1 k2) d,
-       dec_proc v c d <-> decctx_proc v c d)
-  (dec_proc_eqv_dec :                      forall t {k1 k2} (c : context k1 k2) d,
-      ~dead_ckind k2 -> (dec_proc t c d <-> dec c[t] k1 d)).
-
-End RED_REF_SEM.*)
-
-
-
-
-Module RedRefSem (RL : REF_LANG) (ST : REF_STRATEGY RL) <: RED_REF_SEM.
-
-  Module RF := RED_LANG_Facts RL.
-  Import RL RF.
 
 
   Module ST := ST.
   Export ST.
 
-
   Module R <: RED_SEM.
 
-    Include RL.
+    Include PR.
 
-    Lemma decompose :                                                forall (t : term) k, 
+    Lemma decompose :                                                forall (t : term) k,
         ~dead_ckind k -> exists (d : decomp k), dec t k d.
 
     Proof with unfold dec; eauto using dec_context_next_alive, dec_term_next_alive.
@@ -295,6 +213,10 @@ Module RedRefSem (RL : REF_LANG) (ST : REF_STRATEGY RL) <: RED_REF_SEM.
 
       - intuition.
     Qed.
+
+
+    Instance lrws : LABELED_REWRITING_SYSTEM := 
+    { label := ckind; lconfiguration := term; ltransition := reduce }.
 
   End R.
 
@@ -365,7 +287,7 @@ Module RedRefSem (RL : REF_LANG) (ST : REF_STRATEGY RL) <: RED_REF_SEM.
   Qed.
 
 
-  Lemma dec_correct :                             forall t {k1 k2} (c : context k1 k2) d, 
+  Lemma dec_correct :                             forall t {k1 k2} (c : context k1 k2) d,
       dec_proc t c d -> c[t] = d.
 
   Proof.
@@ -631,7 +553,7 @@ Module RedRefSem (RL : REF_LANG) (ST : REF_STRATEGY RL) <: RED_REF_SEM.
   Qed.
 
 
-  Lemma dec_under_value :        forall ec t {k} (v : value k) {k0} (c : context k0 k) d, 
+  Lemma dec_under_value :        forall ec t {k} (v : value k) {k0} (c : context k0 k) d,
       ec:[t] = v -> ~dead_ckind (k+>ec) -> decctx_proc v c d -> dec_proc t (ec=:c) d.
 
   Proof.
@@ -666,7 +588,7 @@ Module RedRefSem (RL : REF_LANG) (ST : REF_STRATEGY RL) <: RED_REF_SEM.
   Qed.
 
 
-  Lemma dec_plug :    forall {k1 k2} (c : context k1 k2) {k3} {c0 : context k3 k1} {t d}, 
+  Lemma dec_plug :    forall {k1 k2} (c : context k1 k2) {k3} {c0 : context k3 k1} {t d},
       ~dead_ckind k2 -> dec_proc c[t] c0 d -> dec_proc t (c~+c0) d.
 
   Proof with eauto.
@@ -709,7 +631,7 @@ Module RedRefSem (RL : REF_LANG) (ST : REF_STRATEGY RL) <: RED_REF_SEM.
                   rewrite H2 in ht.
                   rewrite <- hh in ht.
                   destruct (dec_context_term_next _ _ _ H2) as (H4', H6).
-                  destruct search_order_comp_if with ec:[t] ec2 ec k2 as [H7 | [H7 | H7]].
+                  destruct search_order_comp_if with ec:[t] ec2 ec k2 as [H7|[H7|H7]].
                       compute...
                       compute...
                       assert (H7 := search_order_comp_fi _ _ _ _ H4'); intuition.
@@ -729,7 +651,7 @@ Module RedRefSem (RL : REF_LANG) (ST : REF_STRATEGY RL) <: RED_REF_SEM.
   Qed.
 
 
-  Lemma dec_plug_rev :       forall {k1 k2} (c : context k1 k2) {k3} (c0 : context k3 k1) 
+  Lemma dec_plug_rev :       forall {k1 k2} (c : context k1 k2) {k3} (c0 : context k3 k1)
                                                                                      t d,
           dec_proc t (c~+c0) d -> dec_proc c[t] c0 d.
 
@@ -897,48 +819,6 @@ Module RedRefSem (RL : REF_LANG) (ST : REF_STRATEGY RL) <: RED_REF_SEM.
                          dec_redex_self, dec_value_self. Qed.
 
 End RedRefSem.
-
-
-
-
-
-
-
-
-
-
-
-  (*Lemma dec_is_function : forall {t k} {d0 d1 : decomp k}, 
-                              dec t k d0 -> dec t k d1 -> d0 = d1.
-  Proof.
-    intros t k d0 d1 DE0 DE1.
-
-    induction DE0 using dec_Ind with 
-    (P  := fun t _ _ c d _ => forall d1, dec t c d1    -> d = d1)
-    (P0 := fun _ v _ c d _ => forall d1, decctx v c d1 -> d = d1);
-
-    intros;
-
-    (* automated cases *)
-    match goal with
-
-    | [ RD : (dec ?t ?c ?d), DT1 : (dec_term ?t ?k = _) |- _ ] => 
-             inversion RD; dep_subst; 
-             match goal with DT2 : (dec_term ?t ?k = _) |- _ => 
-                 rewrite DT2 in DT1; inversion DT1 end
-
-    | [ RC : (decctx ?v (?ec=:?c) ?d), DC1 : (dec_context ?ec ?k ?v = _) |- _ ] => 
-             dependent_destruction2 RC; inversion_ccons x2; dep_subst;
-             match goal with DC2 : (dec_context ?ec' ?k' ?v' = _) |- _ => 
-                 rewrite DC2 in DC1; inversion DC1 end
-
-    | [ RC : (decctx ?v [.] ?d) |- _] => 
-             dependent_destruction2 RC
-
-    end;
-
-    subst; eauto.
-  Qed.*)
 
 
 

@@ -1,10 +1,11 @@
-Require Import Program.
-Require Import Entropy.
-Require Import Util.
-Require Import lam_no.
-Require Import abstract_machine.
-Require Import reduction_semantics.
-Require Import reduction_languages_facts.
+Require Import Program
+               Entropy
+               Util
+               rewriting_system
+               lam_no
+               abstract_machine
+               reduction_semantics
+               reduction_languages_facts.
 
 
 
@@ -158,10 +159,6 @@ Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
 
   Import Lam_NO_EAM Lam_NO_RefLang.
 
-  Notation "st1 >>  st2" := (st1 → st2)                  (no associativity, at level 70).
-  Notation "st1 >>+ st2" := (st1 →+ st2)                 (no associativity, at level 70).
-  Notation "st1 >>* st2" := (st1 →* st2)                 (no associativity, at level 70).
-
 
   Definition term          := term.
   Definition value         := value init_ckind.
@@ -215,22 +212,25 @@ Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
 
   Definition transition st1 st2 := next_conf0 st1 = Some st2.
 
+  Instance rws : REWRITING_SYSTEM :=
+  { configuration := configuration; transition := transition }.
 
+(* Uncomment if you don't want to use classes :
   Notation "c1 → c2"  := (transition c1 c2)              (no associativity, at level 70).
   Notation "t1 →+ t2" := (clos_trans_1n _ transition t1 t2)
                                                          (no associativity, at level 70).
   Notation "t1 →* t2" := (clos_refl_trans_1n _ transition t1 t2)
                                                          (no associativity, at level 70).
+*)
 
-
-  Fact trans_computable0 :                                                forall st1 st2,
-       st1 → st2 <-> next_conf0 st1 = Some st2.
+  Fact trans_computable0 :                                       forall (st1 st2 : conf),
+       `(rws) st1 → st2 <-> next_conf0 st1 = Some st2.
 
   Proof. intuition. Qed.
 
 
   Fact trans_computable :                                                 forall st1 st2,
-       st1 → st2 <-> exists e, next_conf e st1 = Some st2.
+       `(rws) st1 → st2 <-> exists e, next_conf e st1 = Some st2.
 
   Proof. 
    intuition. 
@@ -240,9 +240,10 @@ Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
 
 
 
-  Module EAM := Lam_NO_EAM.
 
-  Theorem next_conf0_eq_EAM : forall st, next_conf0 st = EAM.next_conf0 st.
+  Theorem next_conf0_eq_EAM :                                                  forall st,
+      next_conf0 st = Lam_NO_EAM.next_conf0 st.
+
   Proof.
     destruct st as [t k ? | k c v].
     - destruct t, k; eauto.
@@ -251,21 +252,27 @@ Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
   Qed.
 
 
-  Corollary next_conf_eq_EAM : forall e st, next_conf e st = EAM.next_conf e st.
+  Corollary next_conf_eq_EAM :                                               forall e st,
+      next_conf e st = Lam_NO_EAM.next_conf e st.
+
   Proof. eauto using next_conf0_eq_EAM. Qed.
 
 
-  Corollary transition_eqv_EAM : forall st1 st2, st1 >> st2 <-> st1 → st2.
+  Corollary transition_eqv_EAM :                                          forall st1 st2,
+      `(Lam_NO_EAM.rws) st1 → st2  <->  `(rws) st1 → st2.
+
   Proof.
     intros.
-    rewrite trans_computable, EAM.trans_computable. unfold EAM.next_conf, next_conf.
+    rewrite trans_computable, Lam_NO_EAM.trans_computable.
+    unfold Lam_NO_EAM.next_conf, next_conf.
     rewrite next_conf0_eq_EAM.
     intuition.
   Qed.
 
 
   Proposition final_correct :                                                  forall st,
-       final st <> None -> ~exists st', st → st'.
+       final st <> None -> ~exists st', `(rws) st → st'.
+
   Proof.
     destruct st as [? | ? c v]; auto.
     destruct c; auto.
@@ -276,7 +283,7 @@ Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
 
   Fact finals_are_vals :                                                     forall st v,
        final st = Some v <-> st = v. 
-  Proof. exact EAM.finals_are_vals. Qed.
-    
+
+  Proof. exact Lam_NO_EAM.finals_are_vals. Qed.
 
 End Lam_NO_HandMachine.

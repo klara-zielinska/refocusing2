@@ -5,8 +5,7 @@ Require Import Entropy.
 
 
 
-
-Module Type ABSTRACT_MACHINE <: REWRITING_SYSTEM.
+Module Type ABSTRACT_MACHINE.
 
   Parameters 
   (term          : Set)
@@ -21,11 +20,18 @@ Module Type ABSTRACT_MACHINE <: REWRITING_SYSTEM.
 
   Coercion value_to_conf : value >-> configuration.
 
+
+  Instance rws : REWRITING_SYSTEM :=
+  { configuration := configuration; transition := transition }.
+
+(* Uncomment if you don't want to use classes:
+
   Notation "c1 → c2"  := (transition c1 c2)              (no associativity, at level 70).
   Notation "t1 →+ t2" := (clos_trans_1n _ transition t1 t2) 
                                                          (no associativity, at level 70).
   Notation "t1 →* t2" := (clos_refl_trans_1n _ transition t1 t2) 
                                                          (no associativity, at level 70).
+*)
 
   Axioms
   (final_correct :                                                              forall c,
@@ -44,7 +50,8 @@ Module Type ABSTRACT_MACHINE_DET (AM : ABSTRACT_MACHINE).
 
   Include AM.
 
-  Axiom trans_det : forall c1 c2 c3, c1 → c2 -> c1 → c3 -> c2 = c3.
+  Axiom trans_det :                                                      forall c1 c2 c3,
+      c1 → c2  ->  c1 → c3  ->  c2 = c3.
 
 End ABSTRACT_MACHINE_DET.
 

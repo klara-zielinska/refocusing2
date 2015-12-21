@@ -1,5 +1,6 @@
 Require Import Relations.
 Require Import Program.
+Require Import rewriting_system.
 
 
 (* Note: The only grammar mentioned in this formalization is a grammar of evaluation
@@ -226,11 +227,8 @@ Module Type RED_SEM.
           contract r = Some t /\ t2 = c[t].
 
 
-  Notation "k |~ t1 → t2"  := (reduce k t1 t2)           (no associativity, at level 70).
-  Notation "k |~ t1 →+ t2" := (clos_trans_1n _ (reduce k) t1 t2) 
-                                                         (no associativity, at level 70).
-  Notation "k |~ t1 →* t2" := (clos_refl_trans_1n _ (reduce k) t1 t2) 
-                                                         (no associativity, at level 70).
+  Instance lrws : LABELED_REWRITING_SYSTEM :=
+  { label := ckind; lconfiguration := term; ltransition := reduce }.
 
 End RED_SEM.
 
@@ -238,6 +236,6 @@ End RED_SEM.
 
 
 Module Type RED_SEM_DET (R : RED_SEM).  Import R.
-  Axiom dec_is_pfunction : forall {t k} {d d0 : decomp k}, 
-                               dec t k d -> dec t k d0 -> d = d0.
+  Axiom dec_is_det : forall {t k} {d d0 : decomp k}, 
+                         dec t k d -> dec t k d0 -> d = d0.
 End RED_SEM_DET.

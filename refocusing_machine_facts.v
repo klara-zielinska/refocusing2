@@ -1,21 +1,25 @@
-Require Import Util.
-Require Import Program.
-Require Import refocusing_semantics.
-Require Import refocusing_machine.
-Require Import reduction_languages_facts reduction_semantics_facts 
-                   refocusing_semantics_facts.
+Require Import Util
+               Program
+               rewriting_system
+               rewriting_system_following
+               refocusing_semantics
+               refocusing_machine
+               reduction_languages_facts
+               reduction_semantics_facts 
+               refocusing_semantics_facts.
 
 
 
 
 Module RefEvalApplyMachine_Facts (R : RED_REF_SEM) (EAM : REF_EVAL_APPLY_MACHINE R).
 
-  Module RF := RED_LANG_Facts R.
-  Import R.R R RF.
+  Module RLF := RED_LANG_Facts R.
+  Module RRSDet := RedRefSemDet R.
+  Import R.R R RLF RRSDet.
 
-  Notation "c1 >> c2" := (init_ckind |~ c1 → c2) (no associativity, at level 70).
   Notation "k |~ c1 >> c2" := (k |~ c1 → c2)     
                                          (no associativity, at level 70, c1 at level 69).
+  Notation "c1 >> c2" := (init_ckind |~ c1 → c2) (no associativity, at level 70).
 
 
   Import ST.
@@ -40,14 +44,14 @@ Module RefEvalApplyMachine_Facts (R : RED_REF_SEM) (EAM : REF_EVAL_APPLY_MACHINE
         end;
     try solve [left; simpl; congruence].
     - right. 
-      unfold reduce, dec. 
+      unfold ltransition; simpl; unfold reduce, dec.
       exists k c r t0.
       intuition.
       + eapply proper_death_trans...
       + simpl.
         congruence.
     - right.
-      unfold reduce, dec.
+      unfold ltransition; simpl; unfold reduce, dec.
       exists k c r t.
       intuition.
       + eapply proper_death_trans...
@@ -306,33 +310,70 @@ match d with
 
 
 
-  Theorem am_context_complete :                  forall t1 t2 {k} (c : context ick k) st,
-      k |~ t1 >> t2 -> decompile st = c[t1] -> 
+  Lemma am_context_complete_eval :                forall t1 t2 {k} (c : context ick k) t,
+      t1 >> t2  ->  ~dead_ckind k  ->  t1 = c[t] ->
           exists n (sts : Vector.t configuration n) st,
-          (**)Forall (fun st => decompile st = c[t1]) sts /\
-          (**)decompile st = c[t2]                        /\
+          (**)Forall (fun st => decompile st = t1) sts /\
+          (**)decompile st = t2                        /\
           (**)forall m : Fin.t (n+1), 
-                  (c_eval t1 c :: sts ++ [st])[@m] → (sts ++ [st])[@m].
+                  (c_eval t c :: sts ++ [st])[@m] → (sts ++ [st])[@m].
 
   Proof with eauto.
-    intros t1 t2 k c st H H0.
-    destruct H as [k2 [c2 [r [t [[H H1] [H2 H3]]]]]].
-    assert (H4 : dec c[t1] ick (d_red r (c2~+c))).
+    intros t1 t2 k c t H H0 H1.
+    destruct H as [k2 [c2 [r [t' [[H H2] [H3 H4]]]]]].
+    assert (H5 : dec c[t] ick (d_red r c2)).
     {
         constructor;
         solve [subst; simpl; eauto using dead_context_dead, plug_compose].
     }
     assert (~dead_ckind k2) by eauto using (proper_death2 [.]).
-    apply dec_proc_eqv_dec in H4...
-    destruct (dec_proc_sim _ _ _ [.] H4) as [n [sts [G [ [[G0 G1] | [ec [v [G1 G0]]]] G2] ]]];
+    apply dec_proc_eqv_dec in H5...
+    destruct (dec_proc_sim _ _ _ [.] H5) as [n [sts [G [ [[G0 G1] | [ec [v [G1 G0]]]] G2] ]]];
         rewrite <- (compose_empty c) in *;
-        rewrite <- (compose_empty (c2~+c)) in *;
-        exists n sts (c_eval t (c2 ~+ c));
+        rewrite <- (compose_empty (c2)) in *;
+        exists n sts (c_eval t' c2);
     (
         split;
-        [ auto
+        [ rewrite H1; auto
         | split;
-        [ simpl; rewrite plug_compose; congruence
+        [ auto
+        | apply local1; eauto;
+          unfold configuration; (*sic*)
+          rewrite G0
+        ] ]
+    );
+    [ econstructor 1 | econstructor 4 ]...
+  Qed.
+
+
+  Lemma am_context_complete_apply : forall t1 t2 {k} (c : context ick k) (v : R.value k),
+      t1 >> t2 ->  ~dead_ckind k  ->  t1 = c[v]  ->
+          exists n (sts : Vector.t configuration n) st,
+          (**)Forall (fun st => decompile st = t1) sts /\
+          (**)decompile st = t2                          /\
+          (**)forall m : Fin.t (n+1), 
+                  (c_apply c v :: sts ++ [st])[@m] → (sts ++ [st])[@m].
+
+  Proof with eauto.
+    intros t1 t2 k c v H H0 H1.
+    destruct H as [k2 [c2 [r [t' [[H H2] [H3 H4]]]]]].
+    assert (H5 : dec c[v] ick (d_red r c2)).
+    {
+        constructor;
+        solve [subst; simpl; eauto using dead_context_dead, plug_compose].
+    }
+    assert (~dead_ckind k2) by eauto using (proper_death2 [.]).
+    apply dec_proc_eqv_dec in H5...
+    apply dec_proc_val_eqv_decctx in H5.
+    destruct (decctx_proc_sim _ _ _ [.] H5) as [n [sts [G [ [[G0 G1] | [ec [v' [G1 G0]]]] G2] ]]];
+        rewrite <- (compose_empty c) in *;
+        rewrite <- (compose_empty (c2)) in *;
+        exists n sts (c_eval t' c2);
+    (
+        split;
+        [ rewrite H1; auto
+        | split;
+        [ auto
         | apply local1; eauto;
           unfold configuration; (*sic*)
           rewrite G0
@@ -343,16 +384,26 @@ match d with
 
 
 
-  Corollary am_complete :                                                forall t1 t2 st,
-      t1 >> t2 -> decompile st = t1 -> 
-          exists n (sts : Vector.t configuration n) st,
+  Definition good_state st := 
+      match st with 
+      | c_eval _ k _  => ~dead_ckind k 
+      | c_apply k _ _ => ~dead_ckind k
+      end.
+
+
+  Corollary am_complete :                                               forall t1 t2 st1,
+      t1 >> t2 -> good_state st1 -> decompile st1 = t1 -> 
+          exists n (sts : Vector.t configuration n) st2,
           (**)Forall (fun st => decompile st = t1) sts /\
-          (**)decompile st = t2                        /\
+          (**)decompile st2 = t2                       /\
           (**)forall m : Fin.t (n+1), 
-                  (c_eval t1 [.] :: sts ++ [st])[@m] → (sts ++ [st])[@m].
+                  (st1 :: sts ++ [st2])[@m] → (sts ++ [st2])[@m].
+
   Proof with eauto.
-    intros.
-    apply (am_context_complete t1 t2 [.] st)...
+    intros t1 t2 st1 H H0 H1.
+    destruct st1.
+    - apply am_context_complete_eval...
+    - eapply am_context_complete_apply...
   Qed.
 
 
@@ -523,6 +574,23 @@ match d with
     - apply (no_silent_loops_eval t c)...
     - apply (no_silent_loops_apply v c)...
   Qed.
+
+
+  (*Instance red_ref_sem_rws : REWRITING_SYSTEM :=
+  { configuration := R.term; transition := reduce init_ckind }.
+  Instance following : RW_FOLLOWING EAM.rws red_ref_sem_rws :=
+  {
+      semantics := decompile;
+      correct := am_correct;
+      no_silent_loops := no_silent_loops
+  }.
+  intros cd1 cd2 cdr1 H H0.
+  destruct (am_complete cd1 cd2 cdr1 H H0) as [n [crs [cr2 [H1 [H2 H3]]]]].
+  exists n crs cr2.
+  split; [| split].
+  - exact H1.
+  - exact H2.
+  - exact H3.*)
 
 End RefEvalApplyMachine_Facts.
 

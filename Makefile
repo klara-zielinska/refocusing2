@@ -87,6 +87,7 @@ VFILES:=Util.v\
   reduction_semantics_facts.v\
   reduction_strategy.v\
   rewriting_system.v\
+  rewriting_system_following.v\
   abstract_machine.v\
   refocusing_semantics.v\
   refocusing_machine.v\

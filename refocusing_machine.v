@@ -1,11 +1,12 @@
 
 (*** Signatures ***)
 
-Require Import Relations.
-Require Import Entropy.
-Require Import reduction_semantics.
-Require Import refocusing_semantics.
-Require Import abstract_machine.
+Require Import Relations
+               Entropy
+               rewriting_system 
+               reduction_semantics 
+               refocusing_semantics 
+               abstract_machine.
 
 
 
@@ -64,6 +65,10 @@ Module Type REF_EVAL_APPLY_MACHINE (R : RED_REF_SEM) <: ABSTRACT_MACHINE.
 
   where "st1 → st2" := (trans st1 st2).
   Definition transition := trans.
+
+  Instance rws : REWRITING_SYSTEM :=
+  { configuration := configuration; transition := transition }.
+(*
   Hint Unfold transition.
 
   Notation "t1 →+ t2" := (clos_trans_1n _ transition t1 t2) 
@@ -71,7 +76,7 @@ Module Type REF_EVAL_APPLY_MACHINE (R : RED_REF_SEM) <: ABSTRACT_MACHINE.
   Notation "t1 →* t2" := (clos_refl_trans_1n _ transition t1 t2) 
                                                          (no associativity, at level 70).
 
-
+*)
   Definition next_conf0 st :=
       match st with
       | c_eval t k c  => 
@@ -108,8 +113,7 @@ End REF_EVAL_APPLY_MACHINE.
 
 
 (*
-Module Type REF_PUSH_ENTER_MACHINE (R : RED_LANG) (PERS : PE_RED_REF_SEM R) 
-                                                       <: DET_ABSTRACT_MACHINE.
+Module Type REF_PUSH_ENTER_MACHINE (R : RED_PE_REF_SEM R) <: DET_ABSTRACT_MACHINE.
 
   Import R.
   Import PERS.ST.
@@ -282,12 +286,9 @@ Module RefEvalApplyMachine (R : RED_REF_SEM) <: REF_EVAL_APPLY_MACHINE R.
 
   where "st1 → st2" := (trans st1 st2).
   Definition transition := trans.
-  Hint Unfold transition.
 
-  Notation "t1 →+ t2" := (clos_trans_1n _ transition t1 t2) 
-                                                         (no associativity, at level 70).
-  Notation "t1 →* t2" := (clos_refl_trans_1n _ transition t1 t2) 
-                                                         (no associativity, at level 70).
+  Instance rws : REWRITING_SYSTEM :=
+  { configuration := configuration; transition := transition }.
 
 
   Definition next_conf0 st :=

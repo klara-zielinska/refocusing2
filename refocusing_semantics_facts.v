@@ -1,6 +1,6 @@
 Require Import Util.
 Require Import Program.
-Require Import refocusing_semantics.
+Require Import rewriting_system refocusing_semantics.
 Require Import reduction_languages_facts.
 
 
@@ -42,9 +42,6 @@ Module RED_REF_SEM_Facts (R : RED_REF_SEM).
       end;
       solve [congruence].
   Qed.
-
-
-
 
 End RED_REF_SEM_Facts.
 
@@ -94,7 +91,7 @@ Module RedRefSemDet (R : RED_REF_SEM) <: RED_SEM_DET R.
 
 
 
-  Theorem dec_is_pfunction :                             forall t {k} (d0 d1 : decomp k),
+  Lemma dec_is_det :                                   forall t {k} (d0 d1 : decomp k),
       dec t k d0 -> dec t k d1 -> d0 = d1.
 
   Proof with auto.
@@ -106,53 +103,5 @@ Module RedRefSemDet (R : RED_REF_SEM) <: RED_SEM_DET R.
     eauto 10 using dec_proc_is_pfunction.
   Qed.
 
-
-(*  Lemma iter_is_function : forall {k} {d : decomp k} {v0 v1}, 
-                               iter d v0 -> iter d v1 -> v0 = v1.
-  Proof with eauto.
-    intros k d v0 v1.
-    induction 1; intro H2.
-    - dependent destruction H2...
-    - dependent destruction H2; subst. 
-      rewrite H2 in H; inversion H; subst.
-      apply IHiter.
-      erewrite (dec_is_function)...
-  Qed.
-
-
-  Lemma eval_is_function : forall {t} {v0 v1 : value init_ckind}, 
-                               eval t v0 -> eval t v1 -> v0 = v1.
-  Proof with eauto.
-    intros t v0 v1 H H0.
-    dependent destruction H.
-    dependent destruction H0.
-    dependent induction H.
-    - dependent destruction H0.
-      + auto using value_to_term_injective.
-      + destruct H as [k [c [r [t [H _]]]]].
-        apply dec_correct in H.
-        destruct (value_trivial v c r) as [v1 H1]; 
-            eauto using (proper_death2 [.] r).
-        symmetry in H1.
-        apply value_redex in H1.
-        autof.
-    - dependent destruction H1.
-      + destruct H as [k [c [r [t [H _]]]]].
-        apply dec_correct in H.
-        destruct (value_trivial v0 c r) as [v1 H1]; 
-            eauto using (proper_death2 [.] r).
-        symmetry in H1.
-        apply value_redex in H1.
-        autof.
-      + destruct H  as [k1 [c1 [r1 [t1 [H3 [H4 H5]]]]]],
-                 H1 as [k2 [c2 [r2 [t2 [G3 [G4 G5]]]]]].
-        assert (H6 : d_red r1 c1 = d_red r2 c2).
-        { eauto using dec_is_function. }
-        inversion H6; dep_subst.
-        assert (H5 : t1 = t2).
-        { congruence. }
-        subst.
-        eauto.
-  Qed.*)
 
 End RedRefSemDet.

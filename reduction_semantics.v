@@ -64,19 +64,37 @@ Module Type RED_SEM.
      contextes. *)
 
 
-  Parameter term : Set.
-  Parameter elem_context : Set.
-  Parameter ckind : Set. (* kinds of contexts, that is, non-terminal context symbols 
-                            in the grammar *)
+  Parameters 
+  (term         : Set)
+  (elem_context : Set)
+  (ckind        : Set) (* kinds of contexts, that is, non-terminal context symbols 
+                          in the grammar *)
+  (ckind_trans  : ckind -> elem_context -> ckind) (* 
+          function that determinates the productions in the grammar, that is,
+          if ckind_trans k1 ec = k2, then k1 -> EC[k2] where ec matches EC or
+          there is no such production and k2 is a sink. 
+          In other words, it is the transition function of a finite automaton 
+          representing the totalized grammar. *)
+  (elem_plug     : term -> elem_context -> term)
+  (redex         : ckind -> Set) (* representations of redexes that may occur in 
+                                    a hole of a given kind *) 
+  (value         : ckind -> Set) (* 
+          representations of values that may occure in a hole of a given kind; 
+          if the kind is not a sink then the values need to represent a subset of 
+          normal forms of the kind, otherwise they may be represent any subset of 
+          terms *)
+  (value_to_term : forall {k}, value k -> term)
+  (redex_to_term : forall {k}, redex k -> term)
+  (init_ckind    : ckind)         (* a start symbol in the grammar *)
+  (dead_ckind    : ckind -> Prop) (* a set of sink symbols; if your grammar is not 
+                                     total you need to introduce at least one *)
+  (contract : forall {k}, redex k -> option term). (* reduction of a redex, which 
+                                                      may get stuck *)
 
-
-  (* ckind_trans - function that determinates the productions in the grammar, that is,
-                   if ckind_trans k1 ec = k2, then k1 -> EC[k2] where ec matches EC or
-                   there is no such production and k2 is a sink. 
-                   In other words, it is the transition function of a finite automaton 
-                   representing the totalized grammar. *)
-  Parameter  ckind_trans : ckind -> elem_context -> ckind.
-  Infix "+>" := ckind_trans (at level 50, left associativity).
+  Infix "+>"           := ckind_trans (at level 50, left associativity).
+  Notation "ec :[ t ]" := (elem_plug t ec) (at level 0).
+  Coercion  value_to_term : value >-> term.
+  Coercion  redex_to_term : redex >-> term.
 
 
   (* context k1 k2 - contexts of kind k1 (derivated from k1) with a hole of kind k2. 
@@ -90,25 +108,19 @@ Module Type RED_SEM.
   | empty : context k1 k1
   | ccons : forall (ec : elem_context) {k2}, context k1 k2 -> context k1 (k2+>ec).
   Arguments empty {k1}. Arguments ccons {k1} _ {k2} _.
-
   Notation "[.]"      := empty.
   Notation "[.]( k )" := (@empty k).
   Infix    "=:"       := ccons (at level 60, right associativity).
 
-
   (* Note: Contexts are reversed, because during evaluation by refocusing we always 
      access the elem. context nearest to the hole of a context. *)
 
+  (* Definition: The hole of a context is called >dead< if its kind is a sink symbol. *)
 
-  (* Definition: The hole of a context is >dead< if its kind is a sink symbol. *)
-
-  (* Definition: A context is >proper< if its hole is not dead. 
+  (* Definition: A context is called >proper< if its hole is not dead. 
      (Context with dead holes are contexts that cannot be generated in the orginal
      grammar.) *)
 
-
-
-  (* Standard contexts composition: *)
   Fixpoint compose {k1 k2} (c0 : context k1 k2) 
                       {k3} (c1 : context k3 k1) : context k3 k2 := 
       match c0 in context _ k2' return context k3 k2' with
@@ -117,14 +129,6 @@ Module Type RED_SEM.
       end.
   Infix "~+" := compose (at level 60, right associativity).
 
-
-
-  (* Plugging is standard. You need to provide only plugging function for elem.
-     contexts. *)
-
-  Parameter elem_plug : term -> elem_context -> term.
-  Notation "ec :[ t ]" := (elem_plug t ec) (at level 0).
-
   Fixpoint plug (t : term) {k1 k2} (c : context k1 k2) : term :=
       match c with
       | [.]    => t 
@@ -132,75 +136,15 @@ Module Type RED_SEM.
       end.
   Notation "c [ t ]" := (plug t c) (at level 0).
 
-  (* The following axiom, somehow, relates our representation of contexts to the 
-     real eval. contexts, but generally we can instantiate the module with 
-     elem. contexts that do not represent real elem. contexts and so not
-     every module of this signature is a proper. *)
-  Axiom elem_plug_injective1 : forall ec {t0 t1}, ec:[t0] = ec:[t1] -> t0 = t1.
-
-
-  (* An intuitive definition: *)
   Definition immediate_ec ec t := exists t', ec:[t'] = t.
 
-
-  (* redex k - representations of redexes that may occur in a hole of the kind k. 
-     value k where k is not a sink
-             - (almost) normal forms of kind k, that is, representations of terms
-               that cannot be decomposed to a context k k' and a redex k'.  value k
-               where k is a sink may be anything. *)
-  Parameters value redex : ckind -> Set.
-
-  Parameter value_to_term : forall {k}, value k -> term.
-  Coercion  value_to_term : value >-> term.
-  Parameter redex_to_term : forall {k}, redex k -> term.
-  Coercion  redex_to_term : redex >-> term.
-
-  Axiom value_to_term_injective : 
-      forall {k} (v v' : value k), value_to_term v = value_to_term v' -> v = v'.
-  Axiom redex_to_term_injective : 
-      forall {k} (r r' : redex k), redex_to_term r = redex_to_term r' -> r = r'.
-
-
-
-
-  Parameter  init_ckind : ckind.         (* start symbol in the grammar *)
-  Parameter  dead_ckind : ckind -> Prop. (* set of sink symbols; if your grammar
-                                            is not total you need to introduce at least
-                                            one *)
-
-  (* The sink property: *)
-  Axiom death_propagation : 
-      forall k, dead_ckind k -> forall ec, dead_ckind (k+>ec).
-  (* A key property of sink non-terminals: *)
-  Axiom proper_death : 
-      forall k, dead_ckind k -> ~ exists (r : redex k), True.
-
-
-
-
-  (* Definition: A decomposition c[t] is empty if c is empty. *)
-  (* Definition: A decomposition c[t] is proper if c is proper. *)
-
-
-  (* Axioms of normal forms: *)
-  Axiom value_trivial1 : forall {k} (v : value k) ec {t}, 
-                             ~dead_ckind (k+>ec) -> ec:[t] = v -> 
-                                 exists (v' : value (k+>ec)), t = v'.
-  Axiom value_redex    : forall {k} (v : value k) (r : redex k), 
-                             value_to_term v <> redex_to_term r.
-  (*Axiom trivial_val_red : 
-      forall k t, ~dead_ckind k -> only_trivial t k ->
-         (exists (v : value k), t = v) \/ (exists (r : redex k), t = r).*)
-
-
-  (* decomp k  - decomposition of a term t from the symbol k to a redex.
+  (* decomp k - decomposition of a term t from the symbol k to a redex.
      d_red r c  means: t = c[r].
      d_val v    means: t has no redexes and so it is a value, t = v. *)
   Inductive decomp k : Set :=
   | d_red : forall {k'}, redex k' -> context k k' -> decomp k
   | d_val : value k -> decomp k.
   Arguments d_val {k} _. Arguments d_red {k} {k'} _ _.
-
 
   Definition decomp_to_term {k} (d : decomp k) :=
       match d with
@@ -209,26 +153,59 @@ Module Type RED_SEM.
       end.
   Coercion decomp_to_term : decomp >-> term.
 
-
   Definition dec (t : term) k (d : decomp k) : Prop := 
       ~dead_ckind k /\ t = d.
-
-
-  Axiom decompose : forall (t : term) k, ~dead_ckind k -> 
-                        exists d : decomp k, dec t k d.
-
-
-  (* Reduction of a redex (it may get stuck): *)
-  Parameter contract : forall {k}, redex k -> option term.
-
 
   Definition reduce k t1 t2 := 
       exists {k'} (c : context k k') (r : redex k') t,  dec t1 k (d_red r c) /\
           contract r = Some t /\ t2 = c[t].
 
-
   Instance lrws : LABELED_REWRITING_SYSTEM :=
   { label := ckind; lconfiguration := term; ltransition := reduce }.
+
+  (* Definition: A decomposition c[t] is empty if c is empty. *)
+  (* Definition: A decomposition c[t] is proper if c is proper. *)
+
+
+
+  Axioms
+  (init_ckind_alive : 
+       ~dead_ckind init_ckind)
+
+  (death_propagation :                                                       forall k ec,
+       dead_ckind k -> dead_ckind (k+>ec))
+
+  (proper_death :                                                               forall k,
+       dead_ckind k -> ~ exists (r : redex k), True)
+
+  (value_to_term_injective :                                 forall {k} (v v' : value k),
+       value_to_term v = value_to_term v' -> v = v')
+
+  (redex_to_term_injective :                                 forall {k} (r r' : redex k),
+       redex_to_term r = redex_to_term r' -> r = r')
+
+  (* The following axiom, somehow, relates our representation of contexts to the 
+     real eval. contexts, but generally we can instantiate the module with 
+     elem. contexts that do not represent real elem. contexts and so not
+     every module of this signature is a proper. *)
+  (elem_plug_injective1 :                                                forall ec t0 t1,
+       ec:[t0] = ec:[t1] -> t0 = t1)
+
+  (value_trivial1 :                                                    forall {k} ec {t},
+       forall v : value k,  ~dead_ckind (k+>ec)  ->  ec:[t] = v -> 
+           exists (v' : value (k+>ec)), t = v')
+
+  (value_redex :                                  forall {k} (v : value k) (r : redex k),
+       value_to_term v <> redex_to_term r)
+
+  (decompose :                                                                forall t k,
+       ~dead_ckind k -> exists d : decomp k, dec t k d).
+
+  (*Axiom trivial_val_red : 
+      forall k t, ~dead_ckind k -> only_trivial t k ->
+         (exists (v : value k), t = v) \/ (exists (r : redex k), t = r).*)
+
+
 
 End RED_SEM.
 

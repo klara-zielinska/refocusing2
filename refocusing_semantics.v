@@ -30,7 +30,6 @@ Module Type PRE_REF_SEM <: RED_STRATEGY_LANG.
   Notation "k |~ t1 →* t2" := (clos_refl_trans_1n _ (reduce k) t1 t2) 
                                          (no associativity, at level 70, t1 at level 69).
 
-  (* A property of deterministic reduction semantics: *)
   Axioms
   (redex_trivial1 :                                        forall {k} (r : redex k) ec t,
        ~dead_ckind (k+>ec) -> ec:[t] = r -> exists (v : value (k+>ec)), t = v)
@@ -642,11 +641,11 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
                     subst t0.
                     apply H1 with ec2 v1...
                       { congruence. }
-                  + subst; assert (H8 := elem_plug_injective1 _ ht).
+                  + subst; assert (H8 := elem_plug_injective1 _ _ _ ht).
                     subst...
             }
 
-          * subst; assert (H8 := elem_plug_injective1 _ hh).
+          * subst; assert (H8 := elem_plug_injective1 _ _ _ hh).
             subst...
   Qed.
 
@@ -689,7 +688,7 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
           * assert ((v1 : term) = r).
             { compute; congruence. }
             exfalso; eauto using (value_redex v1 r).
-          * assert (H3 := dec_context_next_alive _ _ _ H).
+          * assert (H3 := dec_context_next_alive _ _ _ _ _ H).
             destruct (redex_trivial1 r ec1 t) as [v' ?]; 
                 try solve [auto | congruence].
             subst t.
@@ -741,7 +740,7 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
                   apply H0...
                   { congruence. }
                 + subst.
-                  assert (H5 := elem_plug_injective1 _ ht).
+                  assert (H5 := elem_plug_injective1 _ _ _ ht).
                   subst...
 
               - rewrite DTC2 in H1;
@@ -752,14 +751,14 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
             }
 
           * subst.
-            assert (H5 := elem_plug_injective1 _ DTC2).
+            assert (H5 := elem_plug_injective1 _ _ _ DTC2).
             subst.
             econstructor 3...
 
         + cut (decctx_proc v (c~+c0) d).
           { intro; econstructor; eauto. }
           
-          destruct (value_trivial1 _ _ (dec_not_dead H) DTC2) as [v' ?]; subst t.
+          destruct (value_trivial1 _ _ _ (dec_not_dead H) DTC2) as [v' ?]; subst t.
           capture_all value @value_to_term.
           eapply dec_val in H.
 
@@ -775,7 +774,7 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
             eauto using (value_redex v r).
           * replace v1 with v in * by (apply value_to_term_injective; congruence).
             eauto.
-          * destruct (@value_trivial1 _ v ec1 t) as [v'' ?];
+          * destruct (@value_trivial1 _ ec1 t v) as [v'' ?];
                 try solve [eauto using dec_context_next_alive | congruence].
             capture_all value @value_to_term.
             subst t.

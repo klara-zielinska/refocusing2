@@ -8,17 +8,17 @@ Require Import Eqdep.
 Module Type RED_MINI_LANG.
 
   Parameters
-    (term         : Set)
-    (elem_context : Set)
-    (ckind        : Set)
-    (dead_ckind   : ckind -> Prop)
-    (ckind_trans  : ckind -> elem_context -> ckind)
-    (elem_plug    : term -> elem_context -> term)
+  (term         : Set)
+  (elem_context : Set)
+  (ckind        : Set)
+  (dead_ckind   : ckind -> Prop)
+  (ckind_trans  : ckind -> elem_context -> ckind)
+  (elem_plug    : term -> elem_context -> term)
 
-    (value : ckind -> Set)
-    (redex : ckind -> Set)
-    (value_to_term : forall {k}, value k -> term)
-    (redex_to_term : forall {k}, redex k -> term).
+  (value : ckind -> Set)
+  (redex : ckind -> Set)
+  (value_to_term : forall {k}, value k -> term)
+  (redex_to_term : forall {k}, redex k -> term).
 
   Infix "+>"           := ckind_trans (at level 50, left associativity).
   Notation "ec :[ t ]" := (elem_plug t ec) (at level 0).
@@ -52,18 +52,16 @@ Module Type RED_MINI_LANG.
   Notation "c [ t ]" := (plug t c) (at level 0).
 
 
-
   Axioms
-    (death_propagation : 
-         forall k, dead_ckind k -> forall ec, dead_ckind (k+>ec))
+  (death_propagation :                                                       forall k ec,
+       dead_ckind k -> dead_ckind (k+>ec))
 
-    (proper_death : 
-         forall k, dead_ckind k -> ~ exists (r : redex k), True)
+  (proper_death :                                                               forall k,
+       dead_ckind k -> ~ exists (r : redex k), True)
 
-    (value_trivial1 : 
-         forall {k} (v : value k) ec {t}, 
-             ~dead_ckind (k+>ec) -> ec:[t] = v -> 
-                 exists (v' : value (k+>ec)), t = v').
+  (value_trivial1 :                                                      forall {k} ec t,
+       forall (v : value k),  ~dead_ckind (k+>ec)  -> ec:[t] = v -> 
+           exists (v' : value (k+>ec)), t = v').
 
 End RED_MINI_LANG.
 

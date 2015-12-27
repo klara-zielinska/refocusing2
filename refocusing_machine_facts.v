@@ -408,9 +408,6 @@ match d with
 
 
 
-  Axiom init_ckind_alive : ~dead_ckind ick.
-
-
   Lemma vec_last_by_index : forall {T n} (v : Vector.t T (S n)) (H : n < S n), 
       last v = v[@ Fin.of_nat_lt H].
 

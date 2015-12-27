@@ -79,10 +79,10 @@ Module Lam_NO_RefLang <: PRE_REF_SEM.
 
 
   Lemma death_propagation : 
-      forall k, dead_ckind k -> forall ec, dead_ckind (k+>ec).
+      forall k ec, dead_ckind k -> dead_ckind (k+>ec).
 
   Proof.
-    intros k H.
+    intros k ec H.
     destruct k;
     inversion H;
     reflexivity.
@@ -126,6 +126,10 @@ Module Lam_NO_RefLang <: PRE_REF_SEM.
       | rECaApp x t1 t2 => App (Lam x t1) t2
       end.
   Coercion redex_to_term : redex >-> term.
+
+
+  Lemma init_ckind_alive : ~dead_ckind init_ckind.
+  Proof. auto. Qed.
 
 
   Lemma value_to_term_injective : 
@@ -224,11 +228,11 @@ Module Lam_NO_RefLang <: PRE_REF_SEM.
   Qed.
 
 
-  Lemma value_trivial1 : forall {k} (v : value k) ec t, 
-                             ~dead_ckind (k+>ec) -> ec:[t] = v ->
-                                 exists (v' : value (k+>ec)), t = v'.
+  Lemma value_trivial1 : forall {k} ec t, 
+      forall (v : value k), ~dead_ckind (k+>ec) -> ec:[t] = v ->
+          exists (v' : value (k+>ec)), t = v'.
   Proof.
-    intros k v ec t H H0.
+    intros k ec t v H H0.
     destruct ec, v; inversion H0; subst; 
     solve 
     [ eautof

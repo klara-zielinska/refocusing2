@@ -168,15 +168,6 @@ Module Type RED_STRATEGY (R : RED_STRATEGY_LANG).
   Notation "k , t |~  ec1 << ec2 " := (search_order k t ec1 ec2) 
                (at level 70, t, ec1, ec2 at level 50, no associativity).
 
-
-(*  Axiom dec_term_red_atom : 
-      forall t k {r : redex k}, dec_term t k = in_red r -> 
-          ~exists ec, immediate_ec ec t /\ ~dead_ckind (k+>ec).
-
-  Axiom dec_term_val_atom : 
-      forall t k {v : value k}, dec_term t k = in_val v -> 
-          ~exists ec, immediate_ec ec t /\ ~dead_ckind (k+>ec).*)
-
   Axiom dec_term_term_top : 
       forall t k {t' ec}, dec_term t k = in_term t' ec -> 
           forall ec',  ~ k, t |~ ec << ec'.

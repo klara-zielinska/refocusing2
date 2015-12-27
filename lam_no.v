@@ -6,7 +6,7 @@ Require Import reduction_languages_facts.
 
 
 
-Module Lam_NO_RefLang <: PRE_REF_SEM.
+Module Lam_NO_PreRefSem <: PRE_REF_SEM.
 
   Parameter var : Set.
 
@@ -317,15 +317,14 @@ Module Lam_NO_RefLang <: PRE_REF_SEM.
   Notation "k |~ t1 →* t2" := (clos_refl_trans_1n _ (reduce k) t1 t2) 
                                          (no associativity, at level 70, t1 at level 69).
 
-
-End Lam_NO_RefLang.
-
+End Lam_NO_PreRefSem.
 
 
 
-Module Lam_NO_Strategy <: REF_STRATEGY Lam_NO_RefLang.
 
-  Import Lam_NO_RefLang.
+Module Lam_NO_Strategy <: REF_STRATEGY Lam_NO_PreRefSem.
+
+  Import Lam_NO_PreRefSem.
 
 
   Inductive interm_dec k : Set :=
@@ -613,7 +612,7 @@ End Lam_NO_Strategy.
 
 
 
-Module Lam_NO_RefSem := RedRefSem Lam_NO_RefLang Lam_NO_Strategy.
+Module Lam_NO_RefSem := RedRefSem Lam_NO_PreRefSem Lam_NO_Strategy.
 
 
 

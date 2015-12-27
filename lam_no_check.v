@@ -12,8 +12,8 @@ Require Import Program
 
 Module Lam_NO_HandDecProc.
 
-  Module RF := RED_LANG_Facts Lam_NO_RefLang.
-  Import Lam_NO_RefLang RF.
+  Module RF := RED_LANG_Facts Lam_NO_PreRefSem.
+  Import Lam_NO_PreRefSem RF.
 
 
 
@@ -157,7 +157,7 @@ End Lam_NO_HandDecProc.
 
 Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
 
-  Import Lam_NO_EAM Lam_NO_RefLang.
+  Import Lam_NO_EAM Lam_NO_PreRefSem.
 
 
   Definition term          := term.
@@ -171,8 +171,8 @@ Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
   Notation "[: v :]"         := (value_to_conf v)                        (v at level 99).
   Notation "[$ t , k , c $]" := (@c_eval t k c)                    (t, k, c at level 99).
   Notation "[: c , v :]"     := (c_apply c v)                         (c, v at level 99).
-  Notation "[: ( ec , k ) =: c , v :]" := (c_apply (@ccons _ ec k c) v)  
-                                                               (ec, k, c, v at level 99).
+  Notation "[: ( ec , k ) =: c , v :]" := 
+      (c_apply (@ccons _ ec k c) v)                            (ec, k, c, v at level 99).
 
 
   Definition next_conf0 (st : configuration) : option configuration :=

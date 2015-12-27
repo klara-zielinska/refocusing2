@@ -93,7 +93,9 @@ VFILES:=Util.v\
   refocusing_machine.v\
   refocusing_machine_facts.v\
   lam_no.v\
-  lam_no_check.v
+  lam_no_check.v\
+  miniml.v\
+  miniml_check.v
 
 -include $(addsuffix .d,$(VFILES))
 .SECONDARY: $(addsuffix .d,$(VFILES))

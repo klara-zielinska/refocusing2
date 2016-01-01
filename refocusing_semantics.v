@@ -1,9 +1,10 @@
-Require Import Program.
-Require Import Util.
-Require Import rewriting_system.
-Require Export reduction_semantics.
-Require Import reduction_languages_facts.
-Require Export reduction_strategy.
+Require Import Program
+               Util
+               rewriting_system
+               reduction_languages_facts.
+Require Export Subset
+               reduction_semantics
+               reduction_strategy.
 
 
 
@@ -34,7 +35,8 @@ Module Type PRE_REF_SEM <: RED_STRATEGY_LANG.
   (redex_trivial1 :                                        forall {k} (r : redex k) ec t,
        ~dead_ckind (k+>ec) -> ec:[t] = r -> exists (v : value (k+>ec)), t = v)
   (wf_immediate_subterm : well_founded immediate_subterm)
-  (wf_subterm_order     : well_founded subterm_order).
+  (wf_subterm_order     : well_founded subterm_order)
+  (dead_CompPred        : CompPred _ dead_ckind). 
 
 End PRE_REF_SEM.
 
@@ -120,7 +122,8 @@ Module Type RED_REF_SEM <: RED_SEM.
   (dec_proc_val_eqv_decctx :       forall {k2} (v : value k2) {k1} (c : context k1 k2) d,
        dec_proc v c d <-> decctx_proc v c d)
   (dec_proc_eqv_dec :                             forall t {k1 k2} (c : context k1 k2) d,
-      ~dead_ckind k2 -> (dec_proc t c d <-> dec c[t] k1 d)).
+      ~dead_ckind k2 -> (dec_proc t c d <-> dec c[t] k1 d))
+  (dead_CompPred        : CompPred _ dead_ckind). 
 
 End RED_REF_SEM.
 
@@ -214,8 +217,8 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
     Qed.
 
 
-    Instance lrws : LABELED_REWRITING_SYSTEM := 
-    { label := ckind; lconfiguration := term; ltransition := reduce }.
+    Instance lrws : LABELED_REWRITING_SYSTEM ckind term := 
+    { ltransition := reduce }.
 
   End R.
 

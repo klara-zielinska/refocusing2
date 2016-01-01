@@ -1,14 +1,12 @@
-Require Import Util.
-Require Import Program.
-Require Import refocusing_lang.
-Require Import reduction_semantics_facts.
-
+Require Import Program
+               Util
+               refocusing_semantics.
 
 
 
 (* Lambda calculus with simple explicit substitution for the normal-order strategy *)
 
-Module Lam_SES_NO_RefLang <: REF_LANG.
+Module Lam_SES_NO_PreRefSem <: PRE_REF_SEM.
 
   Require Export Peano_dec Compare_dec.
 
@@ -173,6 +171,11 @@ Module Lam_SES_NO_RefLang <: REF_LANG.
   Coercion redex_to_term : redex >-> term.
 
 
+  Lemma init_ckind_alive :
+      ~dead_ckind init_ckind.
+
+  Proof. auto. Qed.
+
 
   Lemma value_to_term_injective : 
       forall {k} (v v' : value k), value_to_term v = value_to_term v' -> v = v'.
@@ -269,10 +272,10 @@ Module Lam_SES_NO_RefLang <: REF_LANG.
 
 
   Lemma death_propagation : 
-      forall k, dead_ckind k -> forall ec, dead_ckind (k+>ec).
+      forall k ec, dead_ckind k -> dead_ckind (k+>ec).
 
   Proof.
-    intros k H.
+    intros k ec H.
     destruct k;
     inversion H;
     solve [reflexivity].
@@ -288,11 +291,12 @@ Module Lam_SES_NO_RefLang <: REF_LANG.
   Qed.
 
 
-  Lemma value_trivial1 : forall {k} (v : value k) ec t, 
-                             ~dead_ckind (k+>ec) -> ec:[t] = v ->
-                                 exists (v' : value (k+>ec)), t = v'.
+  Lemma value_trivial1 : forall {k} ec t,
+      forall (v : value k), ~dead_ckind (k+>ec) -> ec:[t] = v ->
+          exists (v' : value (k+>ec)), t = v'.
+
   Proof.
-    intros k v ec t H H0.
+    intros k ec t v H H0.
     destruct ec, v; destruct_all sub_tag; destruct_all substitut; 
     inversion H0; subst;
     solve
@@ -370,7 +374,24 @@ Module Lam_SES_NO_RefLang <: REF_LANG.
   Coercion decomp_to_term : decomp >-> term.
   Notation decomp'   := (@decomp ()).
 
-End Lam_SES_NO_RefLang.
+
+  Definition dec (t : term) k (d : decomp k) : Prop := 
+      ~dead_ckind k /\ t = d.
+
+
+  Definition reduce k t1 t2 := 
+      exists {k'} (c : context k k') (r : redex k') t,  dec t1 k (d_red r c) /\
+          contract r = Some t /\ t2 = c[t].
+
+
+  Notation "k |~ t1 → t2"  := (reduce k t1 t2)           
+                                         (no associativity, at level 70, t1 at level 69).
+  Notation "k |~ t1 →+ t2" := (clos_trans_1n _ (reduce k) t1 t2) 
+                                         (no associativity, at level 70, t1 at level 69).
+  Notation "k |~ t1 →* t2" := (clos_refl_trans_1n _ (reduce k) t1 t2) 
+                                         (no associativity, at level 70, t1 at level 69).
+
+End Lam_SES_NO_PreRefSem.
 
 
 

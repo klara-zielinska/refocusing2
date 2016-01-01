@@ -212,8 +212,8 @@ Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
 
   Definition transition st1 st2 := next_conf0 st1 = Some st2.
 
-  Instance rws : REWRITING_SYSTEM :=
-  { configuration := configuration; transition := transition }.
+  Instance rws : REWRITING_SYSTEM configuration :=
+  { transition := transition }.
 
 (* Uncomment if you don't want to use classes :
   Notation "c1 → c2"  := (transition c1 c2)              (no associativity, at level 70).

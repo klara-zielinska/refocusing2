@@ -56,7 +56,7 @@ Module MiniML_HandDecProc.
               decctx_proc' v (case_c ez x es =: c) (d_red (rCase v ez x es) c)
 
   | dc_apr: forall v t (c : context') d, 
-              dec_proc' t (ap_l v =: c) d -> decctx_proc' v (ap_r t =: c) d
+              dec_proc' t (ap_l v =: c) d         -> decctx_proc' v (ap_r t =: c) d
 
   | dc_apl: forall v v0 (c : context'),
               decctx_proc' v (ap_l v0 =: c) (d_red (rApp v0 v) c)
@@ -65,15 +65,15 @@ Module MiniML_HandDecProc.
               decctx_proc' v (let_c x e =: c) (d_red (rLet x v e) c)
 
   | dc_p_r: forall t v (c : context') d, 
-              dec_proc' t (pair_l v =: c) d -> decctx_proc' v (pair_r t =: c) d
+              dec_proc' t (pair_l v =: c) d       -> decctx_proc' v (pair_r t =: c) d
 
   | dc_p_l: forall v v0 c d, 
-              decctx_proc' (vPair v0 v) c d -> decctx_proc' v (pair_l v0 =: c) d
+              decctx_proc' (vPair v0 v) c d       -> decctx_proc' v (pair_l v0 =: c) d
 
   | dc_fst: forall v (c : context'), 
               decctx_proc' v (fst_c =: c) (d_red (rFst v) c)
 
-  | dc_snd: forall v (c : context'),
+  | dc_snd: forall v (c : context'), 
               decctx_proc' v (snd_c =: c) (d_red (rSnd v) c).
 
 
@@ -205,10 +205,9 @@ End MiniML_HandDecProc.
 
 
 
-Module MiniML_HandMachine <: ABSTRACT_MACHINE.
+Module MiniML_HandMachine.
 
   Import MiniML_EAM MiniML_PreRefSem.
-
 
   Notation "[$ t $]"         := (load t)                                 (t at level 99).
   Notation "[: v :]"         := (value_to_conf v)                        (v at level 99).
@@ -248,16 +247,9 @@ Module MiniML_HandMachine <: ABSTRACT_MACHINE.
   Definition transition st1 st2 := next_conf0 st1 = Some st2.
 
 
-  Instance rws : REWRITING_SYSTEM :=
-  { configuration := configuration; transition := transition }.
+  Instance rws : REWRITING_SYSTEM configuration :=
+  { transition := transition }.
 
-(* Uncomment if you don't want to use classes :
-  Notation "c1 → c2"  := (transition c1 c2)              (no associativity, at level 70).
-  Notation "t1 →+ t2" := (clos_trans_1n _ transition t1 t2)
-                                                         (no associativity, at level 70).
-  Notation "t1 →* t2" := (clos_refl_trans_1n _ transition t1 t2)
-                                                         (no associativity, at level 70).
-*)
 
   Fact trans_computable0 :                                       forall (st1 st2 : conf),
        `(rws) st1 → st2 <-> next_conf0 st1 = Some st2.
@@ -269,9 +261,9 @@ Module MiniML_HandMachine <: ABSTRACT_MACHINE.
        `(rws) st1 → st2 <-> exists e, next_conf e st1 = Some st2.
 
   Proof. 
-   intuition. 
-   - destruct (draw_fin_correct 1 Fin.F1) as [e _]; exists e; auto.
-   - destruct H; eauto.
+    intuition. 
+    - destruct (draw_fin_correct 1 Fin.F1) as [e _]; exists e; auto.
+    - destruct H; eauto.
   Qed.
 
 

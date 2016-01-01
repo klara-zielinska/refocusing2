@@ -1,6 +1,6 @@
-Require Import Relations.
-Require Import Program.
-Require Import rewriting_system.
+Require Import Relations
+               Program
+               rewriting_system.
 
 
 (* Note: The only grammar mentioned in this formalization is a grammar of evaluation
@@ -160,8 +160,8 @@ Module Type RED_SEM.
       exists {k'} (c : context k k') (r : redex k') t,  dec t1 k (d_red r c) /\
           contract r = Some t /\ t2 = c[t].
 
-  Instance lrws : LABELED_REWRITING_SYSTEM :=
-  { label := ckind; lconfiguration := term; ltransition := reduce }.
+  Instance lrws : LABELED_REWRITING_SYSTEM ckind term :=
+  { ltransition := reduce }.
 
   (* Definition: A decomposition c[t] is empty if c is empty. *)
   (* Definition: A decomposition c[t] is proper if c is proper. *)

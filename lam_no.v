@@ -1,8 +1,6 @@
-Require Import Program.
-Require Import Util.
-Require Import refocusing_semantics.
-Require Import reduction_languages_facts.
-
+Require Import Program
+               Util
+               refocusing_semantics.
 
 
 

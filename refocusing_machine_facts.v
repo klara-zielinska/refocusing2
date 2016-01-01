@@ -11,7 +11,7 @@ Require Import Util
 
 
 
-Module RefEvalApplyMachine_Facts (R : RED_REF_SEM) (EAM : REF_EVAL_APPLY_MACHINE R).
+Module RefEvalApplyMachine0_Facts (R : RED_REF_SEM) (EAM : REF_EVAL_APPLY_MACHINE0 R).
 
   Module RLF := RED_LANG_Facts R.
   Module RRSDet := RedRefSemDet R.
@@ -80,6 +80,8 @@ Import VectorNotations.
 Infix "++" := append.
 
 
+  Hint Unfold transition.
+
   Lemma dec_proc_sim :               forall t {k1 k2} (d : decomp k1) (c : context k1 k2) 
                                                                    (c0 : context ick k1),
       dec_proc t c d ->
@@ -141,7 +143,7 @@ match d with
   | exists (S n) (c_apply (c ~+ c0) v0 :: sts)
   | exists (S n) (c_eval t (ec0 =: c ~+ c0) :: sts) ];
 
-  solve [ split;
+  try solve [ split;
   [ constructor; simpl; try rewrite G; auto
   | split;
   [ eauto
@@ -448,16 +450,14 @@ match d with
               rewrite <- H in G;
               rewrite H6 in G;
               destruct (H0 (Fin.of_nat_lt H7)) as [H8 H9];
-              rewrite G in H8;
+              rewrite G in H8; compute in H8;
               dependent destruction H8; dep_subst; try congruence;
               replace r0 with r in * by congruence;
               apply H9.
-          + rewrite G; rewrite <- x.
-            simpl.
+          + rewrite G; compute; rewrite <- x.
             exists k' c0 r t1.
             intuition unfold dec... 
-          + rewrite G; rewrite <- x.
-            simpl.
+          + rewrite G; compute; rewrite <- x.
             assert (H10 := dec_context_correct ec k' v); rewrite H4 in H10.
             rewrite H10.
             exists k' c0 r t0.
@@ -518,16 +518,14 @@ match d with
               rewrite <- H in G;
               rewrite H6 in G;
               destruct (H0 (Fin.of_nat_lt H7)) as [H8 H9];
-              rewrite G in H8;
+              rewrite G in H8; compute in H8;
               dependent destruction H8; dep_subst; try congruence;
               replace r0 with r in * by congruence;
               apply H9.
-          + rewrite G; rewrite <- x.
-            simpl.
+          + rewrite G; compute; rewrite <- x.
             exists k' c0 r t0.
             intuition unfold dec... 
-          + rewrite G; rewrite <- x.
-            simpl.
+          + rewrite G; compute; rewrite <- x;
             assert (H10 := dec_context_correct ec k' v0); rewrite H4 in H10.
             rewrite H10.
             exists k' c0 r t.
@@ -573,24 +571,19 @@ match d with
   Qed.
 
 
-  (*Instance red_ref_sem_rws : REWRITING_SYSTEM :=
-  { configuration := R.term; transition := reduce init_ckind }.
-  Instance following : RW_FOLLOWING EAM.rws red_ref_sem_rws :=
-  {
-      semantics := decompile;
-      correct := am_correct;
-      no_silent_loops := no_silent_loops
-  }.
-  intros cd1 cd2 cdr1 H H0.
-  destruct (am_complete cd1 cd2 cdr1 H H0) as [n [crs [cr2 [H1 [H2 H3]]]]].
-  exists n crs cr2.
-  split; [| split].
-  - exact H1.
-  - exact H2.
-  - exact H3.*)
+End RefEvalApplyMachine0_Facts.
 
-End RefEvalApplyMachine_Facts.
 
+
+(*
+Module RefEvalApplyMachine_Facts (R : RED_REF_SEM) (EAM : REF_EVAL_APPLY_MACHINE R).
+
+  Module RAWF := RefEvalApplyMachine0_Facts R EAM.RAW.
+
+  Instance 
+
+  Instance following : RW_FOLLOWING R.lrws EAM.rws.
+*)
 
 
 

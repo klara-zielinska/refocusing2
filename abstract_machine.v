@@ -21,8 +21,8 @@ Module Type ABSTRACT_MACHINE.
   Coercion value_to_conf : value >-> configuration.
 
 
-  Instance rws : REWRITING_SYSTEM :=
-  { configuration := configuration; transition := transition }.
+  Instance rws : REWRITING_SYSTEM configuration :=
+  { transition := transition }.
 
 (* Uncomment if you don't want to use classes:
 

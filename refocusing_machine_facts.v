@@ -6,6 +6,7 @@ Require Import Util
                refocusing_machine
                reduction_languages_facts
                reduction_semantics_facts 
+               reduction_strategy_facts
                refocusing_semantics_facts.
 
 
@@ -14,8 +15,9 @@ Require Import Util
 Module RefEvalApplyMachine0_Facts (R : RED_REF_SEM) (EAM : REF_EVAL_APPLY_MACHINE0 R).
 
   Module RLF := RED_LANG_Facts R.
+  Module RSF := RED_STRATEGY_STEP_Facts R R.ST.
   Module RRSDet := RedRefSemDet R.
-  Import R.R R RLF RRSDet.
+  Import R.R R RLF RSF RRSDet.
 
   Notation "k |~ c1 >> c2" := (k |~ c1 → c2)     
                                          (no associativity, at level 70, c1 at level 69).
@@ -82,11 +84,20 @@ Infix "++" := append.
 
   Hint Unfold transition.
 
+
+
+  Definition good_state st := 
+      match st with 
+      | c_eval _ k _  => ~dead_ckind k 
+      | c_apply k _ _ => ~dead_ckind k
+      end.
+
+
   Lemma dec_proc_sim :               forall t {k1 k2} (d : decomp k1) (c : context k1 k2) 
                                                                    (c0 : context ick k1),
       dec_proc t c d ->
           exists n (sts : Vector.t conf n),
-          (**)Forall (fun st => decompile st = (c~+c0)[t]) sts /\
+          (**)Forall (fun st => decompile st = (c~+c0)[t] /\ good_state st) sts /\
           (**)match d with 
               | d_val v      => last (c_eval t (c ~+ c0) :: sts) = c_apply c0 v 
               | d_red k r c' => last (c_eval t (c ~+ c0) :: sts) = c_eval r (c'~+c0) /\
@@ -98,21 +109,9 @@ Infix "++" := append.
   Proof with eauto.
     intros t k1 k2 d c c0 H.
     induction H using dec_proc_Ind with
-    (P := fun k2 t (c : context k1 k2) d (_ : dec_proc t c d) =>
-exists (n : nat) (sts : Vector.t configuration n),
-  Forall (fun st : configuration => decompile st = (c ~+ c0) [t]) sts /\
-match d with 
-              | d_val v      => last (c_eval t (c ~+ c0) :: sts) = c_apply c0 v 
-              | d_red k r c' => last (c_eval t (c ~+ c0) :: sts) = c_eval r (c'~+c0) /\
-                                dec_term r k = in_red r                              \/
-                                exists ec v, dec_context ec k v = in_red r           /\
-                                last (c_eval t (c ~+ c0) :: sts) = c_apply (ec=:c'~+c0) v
-              end /\
-  (forall m : Fin.t n, (c_eval t (c ~+ c0) :: sts)[@m] → sts[@m]))
-
     (P0 := fun k2 (v' : R.value k2) (c : context k1 k2) d _ =>
 exists (n : nat) (sts : Vector.t configuration n),
-  Forall (fun st : configuration => decompile st = (c ~+ c0) [v']) sts /\
+  Forall (fun st : configuration => decompile st = (c ~+ c0) [v'] /\ good_state st) sts /\
 match d with 
               | d_val v      => last (c_apply (c ~+ c0) v' :: sts) = c_apply c0 v 
               | d_red k r c' => last (c_apply (c ~+ c0) v' :: sts) = c_eval r (c'~+c0) /\
@@ -143,8 +142,11 @@ match d with
   | exists (S n) (c_apply (c ~+ c0) v0 :: sts)
   | exists (S n) (c_eval t (ec0 =: c ~+ c0) :: sts) ];
 
-  try solve [ split;
-  [ constructor; simpl; try rewrite G; auto
+  solve [ split;
+  [ constructor; simpl; 
+    try rewrite G; 
+    eauto using dec_term_val_alive, dec_term_next_alive, 
+                dec_context_val_alive, dec_context_next_alive
   | split;
   [ eauto
   | intro m;
@@ -160,7 +162,7 @@ match d with
                                                                    (c0 : context ick k1),
       decctx_proc v' c d ->
           exists (n : nat) (sts : Vector.t configuration n),
-              Forall (fun st => decompile st = (c ~+ c0) [v']) sts /\
+              Forall (fun st => decompile st = (c ~+ c0) [v'] /\ good_state st) sts /\
               match d with 
               | d_val v      => last (c_apply (c ~+ c0) v' :: sts) = c_apply c0 v 
               | d_red k r c' => last (c_apply (c ~+ c0) v' :: sts) = c_eval r (c'~+c0) /\
@@ -174,7 +176,7 @@ match d with
     induction H using decctx_proc_Ind with
     (P := fun k2 t (c : context k1 k2) d (_ : dec_proc t c d) =>
 exists (n : nat) (sts : Vector.t configuration n),
-  Forall (fun st : configuration => decompile st = (c ~+ c0) [t]) sts /\
+  Forall (fun st : configuration => decompile st = (c ~+ c0) [t] /\ good_state st) sts /\
 match d with 
               | d_val v      => last (c_eval t (c ~+ c0) :: sts) = c_apply c0 v 
               | d_red k r c' => last (c_eval t (c ~+ c0) :: sts) = c_eval r (c'~+c0) /\
@@ -182,19 +184,7 @@ match d with
                                 exists ec v, dec_context ec k v = in_red r           /\
                                 last (c_eval t (c ~+ c0) :: sts) = c_apply (ec=:c'~+c0) v
               end /\
-  (forall m : Fin.t n, (c_eval t (c ~+ c0) :: sts)[@m] → sts[@m]))
-
-    (P0 := fun k2 (v' : R.value k2) (c : context k1 k2) d _ =>
-exists (n : nat) (sts : Vector.t configuration n),
-  Forall (fun st : configuration => decompile st = (c ~+ c0) [v']) sts /\
-match d with 
-              | d_val v      => last (c_apply (c ~+ c0) v' :: sts) = c_apply c0 v 
-              | d_red k r c' => last (c_apply (c ~+ c0) v' :: sts) = c_eval r (c'~+c0) /\
-                                dec_term r k = in_red r                              \/
-                                exists ec v, dec_context ec k v = in_red r           /\
-                                last (c_apply (c ~+ c0) v' :: sts) = c_apply (ec=:c'~+c0) v
-              end /\
-  (forall m : Fin.t n, (c_apply (c ~+ c0) v' :: sts)[@m] → sts[@m]));
+  (forall m : Fin.t n, (c_eval t (c ~+ c0) :: sts)[@m] → sts[@m]));
 
          subst;
 
@@ -218,7 +208,10 @@ match d with
   | exists (S n) (c_eval t (ec0 =: c ~+ c0) :: sts) ];
 
   solve [ split;
-  [ constructor; simpl; try rewrite G; auto
+  [ constructor; simpl; 
+    try rewrite G; 
+    eauto using dec_term_val_alive, dec_term_next_alive, 
+                dec_context_val_alive, dec_context_next_alive
   | split;
   [ eauto
   | intro m;
@@ -315,8 +308,8 @@ match d with
   Lemma am_context_complete_eval :                forall t1 t2 {k} (c : context ick k) t,
       t1 >> t2  ->  ~dead_ckind k  ->  t1 = c[t] ->
           exists n (sts : Vector.t configuration n) st,
-          (**)Forall (fun st => decompile st = t1) sts /\
-          (**)decompile st = t2                        /\
+          (**)Forall (fun st => decompile st = t1 /\ good_state st) sts /\
+          (**)(decompile st = t2 /\ good_state st)                      /\
           (**)forall m : Fin.t (n+1), 
                   (c_eval t c :: sts ++ [st])[@m] → (sts ++ [st])[@m].
 
@@ -351,8 +344,8 @@ match d with
   Lemma am_context_complete_apply : forall t1 t2 {k} (c : context ick k) (v : R.value k),
       t1 >> t2 ->  ~dead_ckind k  ->  t1 = c[v]  ->
           exists n (sts : Vector.t configuration n) st,
-          (**)Forall (fun st => decompile st = t1) sts /\
-          (**)decompile st = t2                          /\
+          (**)Forall (fun st => decompile st = t1 /\ good_state st) sts /\
+          (**)(decompile st = t2 /\ good_state st)                      /\
           (**)forall m : Fin.t (n+1), 
                   (c_apply c v :: sts ++ [st])[@m] → (sts ++ [st])[@m].
 
@@ -385,19 +378,11 @@ match d with
   Qed.
 
 
-
-  Definition good_state st := 
-      match st with 
-      | c_eval _ k _  => ~dead_ckind k 
-      | c_apply k _ _ => ~dead_ckind k
-      end.
-
-
   Corollary am_complete :                                               forall t1 t2 st1,
       t1 >> t2 -> good_state st1 -> decompile st1 = t1 -> 
           exists n (sts : Vector.t configuration n) st2,
-          (**)Forall (fun st => decompile st = t1) sts /\
-          (**)decompile st2 = t2                       /\
+          (**)Forall (fun st => decompile st = t1 /\ good_state st) sts /\
+          (**)(decompile st2 = t2 /\ good_state st2)                    /\
           (**)forall m : Fin.t (n+1), 
                   (st1 :: sts ++ [st2])[@m] → (sts ++ [st2])[@m].
 
@@ -575,16 +560,145 @@ End RefEvalApplyMachine0_Facts.
 
 
 
-(*
+
 Module RefEvalApplyMachine_Facts (R : RED_REF_SEM) (EAM : REF_EVAL_APPLY_MACHINE R).
+
+  Import R EAM.
 
   Module RAWF := RefEvalApplyMachine0_Facts R EAM.RAW.
 
-  Instance 
+  Definition local1 (st : RAW.configuration) (H : RAWF.good_state st) : configuration :=
+      match st as st return RAWF.good_state st -> _ with
+      | RAW.c_eval t k c   => fun H => c_eval t c  (H `as witness of alive_ckind)
+      | RAW.c_apply k c v  => fun H => c_apply c v (H `as witness of alive_ckind)
+      end H.
 
-  Instance following : RW_FOLLOWING R.lrws EAM.rws.
-*)
 
+  Require Import Vector. Import VectorNotations.
+
+
+  Definition map2forall {A B} {P : A -> Prop} (f : forall x : A, P x -> B) : 
+      forall {n} (v : Vector.t A n), Forall P v -> Vector.t B n :=
+
+      fix aux {n} v H :=
+
+          match v as v return match v with [] => True | x :: v' => P x /\ Forall P v' end -> _ 
+          with
+          | []      => fun _ => []
+          | x :: v' => fun H => 
+                       let (H1, H2) := H in
+                       f x H1 :: aux v' H2
+          end
+
+          match H in Forall _ v 
+          return match v with [] => True | x :: v' => P x /\ Forall P v' end : Prop
+          with 
+          | Forall_nil              => I
+          | Forall_cons n x v H0 H1 => conj H0 H1
+          end.
+
+
+  Lemma local2 : forall {n} (sts : Vector.t configuration n) st1 st2,
+  (*1*)(forall m : Fin.t n, (st1 :: sts)[@m] → sts[@m]) ->
+  (*2*)last (st1 :: sts) → st2 ->
+
+      forall m : Fin.t (n + 1), (st1 :: sts ++ [st2])[@m] → (sts ++ [st2])[@m].
+
+  Proof.
+    intros n sts st1 st2 H H0. revert st1 H H0.
+    induction sts; intros.
+    - dependent destruction m.
+      + auto.
+      + inversion m.
+    - dependent destruction m.
+      + apply (H Fin.F1).
+      + apply IHsts.
+        * intro m0. apply (H (Fin.FS m0)).
+        * auto.
+  Qed.
+
+
+  Require Import Arith.
+
+  Lemma local3 : forall {n} (sts : Vector.t RAW.configuration n) st1 st2,
+      (forall m : Fin.t (n + 1), (st1 :: sts ++ [st2])[@m] → (sts ++ [st2])[@m]) ->
+
+      (*1*)(forall m : Fin.t n, (st1 :: sts)[@m] → sts[@m]) /\
+      (*2*)last (st1 :: sts) → st2 .
+
+  Proof.
+    induction sts; intros st1 st2 H;
+        split.
+    - solve [inversion m].
+    - apply (H Fin.F1).
+    - intro m.
+      dependent destruction m.
+      + apply (H Fin.F1).
+      + eapply IHsts.
+        intro m0.
+        apply (H (Fin.FS m0)).
+    - apply IHsts.
+      intro m.
+      apply (H (Fin.FS m)). 
+  Qed.
+
+
+  Instance following : RW_FOLLOWING EAM.rws R.rws := 
+  {
+      semantics := EAM.decompile;
+      correct   := RAWF.am_correct
+  }.
+
+  Proof with eauto.
+  {
+    intros t1 t2 st1 H H0.
+    assert (RAWF.good_state st1).
+    { destruct st1; eapply (sat_untoken alive_ckind)... }
+    destruct (RAWF.am_complete t1 t2 st1 H) as [n [sts [st2 [H2 [[H3 H4] H5]]]]]...
+    
+    exists n (map2forall (fun st H => local1 st (proj2 H)) sts H2) (local1 st2 H4).
+    split; [| split].
+    - clear st2 H3 H4 H5.
+      dependent induction sts.
+      + constructor.
+      + dependent destruction H2; dep_subst.
+        destruct p as [H3 H4].
+        constructor.
+        * clear.
+          destruct h, st1; auto.
+        * apply IHsts.
+    - destruct st2; auto.
+    - apply local2.
+      + clear H0 H1. revert st1 H5.
+        induction sts; 
+            intros st1 H5 m;
+            dependent destruction m;
+            dependent destruction H2; dep_subst.
+        * destruct h;
+          solve [apply (H5 Fin.F1)].
+        * apply IHsts.
+          intro m0.
+          destruct h;
+          eapply (H5 (Fin.FS m0)).
+      + clear H0 H1; revert st1 H5.
+        induction sts; intros st1 H5.
+        * destruct st2; apply (H5 Fin.F1).
+        * dependent destruction H2; dep_subst.
+          apply IHsts.
+          intro m; 
+          destruct h;
+          apply (H5 (Fin.FS m)).
+  }
+
+  {
+    intros [crs H].
+    apply RAWF.no_silent_loops.
+    exists crs.
+    solve [intuition].
+  }
+  Qed.
+
+End RefEvalApplyMachine_Facts.
 
 
 (*Module PushEnterMachine_Facts (R : RED_LANG) (PERS : PE_RED_REF_SEM R) 

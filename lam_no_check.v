@@ -169,45 +169,48 @@ Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
 
   Notation "[$ t $]"         := (load t)                                 (t at level 99).
   Notation "[: v :]"         := (value_to_conf v)                        (v at level 99).
-  Notation "[$ t , k , c $]" := (@c_eval t k c)                    (t, k, c at level 99).
-  Notation "[: c , v :]"     := (c_apply c v)                         (c, v at level 99).
-  Notation "[: ( ec , k ) =: c , v :]" := 
-      (c_apply (@ccons _ ec k c) v)                            (ec, k, c, v at level 99).
+  Notation "[$ t , k , c , H $]" := (@c_eval t k c H)                    (t, k, c at level 99).
+  Notation "[: c , v , H :]"     := (c_apply c v H)                         (c, v at level 99).
+  Notation "[: ( ec , k ) =: c , v , H :]" := 
+      (c_apply (@ccons _ ec k c) v H)                            (ec, k, c, v at level 99).
 
 
-  Definition next_conf0 (st : configuration) : option configuration :=
+  Definition next_conf0 (st : configuration) : option configuration. refine (
       match st with
-      | [$ Var x, C,   c $]     => Some [: c, vCVar x :]
-      | [$ Var x, ECa, c $]     => Some [: c, vECaVar x :]
+      | [$ Var x, C,   c, _ $]     => Some [: c, vCVar x, _ :]
+      | [$ Var x, ECa, c, _ $]     => Some [: c, vECaVar x, _ :]
 
-      | [$ Lam x t, C,   c $]   => Some [$ t, C, lam_c x=:c $] (*!*)
-      | [$ Lam x t, ECa, c $]   => Some [: c, vECaLam x t :]   (*!*)
+      | [$ Lam x t, C,   c, _ $]   => Some [$ t, C, lam_c x=:c, _ $] (*!*)
+      | [$ Lam x t, ECa, c, _ $]   => Some [: c, vECaLam x t, _ :]   (*!*)
 
-      | [$ App t1 t2, C,   c $] => Some [$ t1, ECa, ap_r t2=:c $]
-      | [$ App t1 t2, ECa, c $] => Some [$ t1, ECa, ap_r t2=:c $]
+      | [$ App t1 t2, C,   c, _ $] => Some [$ t1, ECa, ap_r t2=:c, _ $]
+      | [$ App t1 t2, ECa, c, _ $] => Some [$ t1, ECa, ap_r t2=:c, _ $]
 
-      | [: (ap_r t2, C)=:c,   vECaLam x t1 :] => 
-                                   Some [$ contract0 (rCApp x t1 t2), C, c $]
-      | [: (ap_r t2, ECa)=:c, vECaLam x t1 :] => 
-                                   Some [$ contract0 (rECaApp x t1 t2), ECa, c $]
+      | [: (ap_r t2, C)=:c,   vECaLam x t1, _ :] => 
+                                   Some [$ contract0 (rCApp x t1 t2), C, c, _ $]
+      | [: (ap_r t2, ECa)=:c, vECaLam x t1, _ :] => 
+                                   Some [$ contract0 (rECaApp x t1 t2), ECa, c, _ $]
 
-      | [: (ap_r t,  C)=:c,   vECaVar x :] => 
-                                   Some [$ t, C, ap_l (vCaVar x)=:c $]
-      | [: (ap_r t,  ECa)=:c, vECaVar x :] =>
-                                   Some [$ t, C, ap_l (vCaVar x)=:c $]
+      | [: (ap_r t,  C)=:c,   vECaVar x, _ :] => 
+                                   Some [$ t, C, ap_l (vCaVar x)=:c, _ $]
+      | [: (ap_r t,  ECa)=:c, vECaVar x, _ :] =>
+                                   Some [$ t, C, ap_l (vCaVar x)=:c, _ $]
 
-      | [: (ap_r t,  C)=:c,   vECaApp v1 v2 :] =>
-                                   Some [$ t, C, ap_l (vCaApp v1 v2)=:c $]
-      | [: (ap_r t,  ECa)=:c, vECaApp v1 v2 :] =>
-                                   Some [$ t, C, ap_l (vCaApp v1 v2)=:c $]
+      | [: (ap_r t,  C)=:c,   vECaApp v1 v2, _ :] =>
+                                   Some [$ t, C, ap_l (vCaApp v1 v2)=:c, _ $]
+      | [: (ap_r t,  ECa)=:c, vECaApp v1 v2, _ :] =>
+                                   Some [$ t, C, ap_l (vCaApp v1 v2)=:c, _ $]
 
-      | [: (ap_l v1, C)=:c,   v2 :] => Some [: c, vCApp v1 v2 :]
-      | [: (ap_l v1, ECa)=:c, v2 :] => Some [: c, vECaApp v1 v2 :]
+      | [: (ap_l v1, C)=:c,   v2, _ :] => Some [: c, vCApp v1 v2, _ :]
+      | [: (ap_l v1, ECa)=:c, v2, _ :] => Some [: c, vECaApp v1 v2, _ :]
 
-      | [: (lam_c x, C)=:c, v :]    => Some [: c, vCLam x v :]
+      | [: (lam_c x, C)=:c, v, _ :]    => Some [: c, vCLam x v, _ :]
 
       | _ => None
-      end.
+      end);
+
+      solve [apply Subset.sat_token; compute; auto].
+  Defined.
   Definition next_conf (_ : entropy) := next_conf0.
 
   Definition transition st1 st2 := next_conf0 st1 = Some st2.

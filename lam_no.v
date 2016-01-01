@@ -76,6 +76,11 @@ Module Lam_NO_PreRefSem <: PRE_REF_SEM.
   Hint Unfold init_ckind dead_ckind.
 
 
+  Instance dead_CompPred : CompPred ckind dead_ckind.
+      split. destruct x; auto. 
+  Defined.
+
+
   Lemma death_propagation : 
       forall k ec, dead_ckind k -> dead_ckind (k+>ec).
 

@@ -220,6 +220,9 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
     Instance lrws : LABELED_REWRITING_SYSTEM ckind term := 
     { ltransition := reduce }.
 
+    Instance rws : REWRITING_SYSTEM term := 
+    { transition := reduce init_ckind }.
+
   End R.
 
   Include R.

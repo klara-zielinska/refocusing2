@@ -1,6 +1,7 @@
 Require Import Program
                Entropy
                Util
+               Subset
                rewriting_system
                miniml
                abstract_machine
@@ -211,34 +212,40 @@ Module MiniML_HandMachine.
 
   Notation "[$ t $]"         := (load t)                                 (t at level 99).
   Notation "[: v :]"         := (value_to_conf v)                        (v at level 99).
-  Notation "[$ t , c $]"     := (c_eval t c)                       (t, k, c at level 99).
-  Notation "[: c , v :]"     := (c_apply c v)                         (c, v at level 99).
+  Notation "[$ t , c , H $]" := (c_eval t c H)                     (t, k, c at level 99).
+  Notation "[: c , v , H :]" := (c_apply c v H)                       (c, v at level 99).
 
+
+  Lemma ick_aw : init_ckind ? alive_ckind.
+  Proof. apply (init_ckind_alive `as witness of alive_ckind). Qed.
+
+  Notation "[$ t , c $]" := (c_eval t c ick_aw)                     (t, k, c at level 99).
+  Notation "[: c , v :]" := (c_apply c v ick_aw)                       (c, v at level 99).
 
   Definition next_conf0 (st : configuration) : option configuration :=
       match st with
-      | [$ Z, c $]               => Some [: c, vZ :]
-      | [$ S t, c $]             => Some [$ t, s_c =: c $]
-      | [$ Var x, c $]           => Some [: c, vVar x :]
-      | [$ Lam x t, c $]         => Some [: c, vLam x t :]
-      | [$ App t1 t2, c $]       => Some [$ t1, ap_r t2 =: c $]
-      | [$ Case t ez x es, c $]  => Some [$ t, case_c ez x es =: c $]
-      | [$ Fix x t, c $]         => Some [$ subst x (Fix x t) t, c $]
-      | [$ Letv x t1 t2, c $]    => Some [$ t1, let_c x t2 =: c $]
-      | [$ Pair t1 t2, c $]      => Some [$ t1, pair_r t2 =: c $]
-      | [$ Fst t, c $]           => Some [$ t, fst_c =: c $]
-      | [$ Snd t, c $]           => Some [$ t, snd_c =: c $]
+      | [$ Z, c, _ $]               => Some [: c, vZ :]
+      | [$ S t, c, _ $]             => Some [$ t, s_c =: c $]
+      | [$ Var x, c, _ $]           => Some [: c, vVar x :]
+      | [$ Lam x t, c, _ $]         => Some [: c, vLam x t :]
+      | [$ App t1 t2, c, _ $]       => Some [$ t1, ap_r t2 =: c $]
+      | [$ Case t ez x es, c, _ $]  => Some [$ t, case_c ez x es =: c $]
+      | [$ Fix x t, c, _ $]         => Some [$ subst x (Fix x t) t, c $]
+      | [$ Letv x t1 t2, c, _ $]    => Some [$ t1, let_c x t2 =: c $]
+      | [$ Pair t1 t2, c, _ $]      => Some [$ t1, pair_r t2 =: c $]
+      | [$ Fst t, c, _ $]           => Some [$ t, fst_c =: c $]
+      | [$ Snd t, c, _ $]           => Some [$ t, snd_c =: c $]
 
-      | [: (s_c =: c), v :]               => Some [: c, vS v :]
-      | [: (ap_r t =: c), v :]            => Some [$ t, ap_l v =: c $]
-      | [: (ap_l (vLam x t) =: c), v2 :]  => Some [$ subst x (v2 : term) t, c $]
-      | [: (case_c ez x es =: c), vZ :]   => Some [$ ez, c $]
-      | [: (case_c ez x es =: c), vS v :] => Some [$ subst x (v : term) es, c $]
-      | [: (let_c x e =: c), v :]         => Some [$ subst x (v : term) e, c $]
-      | [: (pair_r t =: c), v :]          => Some [$ t, pair_l v =: c $]
-      | [: (pair_l v1 =: c), v2 :]        => Some [: c, vPair v1 v2 :]
-      | [: (fst_c =: c), vPair v1 _ :]    => Some [$ v1 : term, c $]
-      | [: (snd_c =: c), vPair _ v2 :]    => Some [$ v2 : term, c $]
+      | [: (s_c =: c), v, _ :]               => Some [: c, vS v :]
+      | [: (ap_r t =: c), v, _ :]            => Some [$ t, ap_l v =: c $]
+      | [: (ap_l (vLam x t) =: c), v2, _ :]  => Some [$ subst x (v2 : term) t, c $]
+      | [: (case_c ez x es =: c), vZ, _ :]   => Some [$ ez, c $]
+      | [: (case_c ez x es =: c), vS v, _ :] => Some [$ subst x (v : term) es, c $]
+      | [: (let_c x e =: c), v, _ :]         => Some [$ subst x (v : term) e, c $]
+      | [: (pair_r t =: c), v, _ :]          => Some [$ t, pair_l v =: c $]
+      | [: (pair_l v1 =: c), v2, _ :]        => Some [: c, vPair v1 v2 :]
+      | [: (fst_c =: c), vPair v1 _, _ :]    => Some [$ v1 : term, c $]
+      | [: (snd_c =: c), vPair _ v2, _ :]    => Some [$ v2 : term, c $]
 
       | _ => None
       end.
@@ -274,12 +281,14 @@ Module MiniML_HandMachine.
 
   Proof.
     destruct st as [t k ? | k c v].
-    - destruct t, k; auto.
+    - destruct t, k; compute; destruct ick_aw; auto.
     - destruct c as [| ec k c]; auto.
       destruct ec, k; destruct v; 
       solve
-      [ auto
-      | match goal with v : value' |- _ => destruct v; auto end ].
+      [ compute; destruct ick_aw; auto
+      | match goal with v : value' |- _ => 
+        destruct v; compute; destruct ick_aw; auto 
+        end ].
   Qed.
 
 

@@ -78,6 +78,11 @@ Module MiniML_PreRefSem <: PRE_REF_SEM.
   Definition dead_ckind (_ : ckind) := False.
   Hint Unfold init_ckind dead_ckind.
 
+
+  Instance dead_CompPred : CompPred ckind dead_ckind.
+      split. auto. 
+  Defined.
+
   Inductive context (k1 : ckind) : ckind -> Set :=
   | empty : context k1 k1
   | ccons : forall (ec : elem_context) {k2}, context k1 k2 -> context k1 (k2+>ec).

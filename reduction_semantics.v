@@ -163,6 +163,9 @@ Module Type RED_SEM.
   Instance lrws : LABELED_REWRITING_SYSTEM ckind term :=
   { ltransition := reduce }.
 
+  Instance rws : REWRITING_SYSTEM term :=
+  { transition := reduce init_ckind }.
+
   (* Definition: A decomposition c[t] is empty if c is empty. *)
   (* Definition: A decomposition c[t] is proper if c is proper. *)
 

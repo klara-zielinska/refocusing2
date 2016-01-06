@@ -637,6 +637,7 @@ Module Lam_KES_CBN_Strategy <: REF_STRATEGY Lam_KES_CBN_PreRefSem.
 
   Definition search_order : ckind -> term -> elem_context -> elem_context -> Prop := 
       fun _ _ _ _ => False.
+
   Notation "k , t |~  ec1 << ec2 " := (search_order k t ec1 ec2) 
                (at level 70, t, ec1, ec2 at level 50, no associativity).
 

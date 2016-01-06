@@ -1,6 +1,5 @@
 
 
-
 (*** Interface ***)
 
 Require Import Program
@@ -22,13 +21,12 @@ Module Type SLOPPY_REF_EVAL_APPLY_MACHINE (R : RED_REF_SEM) <: ABSTRACT_MACHINE.
 
   Import R ST.
 
-  Notation ick := init_ckind.
-
+  Notation ick     := init_ckind.
   Definition term  := term.
   Definition value := value ick.
 
 
-  Inductive conf : Type :=
+  Inductive conf :=
   | c_eval  : term -> forall {k}, context init_ckind k -> conf
   | c_apply : forall {k}, context init_ckind k -> R.value k -> conf.
   Definition configuration := conf.
@@ -36,7 +34,6 @@ Module Type SLOPPY_REF_EVAL_APPLY_MACHINE (R : RED_REF_SEM) <: ABSTRACT_MACHINE.
 
   Definition load t                    : configuration := c_eval t [.].
   Coercion value_to_conf (v : value)   : configuration := c_apply [.] v.
-  (*Coercion value_to_conf : value >-> configuration.*)
   Definition final (c : configuration) : option value := 
       match c with
       | c_apply _ [.] v => Some v 
@@ -104,26 +101,23 @@ Module Type SLOPPY_REF_EVAL_APPLY_MACHINE (R : RED_REF_SEM) <: ABSTRACT_MACHINE.
       | c_apply _ [.] _ => 
             None
       end.
+  Definition next_conf (_ : entropy) := next_conf0.
+
 
   Instance rws : REWRITING_SYSTEM configuration :=
   { transition := transition }.
 
 
-  Definition next_conf (_ : entropy) := next_conf0.
-
-
   Axioms
-  (final_correct :                                                              forall c,
-       final c <> None -> ~exists c', c → c')
-  (trans_computable :                                                       forall c1 c2,
-       c1 → c2 <-> exists e, next_conf e c1 = Some c2)
-  (finals_are_vals :                                                          forall c v,
-       final c = Some v <-> c = v)
+  (final_correct :                                                             forall st,
+       final st <> None -> ~exists st', st → st')
+  (trans_computable :                                                     forall st1 st2,
+       st1 → st2 <-> exists e, next_conf e st1 = Some st2)
+  (finals_are_vals :                                                         forall st v,
+       final st = Some v <-> st = v)
 
-  (next_eval_alive :                                   forall st t k (c : context ick k),
-      next_conf0 st = Some (c_eval t c) -> ~dead_ckind k)
-  (next_apply_alive :                                  forall st k (c : context ick k) v,
-      next_conf0 st = Some (c_apply c v) -> ~dead_ckind k).
+  (next_conf_alive :                                                      forall st1 st2,
+      next_conf0 st1 = Some st2 -> alive_state st2).
 
 End SLOPPY_REF_EVAL_APPLY_MACHINE.
 
@@ -151,33 +145,23 @@ Module Type REF_EVAL_APPLY_MACHINE (R : PRECISE_RED_REF_SEM) <: ABSTRACT_MACHINE
   Defined.
 
 
-  (*Inductive conf : Type :=
-  | c_eval  : term -> forall {k}, context ick k -> (k ? alive_ckind) -> conf
-  | c_apply : forall {k}, context ick k -> R.value k -> (k ? alive_ckind) -> conf.*)
   Definition configuration := {S? RAW.configuration | alive_state}.
 
   Coercion conf_to_raw (st : configuration) := ¹st.
-      (*match st with
-      | c_eval t _ c _  => RAW.c_eval t c
-      | c_apply _ c v _ => RAW.c_apply c v
-      end.*)
-  Definition load t                    : configuration := 
+
+  Definition load t : configuration := 
       submember_by alive_state (RAW.c_eval t [.]) init_ckind_alive.
-     (*c_eval t [.] (init_ckind_alive `as witness of alive_ckind).*)
+
   Definition value_to_conf (v : value) : configuration := 
      submember_by alive_state (RAW.c_apply [.] v) init_ckind_alive.
-     (*`as witness of alive_ckind).*)
   Coercion value_to_conf : value >-> configuration.
-  Definition final (c : configuration) : option value := RAW.final c. 
-  Definition decompile (c : configuration) : term := RAW.decompile c.
-  Definition transition (st1 st2 : configuration) := RAW.transition st1 st2.
+
+  Definition final (c : configuration)     : option value := RAW.final c. 
+  Definition decompile (c : configuration) : term         := RAW.decompile c.
+  Definition transition (st1 st2 : configuration)         := RAW.transition st1 st2.
 
   Instance rws : REWRITING_SYSTEM configuration :=
   { transition := transition }.
-
-
-  Axiom next_conf_alive :                             forall st1 st2 : RAW.configuration,
-      RAW.next_conf0 st1 = Some st2 -> alive_state st2.
 
 
   Definition next_conf0 (st : configuration) : option configuration :=
@@ -189,36 +173,17 @@ Module Type REF_EVAL_APPLY_MACHINE (R : PRECISE_RED_REF_SEM) <: ABSTRACT_MACHINE
       | None     => fun _ => None
       end eq_refl.
 
-      (*
-      match RAW.next_conf0 st 
-      as sto return RAW.next_conf0 st = sto -> option configuration
-      with
-
-      | Some (RAW.c_eval t k c) => fun H => Some 
-
-            (c_eval t c  (RAW.next_eval_alive st t k c H 
-                                `as witness of alive_ckind) )
-
-      | Some (RAW.c_apply k c v) => fun H => Some 
-
-            (c_apply c v (RAW.next_apply_alive st k c v H 
-                                `as witness of alive_ckind) )
-
-      | None                     => fun _ => None
-
-      end eq_refl.*)
-
 
   Definition next_conf (_ : entropy) := next_conf0.
 
 
   Axioms
-  (final_correct :                                                              forall c,
-       final c <> None -> ~exists c', c → c')
-  (trans_computable :                                                       forall c1 c2,
-       c1 → c2 <-> exists e, next_conf e c1 = Some c2)
-  (finals_are_vals :                                                          forall c v,
-       final c = Some v <-> c = v).
+  (final_correct :                                                             forall st,
+       final st <> None -> ~exists st', st → st')
+  (trans_computable :                                                     forall st1 st2,
+       st1 → st2 <-> exists e, next_conf e st1 = Some st2)
+  (finals_are_vals :                                                         forall st v,
+       final st = Some v <-> st = v).
 
 End REF_EVAL_APPLY_MACHINE.
 
@@ -333,6 +298,7 @@ End REF_PUSH_ENTER_MACHINE.*)
 
 
 
+
 (*** Implementation ***)
 
 
@@ -340,16 +306,14 @@ Require Import Util.
 
 
 
-
 Module SloppyRefEvalApplyMachine (R : RED_REF_SEM) <: SLOPPY_REF_EVAL_APPLY_MACHINE R.
 
   Module RF := RED_LANG_Facts R.
-  Import R RF ST.
+  Module SF := RED_STRATEGY_STEP_Facts R R.ST.
+  Import R RF ST SF.
 
 
-  Notation ick := init_ckind.
-
-
+  Notation ick     := init_ckind.
   Definition term  := term.
   Definition value := value ick.
 
@@ -361,8 +325,7 @@ Module SloppyRefEvalApplyMachine (R : RED_REF_SEM) <: SLOPPY_REF_EVAL_APPLY_MACH
 
 
   Definition load t                    : configuration := c_eval t [.].
-  Definition value_to_conf (v : value) : configuration := c_apply [.] v.
-  Coercion value_to_conf : value >-> configuration.
+  Coercion   value_to_conf (v : value) : configuration := c_apply [.] v.
   Definition final (c : configuration) : option value := 
       match c with
       | c_apply _ [.] v => Some v 
@@ -523,6 +486,33 @@ Module SloppyRefEvalApplyMachine (R : RED_REF_SEM) <: SLOPPY_REF_EVAL_APPLY_MACH
   Qed.
 
 
+  Lemma next_conf_alive :                                                 forall st1 st2,
+      next_conf0 st1 = Some st2 -> alive_state st2.
+
+  Proof.
+    intros st1 st2 H.
+    destruct st1 as [t k c | k [ | ec c] v], st2; 
+    unfold next_conf0 in H; simpl in *;
+    try discriminate;
+    try match goal with
+    | H : context [dec_term ?t ?k] |- _ =>
+          remember (dec_term t k); symmetry in Heqi; 
+          destruct i; try discriminate;
+          [ destruct (contract r); inversion H; dep_subst;
+            auto using (proper_death2 [.])
+          | inversion H; dep_subst;
+            eauto using dec_term_next_alive, dec_term_val_alive ]
+    | H : context [dec_context ?ec ?k ?v] |- _ =>
+          remember (dec_context ec k v); symmetry in Heqi; destruct i; 
+          try discriminate;
+          [ destruct (contract r); inversion H; dep_subst;
+            auto using (proper_death2 [.])
+          | inversion H; dep_subst;
+            eauto using dec_context_next_alive, dec_context_val_alive ]
+    end.
+  Qed.
+
+(*
   Lemma next_eval_alive :                              forall st t k (c : context ick k),
       next_conf0 st = Some (c_eval t c) -> ~dead_ckind k.
 
@@ -567,7 +557,7 @@ Module SloppyRefEvalApplyMachine (R : RED_REF_SEM) <: SLOPPY_REF_EVAL_APPLY_MACH
         assert (H0 : dead_ckind (k+>ec)) by auto using death_propagation.
         apply (dec_context_from_dead ec k v0) in H0.
         congruence.
-  Qed.
+  Qed.*)
 
 End SloppyRefEvalApplyMachine.
 
@@ -578,133 +568,44 @@ End SloppyRefEvalApplyMachine.
 Module RefEvalApplyMachine (R : PRECISE_RED_REF_SEM) <: REF_EVAL_APPLY_MACHINE R.
 
   Module RF := RED_LANG_Facts R.
-  Module SF := RED_STRATEGY_STEP_Facts R R.ST.
-  Import R RF ST SF.
+  Import R RF ST.
 
 
   Module RAW := SloppyRefEvalApplyMachine R.
   Export RAW.
 
-  Notation ick := init_ckind.
 
-  Definition term  := term.
-  Definition value := RAW.value.
-  Notation alive_state := RAW.alive_state.
+  Notation   ick         := init_ckind.
+  Definition term        := term.
+  Definition value       := RAW.value.
+  Notation   alive_state := RAW.alive_state.
 
 
   Instance alive_state_CompPred : CompPred _ alive_state.
       split. 
-      intro st; destruct st; apply (is_satisfied (fun k => ~dead_ckind k) k).
+      intro st; destruct st; 
+      apply (is_satisfied (fun k => ~dead_ckind k) k).
   Defined.
 
 
-  (*Inductive conf : Type :=
-  | c_eval  : term -> forall {k}, context ick k -> (k ? alive_ckind) -> conf
-  | c_apply : forall {k}, context ick k -> R.value k -> (k ? alive_ckind) -> conf.*)
   Definition configuration := {S? RAW.configuration | alive_state }.
 
   Coercion conf_to_raw (st : configuration) := ¹st.
-      (*match st with
-      | c_eval t _ c _  => RAW.c_eval t c
-      | c_apply _ c v _ => RAW.c_apply c v
-      end.*)
-  Definition load t                    : configuration := 
+
+  Definition load t : configuration := 
       submember_by alive_state (RAW.c_eval t [.]) init_ckind_alive.
-     (*c_eval t [.] (init_ckind_alive `as witness of alive_ckind).*)
+
   Definition value_to_conf (v : value) : configuration := 
-     submember_by alive_state (RAW.c_apply [.] v) init_ckind_alive.
-     (*`as witness of alive_ckind).*)
+      submember_by alive_state (RAW.c_apply [.] v) init_ckind_alive.
   Coercion value_to_conf : value >-> configuration.
+
   Definition final (c : configuration) : option value := RAW.final c. 
-  Definition decompile (c : configuration) : term := RAW.decompile c.
-  Definition transition (st1 st2 : configuration) := RAW.transition st1 st2.
+  Definition decompile (c : configuration) : term     := RAW.decompile c.
+  Definition transition (st1 st2 : configuration)     := RAW.transition st1 st2.
 
   Instance rws : REWRITING_SYSTEM configuration :=
   { transition := transition }.
 
-
-  Lemma next_conf_alive :                             forall st1 st2 : RAW.configuration,
-      RAW.next_conf0 st1 = Some st2 -> alive_state st2.
-
-  Proof.
-    intros st1 st2 H.
-    destruct st1 as [t k c | k [ | ec c] v], st2; 
-    unfold RAW.next_conf0 in H; simpl in *;
-    try discriminate;
-    try match goal with
-    | H : context [dec_term ?t ?k] |- _ =>
-          remember (dec_term t k); symmetry in Heqi; 
-          destruct i; try discriminate;
-          [ destruct (contract r); inversion H; dep_subst;
-            auto using (proper_death2 [.])
-          | inversion H; dep_subst;
-            eauto using dec_term_next_alive, dec_term_val_alive ]
-    | H : context [dec_context ?ec ?k ?v] |- _ =>
-          remember (dec_context ec k v); symmetry in Heqi; destruct i; 
-          try discriminate;
-          [ destruct (contract r); inversion H; dep_subst;
-            auto using (proper_death2 [.])
-          | inversion H; dep_subst;
-            eauto using dec_context_next_alive, dec_context_val_alive ]
-    end.
-  Qed.
-
-
-(*
-  Notation ick     := init_ckind.
-  Definition term  := term.
-  Definition value := value ick.
-  Definition alive_ckind k := ~dead_ckind k.
-
-
-  Inductive conf : Type :=
-  | c_eval  : term -> forall {k}, context ick k -> (k ? alive_ckind) -> conf
-  | c_apply : forall {k}, context ick k -> R.value k -> (k ? alive_ckind) -> conf.
-  Definition configuration := conf.
-
-  Coercion conf_to_raw st :=
-      match st with
-      | c_eval t _ c _  => RAW.c_eval t c
-      | c_apply _ c v _ => RAW.c_apply c v
-      end.
-  Definition load t                    : configuration := 
-     c_eval t [.] (init_ckind_alive `as witness of alive_ckind).
-  Definition value_to_conf (v : value) : configuration := 
-     c_apply [.] v (init_ckind_alive `as witness of alive_ckind).
-  Coercion value_to_conf : value >-> configuration.
-  Definition final (c : configuration) : option value := RAW.final c.
-  Definition decompile (c : configuration) : term := RAW.decompile c.
-
-  Definition transition (st1 st2 : configuration) := RAW.transition st1 st2.
-
-
-  Instance rws : REWRITING_SYSTEM configuration :=
-  { transition := transition }.
-
-
-  Definition next_conf0 (st : configuration) : option configuration :=
-
-      match RAW.next_conf0 st 
-      as sto return RAW.next_conf0 st = sto -> option configuration 
-      with
-
-      | Some (RAW.c_eval t k c) => fun H => Some 
-
-            (c_eval t c  (RAW.next_eval_alive st t k c H 
-                                `as witness of alive_ckind) )
-
-      | Some (RAW.c_apply k c v) => fun H => Some 
-
-            (c_apply c v (RAW.next_apply_alive st k c v H 
-                                `as witness of alive_ckind) )
-
-      | None                     => fun _ => None
-
-      end eq_refl.
-
-
-  Definition next_conf (_ : entropy) := next_conf0.
-*)
 
   Definition next_conf0 (st : configuration) : option configuration :=
 
@@ -714,26 +615,6 @@ Module RefEvalApplyMachine (R : PRECISE_RED_REF_SEM) <: REF_EVAL_APPLY_MACHINE R
       | Some st' => fun H => Some (submember_by _ st' (next_conf_alive st st' H))
       | None     => fun _ => None
       end eq_refl.
-
-      (*
-      match RAW.next_conf0 st 
-      as sto return RAW.next_conf0 st = sto -> option configuration
-      with
-
-      | Some (RAW.c_eval t k c) => fun H => Some 
-
-            (c_eval t c  (RAW.next_eval_alive st t k c H 
-                                `as witness of alive_ckind) )
-
-      | Some (RAW.c_apply k c v) => fun H => Some 
-
-            (c_apply c v (RAW.next_apply_alive st k c v H 
-                                `as witness of alive_ckind) )
-
-      | None                     => fun _ => None
-
-      end eq_refl.
-      *)
 
 
   Definition next_conf (_ : entropy) := next_conf0.
@@ -760,47 +641,6 @@ Module RefEvalApplyMachine (R : PRECISE_RED_REF_SEM) <: REF_EVAL_APPLY_MACHINE R
     apply RAW.trans_computable0.
   Qed.
 
-(*
-    intros st1 st2; split; intro H.
-
-  (* -> *) {
-      destruct st1, st2; compute in H; dependent destruction H; dep_subst;
-          simpl;
-          try match goal with H : @eq (interm_dec _) _ _ |- _ => rewrite H end;
-      try solve 
-      [ eauto 
-      | rewrite H0; eauto].
-  }
-
-  (* <- *) {
-      destruct st1; simpl in H.
-      - remember (dec_term t k) as dc.
-        destruct dc.
-        + remember (contract r) as opt.
-          destruct opt.
-          * destruct st2; inversion H; dep_subst.
-            eapply RAW.t_red; eauto.
-          * inversion H.
-        + destruct st2; inversion H; dep_subst.
-          apply RAW.t_term; auto.
-        + destruct st2; inversion H; dep_subst.
-          apply RAW.t_val; auto.
-        + inversion H.
-      - destruct c; autof.
-        remember (dec_context ec k2 v) as dc.
-        destruct dc.
-        + remember (contract r) as opt.
-          destruct opt.
-          * destruct st2; inversion H; dep_subst.
-            eapply RAW.t_cred; eauto.
-          * inversion H.
-        + destruct st2; inversion H; dep_subst.
-          apply RAW.t_cterm; auto.
-        + destruct st2; inversion H; dep_subst.
-          apply RAW.t_cval; auto.
-        + inversion H.
-  }
-  Qed.*)
 
 
   Lemma trans_computable0 :                                                 forall c1 c2,

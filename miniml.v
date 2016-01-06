@@ -79,10 +79,6 @@ Module MiniML_PreRefSem <: PRE_REF_SEM.
   Hint Unfold init_ckind dead_ckind.
 
 
-  Instance dead_CompPred : CompPred ckind dead_ckind.
-      split. auto. 
-  Defined.
-
   Inductive context (k1 : ckind) : ckind -> Set :=
   | empty : context k1 k1
   | ccons : forall (ec : elem_context) {k2}, context k1 k2 -> context k1 (k2+>ec).
@@ -115,6 +111,11 @@ Module MiniML_PreRefSem <: PRE_REF_SEM.
       | rCase v t1 x t2 => Case (v : term) t1 x t2
       end.
   Coercion redex_to_term : redex >-> term.
+
+
+  Instance dead_is_comp : CompPred ckind dead_ckind.
+      split. auto. 
+  Defined.
 
 
   Lemma init_ckind_alive :
@@ -287,12 +288,10 @@ Module MiniML_PreRefSem <: PRE_REF_SEM.
           contract r = Some t /\ t2 = c[t].
 
 
-  Notation "k |~ t1 → t2"  := (reduce k t1 t2)           
-                                         (no associativity, at level 70, t1 at level 69).
-  Notation "k |~ t1 →+ t2" := (clos_trans_1n _ (reduce k) t1 t2) 
-                                         (no associativity, at level 70, t1 at level 69).
-  Notation "k |~ t1 →* t2" := (clos_refl_trans_1n _ (reduce k) t1 t2) 
-                                         (no associativity, at level 70, t1 at level 69).
+  Instance lrws : LABELED_REWRITING_SYSTEM ckind term :=
+  { ltransition := reduce }. 
+  Instance rws : REWRITING_SYSTEM term := 
+  { transition := reduce init_ckind }.
 
 End MiniML_PreRefSem.
 
@@ -555,7 +554,7 @@ End MiniML_Strategy.
 
 
 
-Module MiniML_RefSem := RedRefSem MiniML_PreRefSem MiniML_Strategy.
+Module MiniML_RefSem := PreciseRedRefSem MiniML_PreRefSem MiniML_Strategy.
 
 
 

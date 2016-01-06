@@ -98,7 +98,10 @@ VFILES:=Util.v\
   lam_no.v\
   lam_no_check.v\
   miniml.v\
-  miniml_check.v
+  miniml_check.v\
+  lam_ses_no.v\
+  lam_ses_no_check.v\
+  lam_kes_cbn.v
 
 -include $(addsuffix .d,$(VFILES))
 .SECONDARY: $(addsuffix .d,$(VFILES))

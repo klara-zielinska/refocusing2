@@ -6,7 +6,7 @@ Require Import Program
 
 (* Lambda calculus with simple explicit substitution for the normal-order strategy *)
 
-Module Lam_SES_NO_PreRefSem <: PRE_REF_SEM.
+Module Lam_SES_NO_PreRefSem <: PRE_PRECISE_REF_SEM.
 
   Require Export Peano_dec Compare_dec.
 
@@ -33,6 +33,8 @@ Module Lam_SES_NO_PreRefSem <: PRE_REF_SEM.
 
   Definition CECaD (k : ckind) := match k with CBot => False     | _ => True end.
   Definition CECa  (k : ckind) := match k with CBot | D => False | _ => True end.
+
+  Hint Unfold CECaD CECa.
 
   Ltac destruct_all_CECaD :=
       repeat match goal with H : CECaD ?k |- _ => 
@@ -271,6 +273,11 @@ Module Lam_SES_NO_PreRefSem <: PRE_REF_SEM.
   Definition contract {k} (r : redex k) := Some (contract0 r).
 
 
+  Instance dead_is_comp : CompPred _ dead_ckind.
+      split. destruct x; auto. 
+  Defined.
+
+
   Lemma death_propagation : 
       forall k ec, dead_ckind k -> dead_ckind (k+>ec).
 
@@ -384,21 +391,19 @@ Module Lam_SES_NO_PreRefSem <: PRE_REF_SEM.
           contract r = Some t /\ t2 = c[t].
 
 
-  Notation "k |~ t1 → t2"  := (reduce k t1 t2)           
-                                         (no associativity, at level 70, t1 at level 69).
-  Notation "k |~ t1 →+ t2" := (clos_trans_1n _ (reduce k) t1 t2) 
-                                         (no associativity, at level 70, t1 at level 69).
-  Notation "k |~ t1 →* t2" := (clos_refl_trans_1n _ (reduce k) t1 t2) 
-                                         (no associativity, at level 70, t1 at level 69).
+  Instance lrws : LABELED_REWRITING_SYSTEM ckind term :=
+  { ltransition := reduce }. 
+  Instance rws : REWRITING_SYSTEM term := 
+  { transition := reduce init_ckind }.
 
 End Lam_SES_NO_PreRefSem.
 
 
 
 
-Module Lam_SES_NO_Strategy <: REF_STRATEGY Lam_SES_NO_RefLang.
+Module Lam_SES_NO_Strategy <: REF_STRATEGY Lam_SES_NO_PreRefSem.
 
-  Import Lam_SES_NO_RefLang.
+  Import Lam_SES_NO_PreRefSem.
 
 
   Inductive interm_dec k : Set :=
@@ -596,13 +601,13 @@ Module Lam_SES_NO_Strategy <: REF_STRATEGY Lam_SES_NO_RefLang.
   Qed.
 
 
-  Lemma search_order_comp_if : forall t ec0 ec1, 
+  Lemma search_order_comp_if : forall t ec0 ec1 k, 
       immediate_ec ec0 t -> immediate_ec ec1 t -> 
-      forall k, ~ dead_ckind (k+>ec0) -> ~ dead_ckind (k+>ec1) ->
+      ~ dead_ckind (k+>ec0) -> ~ dead_ckind (k+>ec1) ->
           k,t |~ ec0 << ec1 \/ k,t |~ ec1 << ec0 \/ ec0 = ec1.
 
   Proof.
-    intros t ec0 ec1 H0 H1 k H2 H3.
+    intros t ec0 ec1 k H0 H1 H2 H3.
 
     destruct H0 as (t0, H4); destruct H1 as (t1, H5).
     subst t.
@@ -715,20 +720,13 @@ End Lam_SES_NO_Strategy.
 
 
 
-Module Lam_SES_NO_Cal.
-  Module RefLang := Lam_SES_NO_RefLang.
-  Module RefStrategy := Lam_SES_NO_Strategy.
-  Module RedLang := RedRefLang RefLang RefStrategy.
-End Lam_SES_NO_Cal.
-
-
 
 
 (* Contexts from the Johan Munk's paper *)
 
 Module Lam_SES_NO_AlterContexts.
 
-  Import Lam_SES_NO_RefLang.
+  Import Lam_SES_NO_PreRefSem.
 
   Inductive ckind_IO := Aio | Cio | Dio.
 
@@ -907,8 +905,11 @@ End Lam_SES_NO_AlterContexts.
 
 
 
-Require Import refocusing_semantics_derivation.
+Module Lam_SES_NO_RefSem := PreciseRedRefSem Lam_SES_NO_PreRefSem Lam_SES_NO_Strategy.
+
+
+
+
 Require Import refocusing_machine.
 
-Module Lam_SES_NO_RefSem := RedRefSem Lam_SES_NO_Cal.
-Module Lam_SES_NO_EAM    := RefEvalApplyMachine Lam_SES_NO_Cal.RedLang Lam_SES_NO_RefSem.
+Module Lam_SES_NO_EAM := RefEvalApplyMachine Lam_SES_NO_RefSem.

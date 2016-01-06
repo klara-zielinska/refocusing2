@@ -1,3 +1,9 @@
+
+
+
+(*** Interface ***)
+
+
 Require Import Program
                Util
                rewriting_system
@@ -5,6 +11,7 @@ Require Import Program
 Require Export Subset
                reduction_semantics
                reduction_strategy.
+
 
 
 
@@ -23,22 +30,32 @@ Module Type PRE_REF_SEM <: RED_STRATEGY_LANG.
       exists {k'} (c : context k k') (r : redex k') t,  dec t1 k (d_red r c) /\
           contract r = Some t /\ t2 = c[t].
 
-  Notation "t1 <| t2"      := (subterm_order t1 t2)      (at level 70, no associativity).
-  Notation "k |~ t1 → t2"  := (reduce k t1 t2) 
-                                         (no associativity, at level 70, t1 at level 69).
-  Notation "k |~ t1 →+ t2" := (clos_trans_1n _ (reduce k) t1 t2) 
-                                         (no associativity, at level 70, t1 at level 69).
-  Notation "k |~ t1 →* t2" := (clos_refl_trans_1n _ (reduce k) t1 t2) 
-                                         (no associativity, at level 70, t1 at level 69).
+  Instance lrws : LABELED_REWRITING_SYSTEM ckind term :=
+  { ltransition := reduce }. 
+  Instance rws : REWRITING_SYSTEM term := 
+  { transition := reduce init_ckind }.
+
+  Notation "t1 <| t2"      := (subterm_order t1 t2)      (no associativity, at level 70).
 
   Axioms
   (redex_trivial1 :                                        forall {k} (r : redex k) ec t,
        ~dead_ckind (k+>ec) -> ec:[t] = r -> exists (v : value (k+>ec)), t = v)
   (wf_immediate_subterm : well_founded immediate_subterm)
-  (wf_subterm_order     : well_founded subterm_order)
-  (dead_CompPred        : CompPred _ dead_ckind). 
+  (wf_subterm_order     : well_founded subterm_order). 
 
 End PRE_REF_SEM.
+
+
+
+
+
+Module Type PRE_PRECISE_REF_SEM.
+
+  Include PRE_REF_SEM.
+  Axiom dead_is_comp : CompPred _ dead_ckind.
+
+End PRE_PRECISE_REF_SEM.
+
 
 
 
@@ -70,6 +87,7 @@ Module Type REF_STRATEGY (PR : PRE_REF_SEM) <: RED_STRATEGY PR.
            ~dead_ckind (k+>ec0) /\ ~dead_ckind (k+>ec1)).
 
 End REF_STRATEGY.
+
 
 
 
@@ -122,10 +140,21 @@ Module Type RED_REF_SEM <: RED_SEM.
   (dec_proc_val_eqv_decctx :       forall {k2} (v : value k2) {k1} (c : context k1 k2) d,
        dec_proc v c d <-> decctx_proc v c d)
   (dec_proc_eqv_dec :                             forall t {k1 k2} (c : context k1 k2) d,
-      ~dead_ckind k2 -> (dec_proc t c d <-> dec c[t] k1 d))
-  (dead_CompPred        : CompPred _ dead_ckind). 
+      ~dead_ckind k2 -> (dec_proc t c d <-> dec c[t] k1 d)). 
 
 End RED_REF_SEM.
+
+
+
+
+
+Module Type PRECISE_RED_REF_SEM.
+
+  Include RED_REF_SEM.
+  Axiom dead_is_comp : CompPred _ dead_ckind.
+
+End PRECISE_RED_REF_SEM.
+
 
 
 
@@ -146,6 +175,40 @@ End RED_PE_REF_SEM.
 
 
 
+
+Module REF_LANG_Help.
+
+  Ltac prove_st_wf := 
+      intro t; constructor; induction t; 
+      (
+          intros ? H; 
+          inversion H as [ec DECT]; subst; 
+          destruct ec; inversion DECT; subst; 
+          constructor; auto
+      ).
+
+  Context `{term : Set}.
+  Context `{immediate_subterm : term -> term -> Prop}.
+  Context `{wf_immediate_subterm : well_founded immediate_subterm}.
+
+  Ltac prove_sto_wf :=
+      exact (wf_clos_trans_l _ _ wf_immediate_subterm).
+
+  Ltac prove_ec_wf := 
+      intros k t ec; destruct k, t, ec; repeat 
+      (
+          constructor; 
+          intros ec H; 
+          destruct ec; inversion H; dep_subst; clear H
+      ).
+
+End REF_LANG_Help.
+
+
+
+
+
+(*** Implementation ***)
 
 
 Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
@@ -215,13 +278,6 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
 
       - intuition.
     Qed.
-
-
-    Instance lrws : LABELED_REWRITING_SYSTEM ckind term := 
-    { ltransition := reduce }.
-
-    Instance rws : REWRITING_SYSTEM term := 
-    { transition := reduce init_ckind }.
 
   End R.
 
@@ -828,30 +884,12 @@ End RedRefSem.
 
 
 
-Module REF_LANG_Help.
 
-  Ltac prove_st_wf := 
-      intro t; constructor; induction t; 
-      (
-          intros ? H; 
-          inversion H as [ec DECT]; subst; 
-          destruct ec; inversion DECT; subst; 
-          constructor; auto
-      ).
+Module PreciseRedRefSem (PR : PRE_PRECISE_REF_SEM) (ST : REF_STRATEGY PR) 
+                                                                  <: PRECISE_RED_REF_SEM.
 
-  Context `{term : Set}.
-  Context `{immediate_subterm : term -> term -> Prop}.
-  Context `{wf_immediate_subterm : well_founded immediate_subterm}.
+  Include RedRefSem PR ST.
 
-  Ltac prove_sto_wf :=
-      exact (wf_clos_trans_l _ _ wf_immediate_subterm).
+  Definition dead_is_comp := PR.dead_is_comp.
 
-  Ltac prove_ec_wf := 
-      intros k t ec; destruct k, t, ec; repeat 
-      (
-          constructor; 
-          intros ec H; 
-          destruct ec; inversion H; dep_subst; clear H
-      ).
-
-End REF_LANG_Help.
+End PreciseRedRefSem.

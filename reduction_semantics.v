@@ -1,6 +1,6 @@
 Require Import Relations
-               Program
-               rewriting_system.
+               Program.
+Require Export rewriting_system.
 
 
 (* Note: The only grammar mentioned in this formalization is a grammar of evaluation

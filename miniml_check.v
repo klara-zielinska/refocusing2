@@ -81,12 +81,12 @@ Module MiniML_HandDecProc.
   Definition dec_proc : 
       term -> forall {k1 k2 : ckind}, context k1 k2 -> decomp k1 -> Prop 
 
-      := fun t => ##(dec_proc' t).
+      := fun t => ů ů(dec_proc' t).
 
   Definition decctx_proc : 
       forall {k2}, value k2 -> forall {k1}, context k1 k2 -> decomp k1 -> Prop 
 
-      := #(fun v => #(decctx_proc' v)).
+      := ů(fun v => ů(decctx_proc' v)).
 
   Scheme dec_proc_Ind    := Induction for dec_proc'    Sort Prop
     with decctx_proc_Ind := Induction for decctx_proc' Sort Prop.
@@ -212,15 +212,15 @@ Module MiniML_HandMachine.
 
   Notation "[$ t $]"         := (load t)                                 (t at level 99).
   Notation "[: v :]"         := (value_to_conf v)                        (v at level 99).
-  Notation "[$ t , c , H $]" := (c_eval t c H)                     (t, k, c at level 99).
-  Notation "[: c , v , H :]" := (c_apply c v H)                       (c, v at level 99).
+  Notation "[$ t , c , H $]" := (exist _ (RAW.c_eval t c) H)                     (t, k, c at level 99).
+  Notation "[: c , v , H :]" := (exist _ (RAW.c_apply c v) H)                       (c, v at level 99).
 
 
-  Lemma ick_aw : init_ckind ? alive_ckind.
-  Proof. apply (init_ckind_alive `as witness of alive_ckind). Qed.
+  (*Lemma ick_aw : init_ckind ? alive_ckind.
+  Proof. apply (init_ckind_alive `as witness of alive_ckind). Qed.*)
 
-  Notation "[$ t , c $]" := (c_eval t c ick_aw)                     (t, k, c at level 99).
-  Notation "[: c , v :]" := (c_apply c v ick_aw)                       (c, v at level 99).
+  Notation "[$ t , c $]" := (submember_by _ (RAW.c_eval t c) init_ckind_alive)                     (t, k, c at level 99).
+  Notation "[: c , v :]" := (submember_by _ (RAW.c_apply c v) init_ckind_alive)                       (c, v at level 99).
 
   Definition next_conf0 (st : configuration) : option configuration :=
       match st with
@@ -258,7 +258,7 @@ Module MiniML_HandMachine.
   { transition := transition }.
 
 
-  Fact trans_computable0 :                                       forall (st1 st2 : conf),
+  Fact trans_computable0 :                              forall (st1 st2 : configuration),
        `(rws) st1 → st2 <-> next_conf0 st1 = Some st2.
 
   Proof. intuition. Qed.
@@ -280,14 +280,14 @@ Module MiniML_HandMachine.
       next_conf0 st = MiniML_EAM.next_conf0 st.
 
   Proof.
-    destruct st as [t k ? | k c v].
-    - destruct t, k; compute; destruct ick_aw; auto.
+    destruct st as [[t k ? | k c v] ?].
+    - destruct t, k; compute; auto.
     - destruct c as [| ec k c]; auto.
       destruct ec, k; destruct v; 
       solve
-      [ compute; destruct ick_aw; auto
+      [ compute; auto
       | match goal with v : value' |- _ => 
-        destruct v; compute; destruct ick_aw; auto 
+        destruct v; compute; auto 
         end ].
   Qed.
 
@@ -314,7 +314,7 @@ Module MiniML_HandMachine.
        final st <> None -> ~exists st', `(rws) st → st'.
 
   Proof.
-    destruct st as [? | ? c v]; auto.
+    destruct st as [[? | ? c v] ?]; auto.
     destruct c; auto.
     intros _ [st' H].
     inversion H.

@@ -76,11 +76,6 @@ Module Lam_NO_PreRefSem <: PRE_REF_SEM.
   Hint Unfold init_ckind dead_ckind.
 
 
-  Instance dead_CompPred : CompPred ckind dead_ckind.
-      split. destruct x; auto. 
-  Defined.
-
-
   Lemma death_propagation : 
       forall k ec, dead_ckind k -> dead_ckind (k+>ec).
 
@@ -221,6 +216,11 @@ Module Lam_NO_PreRefSem <: PRE_REF_SEM.
   Definition contract {k} (r : redex k) := Some (contract0 r).
 
 
+  Instance dead_is_comp : CompPred ckind dead_ckind.
+      split. destruct x; auto. 
+  Defined.
+
+
   Lemma valCa_is_valECa : 
       forall v1 : valCa, exists v2 : value ECa, valCa_to_term v1 = value_to_term v2.
 
@@ -313,12 +313,10 @@ Module Lam_NO_PreRefSem <: PRE_REF_SEM.
           contract r = Some t /\ t2 = c[t].
 
 
-  Notation "k |~ t1 → t2"  := (reduce k t1 t2)           
-                                         (no associativity, at level 70, t1 at level 69).
-  Notation "k |~ t1 →+ t2" := (clos_trans_1n _ (reduce k) t1 t2) 
-                                         (no associativity, at level 70, t1 at level 69).
-  Notation "k |~ t1 →* t2" := (clos_refl_trans_1n _ (reduce k) t1 t2) 
-                                         (no associativity, at level 70, t1 at level 69).
+  Instance lrws : LABELED_REWRITING_SYSTEM ckind term :=
+  { ltransition := reduce }. 
+  Instance rws : REWRITING_SYSTEM term := 
+  { transition := reduce init_ckind }.
 
 End Lam_NO_PreRefSem.
 
@@ -615,7 +613,7 @@ End Lam_NO_Strategy.
 
 
 
-Module Lam_NO_RefSem := RedRefSem Lam_NO_PreRefSem Lam_NO_Strategy.
+Module Lam_NO_RefSem := PreciseRedRefSem Lam_NO_PreRefSem Lam_NO_Strategy.
 
 
 

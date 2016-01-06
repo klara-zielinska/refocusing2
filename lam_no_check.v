@@ -1,5 +1,6 @@
 Require Import Program
                Entropy
+               Subset
                Util
                rewriting_system
                lam_no
@@ -136,7 +137,7 @@ Module Lam_NO_HandDecProc.
     end.
   }
 
- (* <- *) {
+  (* <- *) {
     induction H using RS.decctx_proc_Ind with
     (P := fun _ t c d _ => dec_proc t c d);
     try match goal with
@@ -145,9 +146,10 @@ Module Lam_NO_HandDecProc.
     | H : RS.ST.dec_context ?ec ?k ?v = _ |- _ => destruct ec, k2; 
                                                   dependent_destruction2 v; 
                                                   inversion H; subst
-    end; eauto.
- }
- Qed.
+    end; 
+    solve [eauto].
+  }
+  Qed.
 
 End Lam_NO_HandDecProc.
 
@@ -167,12 +169,14 @@ Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
   Definition value_to_conf := value_to_conf.
   Definition final         := final.
 
-  Notation "[$ t $]"         := (load t)                                 (t at level 99).
-  Notation "[: v :]"         := (value_to_conf v)                        (v at level 99).
-  Notation "[$ t , k , c , H $]" := (@c_eval t k c H)                    (t, k, c at level 99).
-  Notation "[: c , v , H :]"     := (c_apply c v H)                         (c, v at level 99).
+  Notation "[$ t $]" := (submember_by _ (c_eval t [.]) init_ckind_alive
+                             : configuration)                            (t at level 99).
+  Notation "[: v :]" := (submember_by _ (c_apply [.] v) init_ckind_alive
+                             : configuration)                            (v at level 99).
+  Notation "[$ t , k , c , H $]" := (@c_eval t k c ?& H)           (t, k, c at level 99).
+  Notation "[: c , v , H :]"     := (c_apply c v ?& H)                (c, v at level 99).
   Notation "[: ( ec , k ) =: c , v , H :]" := 
-      (c_apply (@ccons _ ec k c) v H)                            (ec, k, c, v at level 99).
+      (c_apply (@ccons _ ec k c) v ?& H)                       (ec, k, c, v at level 99).
 
 
   Definition next_conf0 (st : configuration) : option configuration. refine (
@@ -209,7 +213,7 @@ Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
       | _ => None
       end);
 
-      solve [apply Subset.sat_token; compute; auto].
+      solve [apply Subset.witness_intro; compute; auto].
   Defined.
   Definition next_conf (_ : entropy) := next_conf0.
 
@@ -218,15 +222,8 @@ Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
   Instance rws : REWRITING_SYSTEM configuration :=
   { transition := transition }.
 
-(* Uncomment if you don't want to use classes :
-  Notation "c1 → c2"  := (transition c1 c2)              (no associativity, at level 70).
-  Notation "t1 →+ t2" := (clos_trans_1n _ transition t1 t2)
-                                                         (no associativity, at level 70).
-  Notation "t1 →* t2" := (clos_refl_trans_1n _ transition t1 t2)
-                                                         (no associativity, at level 70).
-*)
 
-  Fact trans_computable0 :                                       forall (st1 st2 : conf),
+  Fact trans_computable0 :                               forall (st1 st2 : configuration),
        `(rws) st1 → st2 <-> next_conf0 st1 = Some st2.
 
   Proof. intuition. Qed.
@@ -248,7 +245,7 @@ Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
       next_conf0 st = Lam_NO_EAM.next_conf0 st.
 
   Proof.
-    destruct st as [t k ? | k c v].
+    destruct st as [[t k ? | k c v] ?].
     - destruct t, k; eauto.
     - destruct c as [| ec k c]; eauto.
       destruct ec, k; dependent destruction v; eauto.
@@ -277,7 +274,7 @@ Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
        final st <> None -> ~exists st', `(rws) st → st'.
 
   Proof.
-    destruct st as [? | ? c v]; auto.
+    destruct st as [[? | ? c v] ?]; auto.
     destruct c; auto.
     intros _ [st' H].
     inversion H.

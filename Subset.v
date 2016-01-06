@@ -1,26 +1,47 @@
 
-Class CompPred U (P : U -> Prop) :=
+
+
+Class CompPred (U : Type) (P : U -> Prop) : Type :=
 { satisfyingness_comp : forall x, {P x} + {~P x} }.
 
 
-Definition is_satisfied {U} P `{CompPred U P} x := satisfyingness_comp x.
+Definition is_satisfied {U} P `{CompPred U P} x :=
+    satisfyingness_comp x.
 
 
 Definition satisfied {U} P `{CompPred U P} x : Prop :=
     if is_satisfied P x then True else False.
 
 
-Definition subset {U} P `{CompPred U P} := { x : U | satisfied P x }.
+Definition subset {U : Set} (P : U -> Prop) `{CompPred U P} :=
+    { x : U | satisfied P x }.
+Definition subtype {U : Type} (P : U -> Prop) `{CompPred U P} :=
+    { x : U | satisfied P x }.
 
-Notation "x ? P " := (satisfied P x) (no associativity, at level 89).
-Notation "{? U | P }" := (@subset U P _) (U at level 0).
-Notation "¹ x" := (proj1_sig x) (at level 0).
+
+Notation "x ? P"       := (satisfied P x)                (no associativity, at level 89).
+Notation "{S? U | P }" := (@subset U P _).
+Notation "{T? U | P }" := (@subtype U P _).
+Notation "x ?& W"      := (exist _ x W)                  (no associativity, at level 89).
+Notation "¹ x"         := (proj1_sig x)                                     (at level 0).
+Notation "² x"         := (proj2_sig x)                                     (at level 0).
 (* Bad without eta_CompPred :
-Notation "{ x : U |? P }" := (@subset U (fun x => P) _). *)
+Notation "{S? x : U | P }" := (@subset  U (fun x => P) _).
+Notation "{T? x : U | P }" := (@subtype U (fun x => P) _). *)
 
 
+Definition submember                                        {U : Set} P `{CompPred U P} :
+    forall x, satisfied P x -> subset P :=
 
-Definition sat_token                                          {U} P `{CompPred U P} {x} :
+    fun x H => x ?& H.
+
+Definition submemberT                                      {U : Type} P `{CompPred U P} :
+    forall x, satisfied P x -> subtype P :=
+
+    fun x H => x ?& H.
+
+
+Definition witness_intro                                        {U} P `{CompPred U P} x :
     P x -> x ? P :=
 
     fun H0 => match is_satisfied P x as s
@@ -30,7 +51,8 @@ Definition sat_token                                          {U} P `{CompPred U
               | right notH0 => notH0 H0 
               end.
 
-Definition sat_untoken                                          {U} P `{CompPred U P} x :
+
+Definition witness_elim                                         {U} P `{CompPred U P} x :
     x ? P -> P x :=
 
     fun W  => match is_satisfied P x as s 
@@ -40,8 +62,23 @@ Definition sat_untoken                                          {U} P `{CompPred
               | right notH0 => fun devil => match devil with end
               end W.
 
-Notation "H '`as' 'witness' 'of' P" := (sat_token P H) (no associativity, at level 73).
-Notation "W '`as' 'proof' 'of' P"   := (sat_untoken P W) (no associativity, at level 73).
+
+Notation "H '`as' 'witness' 'of' P x" := (witness_intro P x H)         (no associativity,
+                                                              at level 73, P at level 0).
+Notation "W '`as' 'proof' 'of' P x"   := (witness_elim P x W)          (no associativity,
+                                                              at level 73, P at level 0).
+
+
+
+Definition submember_by                                     {U : Set} P `{CompPred U P} :
+    forall x, P x -> subset P :=
+
+    fun x H => submember P x (H `as witness of P x).
+
+Definition submemberT_by                                   {U : Type} P `{CompPred U P} :
+    forall x, P x -> subtype P :=
+
+    fun x H => submemberT P x (H `as witness of P _).
 
 
 
@@ -57,15 +94,28 @@ Instance not_CompPred                                                           
 }.
 
 
-Instance const_CompPred                                                          {U1} P :
-    CompPred U1 P -> forall U2 x,  CompPred U2 (fun _ => P x) :=
+
+Instance const_CompPred                                                     {U1} P U2 x :
+    CompPred U1 P -> CompPred U2 (fun _ => P x) :=
 
 {
     satisfyingness_comp := fun _ => is_satisfied P x
-}. 
+}.
 
 
-Lemma sat_token_unique :                                  forall {U} P `{CompPred U P} x,
+(*
+Instance eta_CompPred                                                             {U} P :
+    CompPred U P -> CompPred U (fun x => P x) :=
+
+    fun H => H.
+
+Definition instantiation_loop U P (H : CompPred U P) x := 
+    is_satisfied (fun x => ~P x) x.
+*)
+
+
+
+Lemma witness_unique :                                    forall {U} P `{CompPred U P} x,
       forall H1 H2 : x ? P, H1 = H2.
 
 Proof.
@@ -76,25 +126,5 @@ Proof.
 Qed.
 
 
-Hint Resolve sat_token sat_token_unique.
+Hint Resolve witness_intro witness_unique.
 
-
-(*
-Instance eta_CompPred {U} P {H : CompPred U P} : CompPred U (fun x => P x) := H.
-*)
-
-(*
-Instance strange_CompPred {U} P {H : CompPred U P} : CompPred U P := H.
-*)
-
-(*
-Definition P (x : unit) := True.
-
-
-Instance udp : CompPred unit P. 
-  split; unfold P; auto. Defined.
-
-
-Definition S1 := subset (fun (x : unit) => P x).
-Definition S2 := subset (fun (x : unit) => ~True).
-*)

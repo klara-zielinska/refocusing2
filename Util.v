@@ -100,7 +100,7 @@ End tcl.
 
 Definition unit_is_everything : forall {P : unit -> Type}, P () -> forall u, P u :=
     fun P H k => match k as k' return P k' with () => H end.
-Notation "# t" := (unit_is_everything t) (at level 0).
+Notation "'ů' P" := (unit_is_everything P)                                  (at level 0).
 
 
 

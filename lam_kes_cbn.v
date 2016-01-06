@@ -1,8 +1,12 @@
-Require Import Util.
-Require Import refocusing_lang.
-Require Import reduction_semantics_props.
+Require Import Util
+               refocusing_semantics.
+(*Require Import reduction_semantics_props.*)
 
 
+(*** Local library ***)
+
+
+(* Positive nat: *)
 
 Inductive pnat : Set := POne | PS : pnat -> pnat.
 Fixpoint pnat2nat n := match n with POne => 1 | PS n => S (pnat2nat n) end.
@@ -20,8 +24,9 @@ Proof.
 Qed.
 
 
+(* Non-empty lists: *)
 
-Inductive plist (T : Set) : Set := 
+Inductive plist (T : Type) : Type := 
 | PSingle : T -> plist T
 | PCons   : T -> plist T -> plist T.
 Arguments PSingle {T} _. Arguments PCons {T} _ _.
@@ -33,11 +38,14 @@ Fixpoint plist2list {T} (l : plist T) :=
     end.
 Coercion plist2list : plist >-> list.
 
-Fixpoint pcons2 {T : Set} (e : T) (l : list T) := 
-    match l with nil => PSingle e | cons e' l => PCons e (pcons2 e' l) end.
+Fixpoint pcons2 {T} (e : T) (l : list T) := 
+    match l with 
+    | nil => PSingle e 
+    | cons e' l => PCons e (pcons2 e' l) end.
 
+Lemma plist2list_injective :                                forall {T} (l1 l2 : plist T),
+    (l1 : list T) = (l2 : list T) -> l1 = l2.
 
-Lemma plist2list_injective : forall {T} (l1 l2 : plist T), (l1 : list T) = l2 -> l1 = l2.
 Proof.
   intro T.
   induction l1;
@@ -49,9 +57,9 @@ Proof.
   - f_equal; auto.
 Qed.
 
+Lemma pcons2_injective :                         forall {T} (e1 e2 : T) (l1 l2 : list T),
+    pcons2 e1 l1 = pcons2 e2 l2 -> e1 = e2 /\ l1 = l2.
 
-Lemma pcons2_injective : forall {T : Set} (e1 e2 : T) (l1 l2 : list T), 
-                             pcons2 e1 l1 = pcons2 e2 l2 -> e1 = e2 /\ l1 = l2.
 Proof.
   intros T e1 e2 l1; revert e1 e2.
   induction l1; intros e1 e2 l2 H;
@@ -60,8 +68,9 @@ Proof.
   - destruct (IHl1 a t l2 H2); subst; auto.
 Qed.
 
+Lemma pcons2_and_pcons :                                forall {T} (e : T) (l : plist T),
+    PCons e l = pcons2 e l.
 
-Lemma pcons2_and_pcons : forall {T : Set} (e : T) (l : plist T), PCons e l = pcons2 e l.
 Proof. 
   intros T e l; revert e.
   induction l; intro e;
@@ -69,11 +78,15 @@ Proof.
   solve [f_equal; eauto].
 Qed.
 
+(*** Local library end ***)
 
 
 
 
-Module Lam_KES_CBN <: REF_LANG.
+
+
+
+Module Lam_KES_CBN_PreRefSem <: PRE_PRECISE_REF_SEM.
 
 
   Inductive term0 : Set :=
@@ -168,6 +181,10 @@ Module Lam_KES_CBN <: REF_LANG.
   Definition init_ckind : ckind     := tt.
   Definition dead_ckind (_ : ckind) := False.
 
+  Instance dead_is_comp : CompPred _ dead_ckind.
+      split. auto.
+  Defined.
+
 
   Definition contract {k} (r : redex k) : option term :=
       match r with
@@ -194,12 +211,32 @@ Module Lam_KES_CBN <: REF_LANG.
   Coercion decomp_to_term : decomp >-> term.
 
 
+  Definition dec (t : term) k (d : decomp k) : Prop := 
+      ~dead_ckind k /\ t = d.
+
+
+  Definition reduce k t1 t2 := 
+      exists {k'} (c : context k k') (r : redex k') t,  dec t1 k (d_red r c) /\
+          contract r = Some t /\ t2 = c[t].
+
+
+  Instance lrws : LABELED_REWRITING_SYSTEM ckind term := 
+  { ltransition := reduce }. 
+  Instance rws : REWRITING_SYSTEM term := 
+  { transition := reduce init_ckind }.
+
+
   Definition immediate_subterm t0 t := exists ec, t = ec:[t0].
 
   Definition subterm_order := clos_trans_1n term immediate_subterm.
   Notation "t1 <| t2" := (subterm_order t1 t2) (at level 70, no associativity).
 
 
+
+  Lemma init_ckind_alive :
+      ~dead_ckind init_ckind.
+
+  Proof. auto. Qed.
 
 
   Lemma elem_plug_injective1 : 
@@ -234,8 +271,8 @@ Module Lam_KES_CBN <: REF_LANG.
   Qed.
 
 
-  Lemma death_propagation : 
-      forall k, dead_ckind k -> forall ec, dead_ckind (k+>ec).
+  Lemma death_propagation :                                                  forall k ec,
+      dead_ckind k -> dead_ckind (k+>ec).
 
   Proof. auto. Qed.
 
@@ -245,11 +282,11 @@ Module Lam_KES_CBN <: REF_LANG.
   Proof. auto. Qed.
 
 
-  Lemma value_trivial1 : forall {k} (v : value k) ec {t}, 
+  Lemma value_trivial1 : forall {k} ec {t} (v : value k), 
                              ~dead_ckind (k+>ec) -> ec:[t] = v -> 
                                  exists (v' : value (k+>ec)), t = v'.
 
-  Proof. intros k v ec t H H0. destruct ec, v; discriminate. Qed.
+  Proof. intros k ec t v H H0. destruct ec, v; discriminate. Qed.
 
 
   Lemma value_redex    : forall {k} (v : value k) (r : redex k), 
@@ -489,14 +526,14 @@ Module Lam_KES_CBN <: REF_LANG.
     eauto using plug_replace_closed.
   Qed.
 
-End Lam_KES_CBN.
+End Lam_KES_CBN_PreRefSem.
 
 
 
 
-Module Lam_KES_CBN_Strategy <: REF_STRATEGY Lam_KES_CBN.
+Module Lam_KES_CBN_Strategy <: REF_STRATEGY Lam_KES_CBN_PreRefSem.
 
-  Import Lam_KES_CBN.
+  Import Lam_KES_CBN_PreRefSem.
 
 
   Inductive interm_dec k : Set :=
@@ -655,11 +692,11 @@ Module Lam_KES_CBN_Strategy <: REF_STRATEGY Lam_KES_CBN.
 
 
   Lemma search_order_comp_if : 
-      forall t ec0 ec1, immediate_ec ec0 t -> immediate_ec ec1 t -> 
-          forall k, ~ dead_ckind (k+>ec0) -> ~ dead_ckind (k+>ec1) ->
+      forall t ec0 ec1 k, immediate_ec ec0 t -> immediate_ec ec1 t -> 
+          ~ dead_ckind (k+>ec0) -> ~ dead_ckind (k+>ec1) ->
               k, t |~ ec0 << ec1  \/  k, t |~ ec1 << ec0  \/  ec0 = ec1.
   Proof.
-    intros t ec0 ec1 H1 H2 k H3 H4.
+    intros t ec0 ec1 k H1 H2 H3 H4.
     destruct H1 as [t' H1], H2 as [t'' H2].
     destruct ec0, ec1, t; inversion H1; inversion H2; subst.
     inversion H7; subst.
@@ -677,16 +714,11 @@ End Lam_KES_CBN_Strategy.
 
 
 
-
-Module Lam_KES_CBN_Cal.
-  Module RefLang := Lam_KES_CBN.
-  Module RefStrategy := Lam_KES_CBN_Strategy.
-  Module RedLang := RedRefLang RefLang RefStrategy.
-End Lam_KES_CBN_Cal.
+Module Lam_KES_CBN_RefSem := PreciseRedRefSem Lam_KES_CBN_PreRefSem Lam_KES_CBN_Strategy.
 
 
 
-
+(*
 Module Lam_KES_CBN_SafeReg <: SAFE_RED_REGION Lam_KES_CBN_Cal.RedLang.
 
   Import Lam_KES_CBN.
@@ -721,11 +753,11 @@ Module Lam_KES_CBN_RefSem <: PE_RED_REF_SEM Lam_KES_CBN_Cal.RedLang.
 End Lam_KES_CBN_RefSem.
 
 
-Module EAKrivineMachine := RefEvalApplyMachine Lam_KES_CBN_Cal.RedLang Lam_KES_CBN_RefSem.
-Module KrivinMachine    := RefPushEnterMachine Lam_KES_CBN_Cal.RedLang Lam_KES_CBN_RefSem.
+Module EAKrivineMachine:= RefEvalApplyMachine Lam_KES_CBN_Cal.RedLang Lam_KES_CBN_RefSem.
+Module KrivinMachine   := RefPushEnterMachine Lam_KES_CBN_Cal.RedLang Lam_KES_CBN_RefSem.
 
 Module EAKrivineMachine_SafeReg <: AM_SAFE_REGION EAKrivineMachine := 
 
     RefEAMSafeReg  Lam_KES_CBN_Cal.RedLang  Lam_KES_CBN_RefSem 
-                               EAKrivineMachine  Lam_KES_CBN_SafeReg.
+                               EAKrivineMachine  Lam_KES_CBN_SafeReg.*)
 

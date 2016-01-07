@@ -1,16 +1,10 @@
-Require Import Vector
+Require Import Fin2
+               Vector2
                rewriting_system.
 
-Import VectorNotations.
-Infix "++" := append.
 
-Fixpoint fin_lift1 {n} (m : Fin.t n) := match m with
-| Fin.F1 n   => @Fin.F1 (S n)
-| Fin.FS _ m => Fin.FS (fin_lift1 m)
-end.
 
-Coercion fin_lift1 : Fin.t >-> Fin.t.
-
+Open Scope vector.
 
 Class RW_FOLLOWING                                    {configuration_er configuration_ed}
     (Follower : REWRITING_SYSTEM configuration_er) 
@@ -36,3 +30,5 @@ Class RW_FOLLOWING                                    {configuration_er configur
           (**)  `(Follower) crs n  →  crs (S n)  /\ 
           (**)~ `(Followed) semantics (crs n)  →  semantics (crs (S n))
 }.
+
+Close Scope vector.

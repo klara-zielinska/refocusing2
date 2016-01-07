@@ -126,14 +126,81 @@ Module RED_LANG_Facts (R : RED_MINI_LANG).
   Qed.
 
 
-  Lemma context_cons_snoc : forall ec0 {k1 k2} (c0 : context k1 k2),
-                                exists ec1 c1, (ec0=:c0) = (c1~+ec1=:[.]).
+  Lemma context_cons_snoc :                                               forall {k1 k2},
+      forall ec0 (c0 : context k1 k2), exists ec1 c1, (ec0=:c0) = (c1~+ec1=:[.]).
+
   Proof.
     intros; revert ec0.
     induction c0; intros.
     - exists ec0; eexists [.]; trivial.
     - destruct IHc0 with ec as (ec1, (c1, IH)).
       exists ec1; eexists (ec0=:c1); rewrite IH; trivial.
+  Qed.
+
+
+  Lemma mid_ccons_as_append :                      forall {k1 k2} (c1 : context k1 k2) ec
+                                                         {k3} (c2 : context (k2+>ec) k3),
+      c2 ~+ ec =: c1  =  c2 ~+ (ec =: [.]) ~+ c1.
+
+  Proof.
+    intros k1 k2 c1 ec k3 c2.
+    induction c2;
+    solve [ auto ].
+  Qed.
+
+
+  Lemma append_assoc :      forall {k4 k3} (c1 : context k3 k4) {k2} (c2 : context k2 k3)
+                                                               {k1} (c3 : context k1 k2),
+      c1 ~+ c2 ~+ c3 = (c1 ~+ c2) ~+ c3.
+
+  Proof.
+    induction c1; intros; 
+    solve [simpl; f_equal; eauto].
+  Qed.
+
+
+  Lemma ccons_append_empty_self_JM :                         forall {k1 k2 k3},
+      forall (c1 : context k1 k2) (c2 : context k2 k3), 
+          k2 = k3 -> c1 ~= c2 ~+ c1 -> c2 ~= [.](k2).
+
+  Proof with eauto.
+    intros k1 k2 k3 c1; revert k3.
+    induction c1 as [ | ec k c1]; 
+        intros k3 c2 H H0;
+        destruct c2 as [ | ec0 k0 c2]...
+    - discriminateJM H0.
+    - exfalso.
+      simpl in H0.
+      inversion_ccons H0.
+      assert (H1 : c2 ~+ ec0 =: [.](k0) ~= [.](k0)). 
+      {
+          eapply IHc1...
+          rewrite <- append_assoc. 
+          rewrite <- (mid_ccons_as_append c1 ec0 c2).
+          replace (c2 ~+ ec0 =: c1) with c1 by auto.
+          reflexivity.
+      }
+      revert H1; clear; revert c2.
+      cut (forall k (c : context (k0 +> ec0) k), 
+               k = k0 -> ~ (c ~+ ec0 =: [.](k0) ~= [.](k0))).
+      { intros H c2 H1; eapply H... }
+      intros k c G H.
+      destruct c;
+      discriminateJM H.
+  Qed.
+
+
+  Lemma ccons_append_empty_self :                     forall {k1 k2} (c1 : context k1 k2)
+                                                                    (c2 : context k2 k2),
+      c1 = c2 ~+ c1 -> c2 = [.](k2).
+
+  Proof with eauto. 
+    intros k1 k2 c1 c2 H.
+    cut (c2 ~= [.](k2)).
+    { intro H0; rewrite H0... }
+    eapply ccons_append_empty_self_JM with c1...
+    rewrite <- H.
+    reflexivity.
   Qed.
 
 

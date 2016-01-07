@@ -1,4 +1,6 @@
-Require Import Util
+Require Import Fin2 
+               Vector2
+               Util
                Program
                rewriting_system
                rewriting_system_following
@@ -12,30 +14,30 @@ Require Import Util
 
 
 
+Open Scope vector.
+
 Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM) 
                                        (EAM : SLOPPY_REF_EVAL_APPLY_MACHINE R).
 
   Module RLF := RED_LANG_Facts R.
   Module RSF := RED_STRATEGY_STEP_Facts R R.ST.
   Module RRSDet := RedRefSemDet R.
-  Import R.R R RLF RSF RRSDet.
-
-  Notation "k |~ c1 >> c2" := (k |~ c1 → c2)     
-                                         (no associativity, at level 70, c1 at level 69).
-  Notation "c1 >> c2" := (init_ckind |~ c1 → c2) (no associativity, at level 70).
+  Import R.R R RLF RSF RRSDet ST EAM.
 
 
-  Import ST.
-  Import EAM.
+  Notation eam := EAM.rws.
+  Notation rs  := R.rws.
 
 
   Local Hint Constructors EAM.trans clos_trans_1n.
+  Local Hint Unfold transition.
 
-  Theorem am_correct :                                                      forall c1 c2,
-      c1 → c2 -> decompile c1 = decompile c2 \/ decompile c1 >> decompile c2.
+  Theorem am_correct :                                                    forall st1 st2,
+      `(eam) st1 → st2 -> decompile st1 = decompile st2 \/ 
+                              `(rs) decompile st1 → decompile st2.
 
   Proof with eauto.
-    intros c1 c2 H.
+    intros st1 st2 H.
     inversion H; subst;
         try match goal with 
         | H : dec_term ?t ?k = _ |- _ =>
@@ -45,16 +47,21 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
               assert (G := dec_context_correct ec k v);
               rewrite H in G
         end;
-    try solve [left; simpl; congruence].
-    - right. 
-      unfold ltransition; simpl; unfold reduce, dec.
+
+    try solve 
+    [ left; 
+      simpl; congruence ].
+
+    - right.
+      simpl; unfold reduce, dec.
       exists k c r t0.
       intuition.
       + eapply proper_death_trans...
       + simpl.
         congruence.
+
     - right.
-      unfold ltransition; simpl; unfold reduce, dec.
+      simpl; unfold reduce, dec.
       exists k c r t.
       intuition.
       + eapply proper_death_trans...
@@ -62,222 +69,170 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
         congruence.
   Qed.
 
-Require Import Vector.
-
-
-Fixpoint fin_lift {n} (m : Fin.t n) := match m with
-| Fin.F1 n => @Fin.F1 (S n)
-| Fin.FS _ m => Fin.FS (fin_lift m)
-end.
-Fixpoint fin_to_nat {n} (m : Fin.t n) := match m with
-| Fin.F1 _   => 0
-| Fin.FS _ m => S (fin_to_nat m)
-end.
-
-Coercion fin_lift : Fin.t >-> Fin.t.
-Coercion fin_to_nat : Fin.t >-> nat.
-
-Arguments cons {A} _ {n} _.
-
-Import VectorNotations.
-Infix "++" := append.
-
-
-  Hint Unfold transition.
 
 
 
 
-  Lemma dec_proc_sim :               forall t {k1 k2} (d : decomp k1) (c : context k1 k2) 
+  Lemma dec_proc_sim :               forall t {k1 k2} (d : decomp k1) (c : context k1 k2)
                                                                    (c0 : context ick k1),
       dec_proc t c d ->
-          exists n (sts : Vector.t conf n),
+          exists n (sts : Vector.t configuration n), (*such that: *)
+
           (**)Forall (fun st => decompile st = (c~+c0)[t] /\ alive_state st) sts /\
+
           (**)match d with 
               | d_val v      => last (c_eval t (c ~+ c0) :: sts) = c_apply c0 v 
+
               | d_red k r c' => last (c_eval t (c ~+ c0) :: sts) = c_eval r (c'~+c0) /\
-                                dec_term r k = in_red r                              \/
-                                exists ec v, dec_context ec k v = in_red r           /\
+                                dec_term r k = in_red r  \/
+
+                                exists ec v, dec_context ec k v = in_red r /\
                                 last (c_eval t (c ~+ c0) :: sts) = c_apply (ec=:c'~+c0) v
               end /\
+
           (**)forall m : Fin.t n, (c_eval t (c~+c0) :: sts)[@m] → sts[@m].
+
   Proof with eauto.
     intros t k1 k2 d c c0 H.
     induction H using dec_proc_Ind with
     (P0 := fun k2 (v' : R.value k2) (c : context k1 k2) d _ =>
-exists (n : nat) (sts : Vector.t configuration n),
-  Forall (fun st : configuration => decompile st = (c ~+ c0) [v'] /\ alive_state st) sts /\
-match d with 
-              | d_val v      => last (c_apply (c ~+ c0) v' :: sts) = c_apply c0 v 
-              | d_red k r c' => last (c_apply (c ~+ c0) v' :: sts) = c_eval r (c'~+c0) /\
-                                dec_term r k = in_red r  \/
-                                exists ec v, dec_context ec k v = in_red r             /\
-                                last (c_apply (c ~+ c0) v' :: sts) = c_apply (ec=:c'~+c0) v
-              end /\
-  (forall m : Fin.t n, (c_apply (c ~+ c0) v' :: sts)[@m] → sts[@m]));
 
-         subst;
+        exists n (sts : Vector.t configuration n),
 
-      try destruct IHdec_proc as [n [sts [H0 [H1 H2]]]]; auto;
-      repeat match goal with
-      | H : dec_term ?t ?k = _ |- _ => 
-            assert (G := dec_term_correct t k);
-            rewrite H in G
-      | H : dec_context ?ec ?k ?v = _ |- _ => 
-            assert (G := dec_context_correct ec k v);
-            rewrite H in G
-      end;
-      subst;
+        (**)Forall (fun st => decompile st = (c ~+ c0) [v'] /\ alive_state st) sts /\
 
-  [ exists 0 (nil configuration)
-  | exists (S n) (c_apply (c~+c0) v :: sts)
-  | exists (S n) (c_eval t0 (ec =: c~+c0) :: sts) 
-  | exists 0 (nil configuration)
-  | exists 0 (nil configuration)
-  | exists (S n) (c_apply (c ~+ c0) v0 :: sts)
-  | exists (S n) (c_eval t (ec0 =: c ~+ c0) :: sts) ];
+        (**)match d with 
+            | d_val v      => last (c_apply (c ~+ c0) v' :: sts) = c_apply c0 v 
 
-  solve [ split;
-  [ constructor; simpl; 
-    try rewrite G; 
-    eauto using dec_term_val_alive, dec_term_next_alive, 
-                dec_context_val_alive, dec_context_next_alive
-  | split;
-  [ eauto
-  | intro m;
-    dependent_destruction2 m; 
-    solve
-    [ simpl; eauto 
-    | apply H2 ]
-  ] ] ].
+            | d_red k r c' => last (c_apply (c ~+ c0) v' :: sts) = c_eval r (c'~+c0) /\
+                              dec_term r k = in_red r  \/
+
+                              exists ec v, dec_context ec k v = in_red r /\
+                              last (c_apply (c ~+ c0) v' :: sts) = c_apply (ec=:c'~+c0) v
+            end /\
+
+        (**)forall m : Fin.t n, (c_apply (c ~+ c0) v' :: sts)[@m] → sts[@m]
+    );
+
+        subst;
+        try destruct IHdec_proc as [n [sts [H0 [H1 H2]]]]; auto;
+        repeat match goal with
+        | H : dec_term ?t ?k = _ |- _ => 
+              assert (G := dec_term_correct t k);
+              rewrite H in G
+        | H : dec_context ?ec ?k ?v = _ |- _ => 
+              assert (G := dec_context_correct ec k v);
+              rewrite H in G
+        end;
+        subst;
+
+    [ exists    0  [](configuration)
+    | exists (S n) (c_apply (c~+c0) v :: sts)
+    | exists (S n) (c_eval t0 (ec =: c~+c0) :: sts) 
+    | exists    0  [](configuration)
+    | exists    0  [](configuration)
+    | exists (S n) (c_apply (c ~+ c0) v0 :: sts)
+    | exists (S n) (c_eval t (ec0 =: c ~+ c0) :: sts) ];
+
+    solve 
+    [ split; [ | split ];
+
+    [ constructor; simpl; 
+      try rewrite G; 
+      eauto using dec_term_val_alive, dec_term_next_alive, 
+                  dec_context_val_alive, dec_context_next_alive
+
+    | eauto
+
+    | intro m;
+      dependent_destruction2 m; 
+      solve
+      [ simpl; eauto 
+      | apply H2 ]
+    ] ].
   Qed.
 
 
-  Lemma decctx_proc_sim :                         forall {k1 k2} v' d (c : context k1 k2) 
+  Lemma decctx_proc_sim :                         forall {k1 k2} v' d (c : context k1 k2)
                                                                    (c0 : context ick k1),
       decctx_proc v' c d ->
-          exists (n : nat) (sts : Vector.t configuration n),
-              Forall (fun st => decompile st = (c ~+ c0) [v'] /\ alive_state st) sts /\
-              match d with 
+          exists n (sts : Vector.t configuration n),
+
+          (**)Forall (fun st => decompile st = (c ~+ c0) [v'] /\ alive_state st) sts /\
+
+          (**)match d with 
               | d_val v      => last (c_apply (c ~+ c0) v' :: sts) = c_apply c0 v 
+
               | d_red k r c' => last (c_apply (c ~+ c0) v' :: sts) = c_eval r (c'~+c0) /\
-                                dec_term r k = in_red r                              \/
-                                exists ec v, dec_context ec k v = in_red r           /\
-                                last (c_apply (c ~+ c0) v' :: sts) = c_apply (ec=:c'~+c0) v
+                                dec_term r k = in_red r \/
+
+                                exists ec v, dec_context ec k v = in_red r /\
+                                last (c_apply (c ~+ c0) v' :: sts) = 
+                                                                   c_apply (ec=:c'~+c0) v
               end /\
-  (forall m : Fin.t n, (c_apply (c ~+ c0) v' :: sts)[@m] → sts[@m]).
+
+          (**)forall m : Fin.t n, (c_apply (c ~+ c0) v' :: sts)[@m] → sts[@m].
+
   Proof with eauto.
     intros k1 k2 v' d c c0 H.
     induction H using decctx_proc_Ind with
     (P := fun k2 t (c : context k1 k2) d (_ : dec_proc t c d) =>
-exists (n : nat) (sts : Vector.t configuration n),
-  Forall (fun st : configuration => decompile st = (c ~+ c0) [t] /\ alive_state st) sts /\
-match d with 
-              | d_val v      => last (c_eval t (c ~+ c0) :: sts) = c_apply c0 v 
-              | d_red k r c' => last (c_eval t (c ~+ c0) :: sts) = c_eval r (c'~+c0) /\
-                                dec_term r k = in_red r                              \/
-                                exists ec v, dec_context ec k v = in_red r           /\
-                                last (c_eval t (c ~+ c0) :: sts) = c_apply (ec=:c'~+c0) v
-              end /\
-  (forall m : Fin.t n, (c_eval t (c ~+ c0) :: sts)[@m] → sts[@m]));
+
+        exists n (sts : Vector.t configuration n),
+
+        (**)Forall (fun st => decompile st = (c ~+ c0) [t] /\ alive_state st) sts /\
+
+        (**)match d with 
+            | d_val v      => last (c_eval t (c ~+ c0) :: sts) = c_apply c0 v 
+
+            | d_red k r c' => last (c_eval t (c ~+ c0) :: sts) = c_eval r (c'~+c0) /\
+                              dec_term r k = in_red r \/
+
+                              exists ec v, dec_context ec k v = in_red r           /\
+                              last (c_eval t (c ~+ c0) :: sts) = c_apply (ec=:c'~+c0) v
+            end /\
+
+        (**)forall m : Fin.t n, (c_eval t (c ~+ c0) :: sts)[@m] → sts[@m]
+    );
 
          subst;
 
-      try destruct IHdecctx_proc as [n [sts [H0 [H1 H2]]]]; auto;
-      repeat match goal with
-      | H : dec_term ?t ?k = _ |- _ => 
-            assert (G := dec_term_correct t k);
-            rewrite H in G
-      | H : dec_context ?ec ?k ?v = _ |- _ => 
-            assert (G := dec_context_correct ec k v);
-            rewrite H in G
-      end;
-      subst;
+         try destruct IHdecctx_proc as [n [sts [H0 [H1 H2]]]]; auto;
+         repeat match goal with
+         | H : dec_term ?t ?k = _ |- _ => 
+               assert (G := dec_term_correct t k);
+               rewrite H in G
+         | H : dec_context ?ec ?k ?v = _ |- _ => 
+               assert (G := dec_context_correct ec k v);
+               rewrite H in G
+         end;
+         subst;
 
-  [ exists 0 (nil configuration)
-  | exists (S n) (c_apply (c~+c0) v :: sts)
-  | exists (S n) (c_eval t0 (ec =: c~+c0) :: sts) 
-  | exists 0 (nil configuration)
-  | exists 0 (nil configuration)
-  | exists (S n) (c_apply (c ~+ c0) v0 :: sts)
-  | exists (S n) (c_eval t (ec0 =: c ~+ c0) :: sts) ];
+    [ exists    0  [](configuration)
+    | exists (S n) (c_apply (c~+c0) v :: sts)
+    | exists (S n) (c_eval t0 (ec =: c~+c0) :: sts) 
+    | exists    0  [](configuration)
+    | exists    0  [](configuration)
+    | exists (S n) (c_apply (c ~+ c0) v0 :: sts)
+    | exists (S n) (c_eval t (ec0 =: c ~+ c0) :: sts) ];
 
-  solve [ split;
-  [ constructor; simpl; 
-    try rewrite G; 
-    eauto using dec_term_val_alive, dec_term_next_alive, 
-                dec_context_val_alive, dec_context_next_alive
-  | split;
-  [ eauto
-  | intro m;
-    dependent_destruction2 m; 
-    solve
-    [ simpl; eauto 
-    | apply H2 ]
-  ] ] ].
+    solve [ split; [ | split ];
+    [ constructor; simpl; 
+      try rewrite G; 
+      eauto using dec_term_val_alive, dec_term_next_alive, 
+                  dec_context_val_alive, dec_context_next_alive
+
+    | eauto
+
+    | intro m;
+      dependent_destruction2 m; 
+      solve
+      [ simpl; eauto 
+      | apply H2 ]
+    ] ].
   Qed.
 
-
-  Lemma mid_ccons_as_append :                      forall {k1 k2} (c1 : context k1 k2) ec
-                                                         {k3} (c2 : context (k2+>ec) k3),
-      c2 ~+ ec =: c1 = c2 ~+ (ec =: [.]) ~+ c1.
-
-  Proof.
-    intros k1 k2 c1 ec k3 c2.
-    induction c2;
-    solve [ auto ].
-  Qed.
-
-
-  Lemma append_assoc : forall {k4 k3} (c1 : context k3 k4) {k2} (c2 : context k2 k3)
-                         {k1} (c3 : context k1 k2),
-      c1 ~+ c2 ~+ c3 = (c1 ~+ c2) ~+ c3.
-  Proof.
-    induction c1; intros; 
-    solve [simpl; f_equal; eauto].
-  Qed.
-
-
-  Lemma ccons_append_empty_self_JM : forall {k1 k2} (c1 : context k1 k2) {k3} (c2 : context k2 k3),
-      k2 = k3 -> c1 ~= c2 ~+ c1 -> c2 ~= [.](k2).
-
-  Proof with eauto.
-    intros k1 k2 c1.
-    induction c1; intros k3 c2 H H0;
-      destruct c2...
-    - discriminateJM H0.
-    - exfalso.
-      simpl in H0.
-      inversion_ccons H0; clear H5 x.
-      assert (H1 : c2 ~+ ec0 =: [.](k0) ~= [.](k0)). 
-      {
-          eapply IHc1...
-          rewrite <- append_assoc. 
-          rewrite <- (mid_ccons_as_append c1 ec0 c2).
-          rewrite <- x0.
-          reflexivity.
-      }
-      revert H1. clear. revert c2.
-      cut (forall k (c : context (k0 +> ec0) k), k = k0 -> ~ (c ~+ ec0 =: [.](k0) ~= [.](k0))).
-      intro. intros. eapply H. reflexivity. exact H1.
-      intros k c G H.
-      destruct c;
-      discriminateJM H.
-  Qed.
-
-
-  Lemma ccons_append_empty_self : forall {k1 k2} (c1 : context k1 k2) (c2 : context k2 k2),
-      c1 = c2 ~+ c1 -> c2 = [.](k2).
-
-  Proof with eauto. 
-    intros.
-    cut (c2 ~= [.](k2)).
-    { intro H0; rewrite H0... }
-    eapply ccons_append_empty_self_JM with c1...
-    rewrite <- H.
-    solve [trivial].
-  Qed.
-
+  
 
   Lemma local1 : forall {n} (sts : Vector.t configuration n) st1 st2,
   (*1*)(forall m : Fin.t n, (st1 :: sts)[@m] → sts[@m]) ->
@@ -301,12 +256,12 @@ match d with
 
 
   Lemma am_context_complete_eval :                forall t1 t2 {k} (c : context ick k) t,
-      t1 >> t2  ->  ~dead_ckind k  ->  t1 = c[t] ->
+      `(rs) t1 → t2  ->  ~dead_ckind k  ->  t1 = c[t] ->
           exists n (sts : Vector.t configuration n) st,
           (**)Forall (fun st => decompile st = t1 /\ alive_state st) sts /\
           (**)(decompile st = t2 /\ alive_state st)                      /\
           (**)forall m : Fin.t (n+1), 
-                  (c_eval t c :: sts ++ [st])[@m] → (sts ++ [st])[@m].
+                  `(eam) (c_eval t c :: sts ++ [st])[@m] → (sts ++ [st])[@m].
 
   Proof with eauto.
     intros t1 t2 k c t H H0 H1.
@@ -337,12 +292,12 @@ match d with
 
 
   Lemma am_context_complete_apply : forall t1 t2 {k} (c : context ick k) (v : R.value k),
-      t1 >> t2 ->  ~dead_ckind k  ->  t1 = c[v]  ->
+      `(rs) t1 → t2 ->  ~dead_ckind k  ->  t1 = c[v]  ->
           exists n (sts : Vector.t configuration n) st,
           (**)Forall (fun st => decompile st = t1 /\ alive_state st) sts /\
           (**)(decompile st = t2 /\ alive_state st)                      /\
           (**)forall m : Fin.t (n+1), 
-                  (c_apply c v :: sts ++ [st])[@m] → (sts ++ [st])[@m].
+                  `(eam) (c_apply c v :: sts ++ [st])[@m] → (sts ++ [st])[@m].
 
   Proof with eauto.
     intros t1 t2 k c v H H0 H1.
@@ -374,12 +329,12 @@ match d with
 
 
   Corollary am_complete :                                               forall t1 t2 st1,
-      t1 >> t2 -> alive_state st1 -> decompile st1 = t1 -> 
+      `(rs) t1 → t2 -> alive_state st1 -> decompile st1 = t1 -> 
           exists n (sts : Vector.t configuration n) st2,
           (**)Forall (fun st => decompile st = t1 /\ alive_state st) sts /\
           (**)(decompile st2 = t2 /\ alive_state st2)                    /\
           (**)forall m : Fin.t (n+1), 
-                  (st1 :: sts ++ [st2])[@m] → (sts ++ [st2])[@m].
+                  `(eam) (st1 :: sts ++ [st2])[@m] → (sts ++ [st2])[@m].
 
   Proof with eauto.
     intros t1 t2 st1 H H0 H1.
@@ -404,9 +359,10 @@ match d with
 
 
   Lemma no_silent_loops_eval : forall t {k} (c : context ick k),
-      ~ exists sts : nat -> configuration, 
+      ~exists sts : nat -> configuration, 
           sts 0 = c_eval t c /\
-          forall n, sts n → sts (S n) /\ ~ decompile (sts n) >> decompile (sts (S n)).
+          forall n, `(eam) sts n → sts (S n) /\ 
+                    ~ `(rs) decompile (sts n) → decompile (sts (S n)).
 
   Proof with eauto using init_ckind_alive.
     intros t k c [sts [H H0]].
@@ -473,7 +429,8 @@ match d with
   Lemma no_silent_loops_apply : forall {k} v (c : context ick k),
       ~ exists sts : nat -> configuration, 
           sts 0 = c_apply c v /\
-          forall n, sts n → sts (S n) /\ ~ decompile (sts n) >> decompile (sts (S n)).
+          forall n, `(eam) sts n → sts (S n) /\ 
+                    ~ `(rs) decompile (sts n) → decompile (sts (S n)).
 
   Proof with eauto using init_ckind_alive.
     intros k v c [sts [H H0]].
@@ -536,11 +493,12 @@ match d with
           unfold next_conf in H, H1; congruence.
         * intro m0. apply (H5 (Fin.FS m0)).
   Qed.
-  
+
 
   Theorem no_silent_loops :
       ~ exists sts : nat -> configuration,
-          forall n, sts n → sts (S n) /\ ~ decompile (sts n) >> decompile (sts (S n)).
+          forall n, `(eam) sts n → sts (S n) /\ 
+                    ~ `(rs) decompile (sts n) → decompile (sts (S n)).
 
   Proof with eauto.
     intros [sts H].
@@ -574,25 +532,6 @@ Module RefEvalApplyMachine_Facts (R : PRECISE_RED_REF_SEM) (EAM : REF_EVAL_APPLY
 *)
 
 
-  Definition map2forall {A B} {P : A -> Prop} (f : forall x : A, P x -> B) : 
-      forall {n} (v : Vector.t A n), Forall P v -> Vector.t B n :=
-
-      fix aux {n} v H :=
-
-          match v as v return match v with [] => True | x :: v' => P x /\ Forall P v' end -> _ 
-          with
-          | []      => fun _ => []
-          | x :: v' => fun H => 
-                       let (H1, H2) := H in
-                       f x H1 :: aux v' H2
-          end
-
-          match H in Forall _ v 
-          return match v with [] => True | x :: v' => P x /\ Forall P v' end : Prop
-          with 
-          | Forall_nil              => I
-          | Forall_cons n x v H0 H1 => conj H0 H1
-          end.
 
 
   Lemma local2 : forall {n} (sts : Vector.t configuration n) st1 st2,
@@ -651,7 +590,7 @@ Module RefEvalApplyMachine_Facts (R : PRECISE_RED_REF_SEM) (EAM : REF_EVAL_APPLY
     { destruct st1; eapply (witness_elim)... }
     destruct (RAWF.am_complete t1 t2 st1 H) as [n [sts [st2 [H2 [[H3 H4] H5]]]]]...
     
-    exists n (map2forall (fun st H => submember_by _ st (proj2 H)) sts H2) 
+    exists n (map2forall _ (fun st H => submember_by _ st (proj2 H)) sts H2) 
            (submember_by _ st2 H4).
     split; [| split].
     - clear st2 H3 H4 H5.
@@ -695,6 +634,7 @@ Module RefEvalApplyMachine_Facts (R : PRECISE_RED_REF_SEM) (EAM : REF_EVAL_APPLY
   Qed.
 
 End RefEvalApplyMachine_Facts.
+
 
 
 (*Module PushEnterMachine_Facts (R : RED_LANG) (PERS : PE_RED_REF_SEM R) 
@@ -755,3 +695,7 @@ End RefEvalApplyMachine_Facts.
   Proof. etransitivity; eauto using PENSF.eval_preserved, eval_PENS_eqv_PEM. Qed.
 
 End PushEnterMachine_Facts.*)
+
+
+Close Scope vector.
+

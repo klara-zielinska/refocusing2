@@ -80,16 +80,18 @@ endif
 #                    #
 ######################
 
-VFILES:=Util.v\
+VFILES:=Fin2.v\
+  Vector2.v\
+  Util.v\
   Subset.v\
   Entropy.v\
+  rewriting_system.v\
+  rewriting_system_following.v\
   reduction_semantics.v\
   reduction_languages_facts.v\
   reduction_semantics_facts.v\
   reduction_strategy.v\
   reduction_strategy_facts.v\
-  rewriting_system.v\
-  rewriting_system_following.v\
   abstract_machine.v\
   refocusing_semantics.v\
   refocusing_semantics_facts.v\

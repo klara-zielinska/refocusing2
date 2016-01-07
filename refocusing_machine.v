@@ -2,16 +2,11 @@
 
 (*** Interface ***)
 
-Require Import Program
-               Relations
-               Subset
+Require Import Subset
                Entropy
-               rewriting_system 
-               reduction_languages_facts
                reduction_semantics
-               reduction_strategy_facts
-               refocusing_semantics 
-               abstract_machine.
+               refocusing_semantics.
+Require Export abstract_machine.
 
 
 
@@ -37,7 +32,7 @@ Module Type SLOPPY_REF_EVAL_APPLY_MACHINE (R : RED_REF_SEM) <: ABSTRACT_MACHINE.
   Definition final (c : configuration) : option value := 
       match c with
       | c_apply _ [.] v => Some v 
-      | _  => None
+      | _               => None
       end.
   Definition decompile (c : configuration) : term :=
       match c with
@@ -53,28 +48,35 @@ Module Type SLOPPY_REF_EVAL_APPLY_MACHINE (R : RED_REF_SEM) <: ABSTRACT_MACHINE.
 
   Section S1.
 
-  Local Reserved Notation "c1 → c2" (no associativity, at level 70).
+  Local Reserved Notation "c1 → c2"                      (no associativity, at level 70).
 
   Inductive trans : configuration -> configuration -> Prop :=
 
-  | t_red  : forall t {k} (c : context ick k) r t0,
-               dec_term t k = in_red r -> contract r = Some t0 ->
-               c_eval t c → c_eval t0 c
-  | t_val  : forall t {k} (c : context ick k) v,
-      	       dec_term t k = in_val v ->
-               c_eval t c → c_apply c v
-  | t_term : forall t {k} (c : context ick k) {t0 ec},
-               dec_term t k = in_term t0 ec ->
-               c_eval t c → c_eval t0 (ec=:c)
-  | t_cred : forall ec {k} (v : R.value (k+>ec)) (c : context ick k) r t,
-               dec_context ec k v = in_red r -> contract r = Some t ->
-               c_apply (ec=:c) v → c_eval t c
-  | t_cval : forall ec {k} (v : R.value (k+>ec)) (c : context ick k) v0,
-               dec_context ec k v = in_val v0 ->
-               c_apply (ec=:c) v → c_apply c v0
-  | t_cterm: forall ec {k} (v : R.value (k+>ec)) (c : context ick k) t ec0,
-               dec_context ec k v = in_term t ec0 ->
-               c_apply (ec=:c) v → c_eval t (ec0=:c)
+  | t_red :                                        forall t {k} (c : context ick k) r t0,
+        dec_term t k = in_red r -> 
+        contract r = Some t0 ->
+        c_eval t c → c_eval t0 c
+
+  | t_val :                                           forall t {k} (c : context ick k) v,
+        dec_term t k = in_val v ->
+        c_eval t c → c_apply c v
+
+  | t_term :                                    forall t {k} (c : context ick k) {t0 ec},
+        dec_term t k = in_term t0 ec ->
+        c_eval t c → c_eval t0 (ec=:c)
+
+  | t_cred :                                     forall ec {k} (c : context ick k) v r t,
+        dec_context ec k v = in_red r -> 
+        contract r = Some t ->
+        c_apply (ec=:c) v → c_eval t c
+
+  | t_cval :                                      forall ec {k} (c : context ick k) v v0,
+        dec_context ec k v = in_val v0 ->
+        c_apply (ec=:c) v → c_apply c v0
+
+  | t_cterm :                                  forall ec {k} (c : context ick k) v t ec0,
+        dec_context ec k v = in_term t ec0 ->
+        c_apply (ec=:c) v → c_eval t (ec0=:c)
 
   where "st1 → st2" := (trans st1 st2).
   Definition transition := trans.
@@ -116,7 +118,7 @@ Module Type SLOPPY_REF_EVAL_APPLY_MACHINE (R : RED_REF_SEM) <: ABSTRACT_MACHINE.
   (finals_are_vals :                                                         forall st v,
        final st = Some v <-> st = v)
 
-  (next_conf_alive :                                                      forall st1 st2,
+  (next_conf0_alive :                                                     forall st1 st2,
       next_conf0 st1 = Some st2 -> alive_state st2).
 
 End SLOPPY_REF_EVAL_APPLY_MACHINE.
@@ -139,10 +141,14 @@ Module Type REF_EVAL_APPLY_MACHINE (R : PRECISE_RED_REF_SEM) <: ABSTRACT_MACHINE
   Notation alive_state := RAW.alive_state.
 
 
-  Instance alive_state_CompPred : CompPred _ alive_state.
-      split. 
-      intro st; destruct st; apply (is_satisfied (fun k => ~dead_ckind k) k).
-  Defined.
+  Instance alive_state_CompPred : CompPred _ alive_state :=
+  {
+      satisfyingness_comp := fun st => 
+          match st with 
+          | c_eval _ k _  => is_satisfied (fun k => ~dead_ckind k) k 
+          | c_apply k _ _ => is_satisfied (fun k => ~dead_ckind k) k 
+          end
+  }.
 
 
   Definition configuration := {S? RAW.configuration | alive_state}.
@@ -166,13 +172,12 @@ Module Type REF_EVAL_APPLY_MACHINE (R : PRECISE_RED_REF_SEM) <: ABSTRACT_MACHINE
 
   Definition next_conf0 (st : configuration) : option configuration :=
 
-      match RAW.next_conf0 st 
-      as sto return RAW.next_conf0 st = sto -> option configuration
+      match RAW.next_conf0 st                                                      as sto
+                                   return RAW.next_conf0 st = sto -> option configuration
       with
-      | Some st' => fun H => Some (submember_by _ st' (next_conf_alive st st' H))
+      | Some st' => fun H => Some (submember_by _ st' (next_conf0_alive st st' H))
       | None     => fun _ => None
       end eq_refl.
-
 
   Definition next_conf (_ : entropy) := next_conf0.
 
@@ -302,7 +307,9 @@ End REF_PUSH_ENTER_MACHINE.*)
 (*** Implementation ***)
 
 
-Require Import Util.
+Require Import Util
+               reduction_languages_facts
+               reduction_strategy_facts.
 
 
 
@@ -329,7 +336,7 @@ Module SloppyRefEvalApplyMachine (R : RED_REF_SEM) <: SLOPPY_REF_EVAL_APPLY_MACH
   Definition final (c : configuration) : option value := 
       match c with
       | c_apply _ [.] v => Some v 
-      | _  => None
+      | _               => None
       end.
   Definition decompile (c : configuration) : term :=
       match c with
@@ -349,24 +356,31 @@ Module SloppyRefEvalApplyMachine (R : RED_REF_SEM) <: SLOPPY_REF_EVAL_APPLY_MACH
 
   Inductive trans : configuration -> configuration -> Prop :=
 
-  | t_red  : forall t {k} (c : context ick k) r t0,
-               dec_term t k = in_red r -> contract r = Some t0 ->
-               c_eval t c → c_eval t0 c
-  | t_val  : forall t {k} (c : context ick k) v,
-      	       dec_term t k = in_val v ->
-               c_eval t c → c_apply c v
-  | t_term : forall t {k} (c : context ick k) {t0 ec},
-               dec_term t k = in_term t0 ec ->
-               c_eval t c → c_eval t0 (ec=:c)
-  | t_cred : forall ec {k} (v : R.value (k+>ec)) (c : context ick k) r t,
-               dec_context ec k v = in_red r -> contract r = Some t ->
-               c_apply (ec=:c) v → c_eval t c
-  | t_cval : forall ec {k} (v : R.value (k+>ec)) (c : context ick k) v0,
-               dec_context ec k v = in_val v0 ->
-               c_apply (ec=:c) v → c_apply c v0
-  | t_cterm: forall ec {k} (v : R.value (k+>ec)) (c : context ick k) t ec0,
-               dec_context ec k v = in_term t ec0 ->
-               c_apply (ec=:c) v → c_eval t (ec0=:c)
+  | t_red :                                        forall t {k} (c : context ick k) r t0,
+        dec_term t k = in_red r -> 
+        contract r = Some t0 ->
+        c_eval t c → c_eval t0 c
+
+  | t_val :                                           forall t {k} (c : context ick k) v,
+        dec_term t k = in_val v ->
+        c_eval t c → c_apply c v
+
+  | t_term :                                    forall t {k} (c : context ick k) {t0 ec},
+        dec_term t k = in_term t0 ec ->
+        c_eval t c → c_eval t0 (ec=:c)
+
+  | t_cred :                                     forall ec {k} (c : context ick k) v r t,
+        dec_context ec k v = in_red r -> 
+        contract r = Some t ->
+        c_apply (ec=:c) v → c_eval t c
+
+  | t_cval :                                      forall ec {k} (c : context ick k) v v0,
+        dec_context ec k v = in_val v0 ->
+        c_apply (ec=:c) v → c_apply c v0
+
+  | t_cterm :                                  forall ec {k} (c : context ick k) v t ec0,
+        dec_context ec k v = in_term t ec0 ->
+        c_apply (ec=:c) v → c_eval t (ec0=:c)
 
   where "st1 → st2" := (trans st1 st2).
   Definition transition := trans.
@@ -393,13 +407,11 @@ Module SloppyRefEvalApplyMachine (R : RED_REF_SEM) <: SLOPPY_REF_EVAL_APPLY_MACH
       | c_apply _ [.] _ => 
             None
       end.
+  Definition next_conf (_ : entropy) := next_conf0.
 
 
   Instance rws : REWRITING_SYSTEM configuration :=
   { transition := transition }.
-
-
-  Definition next_conf (_ : entropy) := next_conf0.
 
 
   Lemma final_correct :                                                         forall c,
@@ -474,6 +486,7 @@ Module SloppyRefEvalApplyMachine (R : RED_REF_SEM) <: SLOPPY_REF_EVAL_APPLY_MACH
 
   Lemma finals_are_vals :                                                     forall c v,
        final c = Some v <-> c = v.
+
   Proof.
     intros c v.
     destruct c; simpl.
@@ -486,7 +499,7 @@ Module SloppyRefEvalApplyMachine (R : RED_REF_SEM) <: SLOPPY_REF_EVAL_APPLY_MACH
   Qed.
 
 
-  Lemma next_conf_alive :                                                 forall st1 st2,
+  Lemma next_conf0_alive :                                                forall st1 st2,
       next_conf0 st1 = Some st2 -> alive_state st2.
 
   Proof.
@@ -581,11 +594,14 @@ Module RefEvalApplyMachine (R : PRECISE_RED_REF_SEM) <: REF_EVAL_APPLY_MACHINE R
   Notation   alive_state := RAW.alive_state.
 
 
-  Instance alive_state_CompPred : CompPred _ alive_state.
-      split. 
-      intro st; destruct st; 
-      apply (is_satisfied (fun k => ~dead_ckind k) k).
-  Defined.
+  Instance alive_state_CompPred : CompPred _ alive_state :=
+  {
+      satisfyingness_comp := fun st => 
+          match st with 
+          | c_eval _ k _  => is_satisfied (fun k => ~dead_ckind k) k 
+          | c_apply k _ _ => is_satisfied (fun k => ~dead_ckind k) k 
+          end
+  }.
 
 
   Definition configuration := {S? RAW.configuration | alive_state }.
@@ -609,13 +625,12 @@ Module RefEvalApplyMachine (R : PRECISE_RED_REF_SEM) <: REF_EVAL_APPLY_MACHINE R
 
   Definition next_conf0 (st : configuration) : option configuration :=
 
-      match RAW.next_conf0 st 
-      as sto return RAW.next_conf0 st = sto -> option configuration
+      match RAW.next_conf0 st                                                      as sto
+                                   return RAW.next_conf0 st = sto -> option configuration
       with
-      | Some st' => fun H => Some (submember_by _ st' (next_conf_alive st st' H))
+      | Some st' => fun H => Some (submember_by _ st' (next_conf0_alive st st' H))
       | None     => fun _ => None
       end eq_refl.
-
 
   Definition next_conf (_ : entropy) := next_conf0.
 

@@ -63,9 +63,8 @@ Module DET_RED_SEM_Facts (R : DET_RED_MINI_SEM).
  Qed.
 
 
-  Lemma reduce_red : 
-      forall {k1 k2} (c : context k1 k2) (r : redex k2) t,  k1 |~ c[r] → t  ->
-          exists t', contract r = Some t' /\ t = c[t'].
+  Lemma reduce_red :                 forall {k1 k2} (c : context k1 k2) (r : redex k2) t,
+      k1 |~ c[r] → t  ->  exists t', contract r = Some t' /\ t = c[t'].
 
   Proof.
     intros k1 k2 c r t H.

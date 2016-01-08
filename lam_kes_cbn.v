@@ -375,6 +375,7 @@ Module Lam_KES_CBN_PreRefSem <: PRE_PRECISE_REF_SEM.
 
   Lemma thunk_closures_closed :
       forall th n cl, closed_th th -> List.nth_error th n = Some cl -> closed_cl cl.
+
   Proof.
     intros th n cl H; revert n cl.
     induction H; 
@@ -709,6 +710,7 @@ Module Lam_KES_CBN_Strategy <: REF_STRATEGY Lam_KES_CBN_PreRefSem.
       forall k t ec0 ec1,  k, t |~ ec0 << ec1 ->  
           immediate_ec ec0 t /\ immediate_ec ec1 t /\ 
               ~ dead_ckind (k+>ec0) /\ ~ dead_ckind (k+>ec1).
+
   Proof. inversion 1. Qed.
 
 End Lam_KES_CBN_Strategy.

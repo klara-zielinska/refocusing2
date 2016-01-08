@@ -204,12 +204,6 @@ Module Type RED_SEM.
   (decompose :                                                                forall t k,
        ~dead_ckind k -> exists d : decomp k, dec t k d).
 
-  (*Axiom trivial_val_red : 
-      forall k t, ~dead_ckind k -> only_trivial t k ->
-         (exists (v : value k), t = v) \/ (exists (r : redex k), t = r).*)
-
-
-
 End RED_SEM.
 
 

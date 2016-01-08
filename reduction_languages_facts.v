@@ -245,7 +245,6 @@ Module RED_LANG_Facts (R : RED_MINI_LANG).
 
 
 
-
   (* Values *)
 
   Lemma value_trivial : forall {k} (v : value k) {k'} (c : context k k') t, 
@@ -263,6 +262,67 @@ Module RED_LANG_Facts (R : RED_MINI_LANG).
   Qed.
 
 End RED_LANG_Facts.
+
+
+
+
+Module Type RED_MINI_LANG2.
+
+  Include RED_MINI_LANG.
+
+  Inductive decomp k : Set :=
+  | d_red : forall {k'}, redex k' -> context k k' -> decomp k
+  | d_val : value k -> decomp k.
+  Arguments d_val {k} _. Arguments d_red {k} {k'} _ _.
+
+  Definition decomp_to_term {k} (d : decomp k) :=
+      match d with
+      | d_val v   => value_to_term v
+      | d_red _ r c => c[r]
+      end.
+  Coercion decomp_to_term : decomp >-> term.
+
+  Definition dec (t : term) k (d : decomp k) : Prop := 
+      ~dead_ckind k /\ t = d.
+
+  Axioms
+  (decompose :                                                                forall t k,
+       ~dead_ckind k -> exists d : decomp k, dec t k d)
+  (value_redex :                                  forall {k} (v : value k) (r : redex k),
+       value_to_term v <> redex_to_term r).
+
+End RED_MINI_LANG2.
+
+
+
+
+Module RED_LANG2_Facts (R : RED_MINI_LANG2).
+
+  Import R.
+
+  (* Redex *)
+
+  Definition only_trivial_dec t k :=                                        forall t' k',
+      forall (c : context k k'), ~dead_ckind k' -> c[t'] = t -> 
+          k = k' /\ [.](k) ~= c \/ exists (v : value k'), t' = v.
+
+
+  Lemma trivial_val_red :                                                     forall t k,
+      ~dead_ckind k -> only_trivial_dec t k ->
+          (exists (v : value k), t = v) \/ (exists (r : redex k), t = r).
+
+  Proof with eauto.
+    intros t k H H0.
+    destruct (decompose t k H) as [[k' r c | v]].
+    - destruct (H0 r _ c) as [[H2 H3] | [v H2]]; dep_subst.
+      + intro H2; apply (proper_death _ H2)...
+      + symmetry; apply H1.
+      + right. exists r; apply H1.
+      + symmetry in H2. apply value_redex in H2. autof.
+    - left. exists v; apply H1.
+  Qed.
+
+End RED_LANG2_Facts.
 
 
 
@@ -340,38 +400,4 @@ Module RedDecProcEqvDec (R : RED_MINI_LANG_WD).
   End S.
 
 End RedDecProcEqvDec.
-
-
-
-(* Facts about a deterministic red. semantics.
-
-  Lemma unique_decomposition :
-
-      forall (t : term) k1, ~ dead_ckind k1 ->  
-
-         (exists v : value k1, t = v) \/
-
-         (exists k2 (r : redex k2) (c : context k1 k2), t = c[r] /\ 
-	      forall k2' (r' : redex k2') (c' : context k1 k2'), ~ dead_ckind k2' -> 
-                  t = c'[r'] -> k2' = k2 /\ r ~= r' /\ c ~= c').
-
-  Proof.
-    intros t k1 H.
-    destruct (dec_total t k1 H) as (d, H0); destruct H0.
-    destruct d.
-    - right.
-      exists k' r c.
-      split. apply (dec_correct H0).
-      intros k2' r' c' H1 H2.
-      assert (d_red r c = d_red r' c').
-      eapply dec_is_function. constructor.
-    apply H0.
-    subst.
-    apply dec_plug_rev. auto.
-    rewrite <- compose_empty.
-    apply dec_redex_self.
-    inversion H3; dep_subst.
-    auto.
-    - left. exists v. apply (dec_correct H0).
-  Qed. *)
 

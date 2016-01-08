@@ -23,9 +23,9 @@ Notation "c1 →* c2" := (clos_refl_trans_1n _ transition c1 c2)
 
 
 
-Class LABELED_REWRITING_SYSTEM (label lconfiguration : Set) :=
+Class LABELED_REWRITING_SYSTEM (label configuration : Set) :=
 {
-    ltransition : label -> lconfiguration -> lconfiguration -> Prop
+    ltransition : label -> configuration -> configuration -> Prop
 }.
 
 
@@ -45,7 +45,56 @@ Notation "l |~ c1 →* c2" := (clos_refl_trans_1n _ (ltransition l) c1 c2)
 
 
 
-Instance LRWS_is_RWS {conf} `(REWRITING_SYSTEM conf) : LABELED_REWRITING_SYSTEM unit conf:=
+Instance RWS_is_LRWS                                    {conf} `(REWRITING_SYSTEM conf) :
+                                                    LABELED_REWRITING_SYSTEM unit conf :=
 {
     ltransition := fun (_ : unit) => transition
 }.
+
+
+
+
+Require Import Fin2 Vector2 Program.
+
+Open Local Scope vector.
+
+Definition path_in                                    {conf} `(REWRITING_SYSTEM conf) {n}
+    (cs : Vector.t conf n) : Prop :=
+
+    match cs with
+    | []          => False
+    | cons c n cs => forall m : Fin.t n, (c::cs)[@m] → cs[@m]
+    end.
+Definition path {conf} {rws : REWRITING_SYSTEM conf} {n} := @path_in conf rws n.
+
+
+Definition lpath_in               {label conf} `(LABELED_REWRITING_SYSTEM label conf) {n}
+    (cs : Vector.t conf (S n)) (ls : Vector.t label n) : Prop :=
+
+    match cs in Vector.t _ n return Vector.t label (pred n) -> Prop with
+    | []          => fun _  => False
+    | cons c n cs => fun ls => forall m : Fin.t n, ls[@m] |~ (c::cs)[@m] → cs[@m]
+    end ls.
+Definition lpath {label conf} {lrws : LABELED_REWRITING_SYSTEM label conf} {n} := 
+    @lpath_in label conf lrws n.
+
+
+Lemma path_snoc                                     {conf} `{REWRITING_SYSTEM conf} {n} :
+    forall (cs : Vector.t conf (S n)) c, path cs -> (last cs) → c -> path (cs ++ [c]).
+
+Proof.
+  intros cs c H0 H1.
+  dependent destruction cs.
+  revert h H0 H1.
+  induction cs; 
+      intros c0 H0 H1 m.
+  - dependent destruction m.
+    + auto.
+    + inversion m.
+  - dependent destruction m.
+    + apply (H0 Fin.F1).
+    + apply IHcs.
+      * intro m0; apply (H0 (Fin.FS m0)).
+      * auto.
+Qed.
+

@@ -14,7 +14,7 @@ Require Import Fin2
 
 
 
-Open Scope vector.
+Local Open Scope vector.
 
 Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM) 
                                        (EAM : SLOPPY_REF_EVAL_APPLY_MACHINE R).
@@ -31,6 +31,7 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
 
   Local Hint Constructors EAM.trans clos_trans_1n.
   Local Hint Unfold transition.
+
 
   Theorem am_correct :                                                    forall st1 st2,
       `(eam) st1 → st2 -> decompile st1 = decompile st2 \/ 
@@ -71,8 +72,6 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
 
 
 
-
-
   Lemma dec_proc_sim :               forall t {k1 k2} (d : decomp k1) (c : context k1 k2)
                                                                    (c0 : context ick k1),
       dec_proc t c d ->
@@ -90,7 +89,7 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
                                 last (c_eval t (c ~+ c0) :: sts) = c_apply (ec=:c'~+c0) v
               end /\
 
-          (**)forall m : Fin.t n, (c_eval t (c~+c0) :: sts)[@m] → sts[@m].
+          (**)path (c_eval t (c~+c0) :: sts).
 
   Proof with eauto.
     intros t k1 k2 d c c0 H.
@@ -111,7 +110,7 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
                               last (c_apply (c ~+ c0) v' :: sts) = c_apply (ec=:c'~+c0) v
             end /\
 
-        (**)forall m : Fin.t n, (c_apply (c ~+ c0) v' :: sts)[@m] → sts[@m]
+        (**)path (c_apply (c ~+ c0) v' :: sts)
     );
 
         subst;
@@ -153,6 +152,7 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
   Qed.
 
 
+
   Lemma decctx_proc_sim :                         forall {k1 k2} v' d (c : context k1 k2)
                                                                    (c0 : context ick k1),
       decctx_proc v' c d ->
@@ -171,7 +171,7 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
                                                                    c_apply (ec=:c'~+c0) v
               end /\
 
-          (**)forall m : Fin.t n, (c_apply (c ~+ c0) v' :: sts)[@m] → sts[@m].
+          (**)path (c_apply (c ~+ c0) v' :: sts).
 
   Proof with eauto.
     intros k1 k2 v' d c c0 H.
@@ -192,11 +192,10 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
                               last (c_eval t (c ~+ c0) :: sts) = c_apply (ec=:c'~+c0) v
             end /\
 
-        (**)forall m : Fin.t n, (c_eval t (c ~+ c0) :: sts)[@m] → sts[@m]
+        (**)path (c_eval t (c ~+ c0) :: sts)
     );
 
          subst;
-
          try destruct IHdecctx_proc as [n [sts [H0 [H1 H2]]]]; auto;
          repeat match goal with
          | H : dec_term ?t ?k = _ |- _ => 
@@ -232,36 +231,16 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
     ] ].
   Qed.
 
-  
-
-  Lemma local1 : forall {n} (sts : Vector.t configuration n) st1 st2,
-  (*1*)(forall m : Fin.t n, (st1 :: sts)[@m] → sts[@m]) ->
-  (*2*)last (st1 :: sts) → st2 ->
-
-      forall m : Fin.t (n + 1), (st1 :: sts ++ [st2])[@m] → (sts ++ [st2])[@m].
-
-  Proof.
-    intros n sts st1 st2 H H0. revert st1 H H0.
-    induction sts; intros.
-    - dependent destruction m.
-      + auto.
-      + inversion m.
-    - dependent destruction m.
-      + apply (H Fin.F1).
-      + apply IHsts.
-        * intro m0. apply (H (Fin.FS m0)).
-        * auto.
-  Qed.
-
 
 
   Lemma am_context_complete_eval :                forall t1 t2 {k} (c : context ick k) t,
+
       `(rs) t1 → t2  ->  ~dead_ckind k  ->  t1 = c[t] ->
           exists n (sts : Vector.t configuration n) st,
+
           (**)Forall (fun st => decompile st = t1 /\ alive_state st) sts /\
           (**)(decompile st = t2 /\ alive_state st)                      /\
-          (**)forall m : Fin.t (n+1), 
-                  `(eam) (c_eval t c :: sts ++ [st])[@m] → (sts ++ [st])[@m].
+          (**)path (c_eval t c :: sts ++ [st]).
 
   Proof with eauto.
     intros t1 t2 k c t H H0 H1.
@@ -273,31 +252,31 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
     }
     assert (~dead_ckind k2) by eauto using (proper_death2 [.]).
     apply dec_proc_eqv_dec in H5...
-    destruct (dec_proc_sim _ _ _ [.] H5) as [n [sts [G [ [[G0 G1] | [ec [v [G1 G0]]]] G2] ]]];
+    destruct (dec_proc_sim _ _ _ [.] H5) as [n [sts [G [G1 G2] ]]];
+    destruct                          G1 as [[G0 G1] | [ec [v [G1 G0]]]];
         rewrite <- (compose_empty c) in *;
         rewrite <- (compose_empty (c2)) in *;
         exists n sts (c_eval t' c2);
     (
-        split;
+        split; [ | split];
         [ rewrite H1; auto
-        | split;
-        [ auto
-        | apply local1; eauto;
-          unfold configuration; (*sic*)
+        | auto
+        | apply (path_snoc (c_eval t c :: sts)); eauto;
           rewrite G0
-        ] ]
+        ]
     );
     [ econstructor 1 | econstructor 4 ]...
   Qed.
 
 
   Lemma am_context_complete_apply : forall t1 t2 {k} (c : context ick k) (v : R.value k),
+
       `(rs) t1 → t2 ->  ~dead_ckind k  ->  t1 = c[v]  ->
           exists n (sts : Vector.t configuration n) st,
+
           (**)Forall (fun st => decompile st = t1 /\ alive_state st) sts /\
           (**)(decompile st = t2 /\ alive_state st)                      /\
-          (**)forall m : Fin.t (n+1), 
-                  `(eam) (c_apply c v :: sts ++ [st])[@m] → (sts ++ [st])[@m].
+          (**)path (c_apply c v :: sts ++ [st]).
 
   Proof with eauto.
     intros t1 t2 k c v H H0 H1.
@@ -310,22 +289,22 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
     assert (~dead_ckind k2) by eauto using (proper_death2 [.]).
     apply dec_proc_eqv_dec in H5...
     apply dec_proc_val_eqv_decctx in H5.
-    destruct (decctx_proc_sim _ _ _ [.] H5) as [n [sts [G [ [[G0 G1] | [ec [v' [G1 G0]]]] G2] ]]];
+    destruct (decctx_proc_sim _ _ _ [.] H5) as [n [sts [G [G1 G2] ]]];
+    destruct                             G1 as[[G0 G1] | [ec [v' [G1 G0]]]];
         rewrite <- (compose_empty c) in *;
         rewrite <- (compose_empty (c2)) in *;
         exists n sts (c_eval t' c2);
     (
-        split;
+        split; [ | split];
         [ rewrite H1; auto
-        | split;
-        [ auto
-        | apply local1; eauto;
-          unfold configuration; (*sic*)
+        | auto
+        | apply (path_snoc (c_apply c v :: sts)); eauto;
           rewrite G0
-        ] ]
+        ]
     );
     [ econstructor 1 | econstructor 4 ]...
   Qed.
+
 
 
   Corollary am_complete :                                               forall t1 t2 st1,
@@ -333,8 +312,7 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
           exists n (sts : Vector.t configuration n) st2,
           (**)Forall (fun st => decompile st = t1 /\ alive_state st) sts /\
           (**)(decompile st2 = t2 /\ alive_state st2)                    /\
-          (**)forall m : Fin.t (n+1), 
-                  `(eam) (st1 :: sts ++ [st2])[@m] → (sts ++ [st2])[@m].
+          (**)path (st1 :: sts ++ [st2]).
 
   Proof with eauto.
     intros t1 t2 st1 H H0 H1.
@@ -345,154 +323,157 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
 
 
 
-  Lemma vec_last_by_index : forall {T n} (v : Vector.t T (S n)) (H : n < S n), 
-      last v = v[@ Fin.of_nat_lt H].
+  Lemma no_silent_loops_eval :                          forall t {k} (c : context ick k),
 
-  Proof.
-    intros.
-    dependent induction v.
-    destruct v.
-    - auto.
-    - apply (IHv n (h0 :: v)); auto.
-  Qed.
-
-
-
-  Lemma no_silent_loops_eval : forall t {k} (c : context ick k),
       ~exists sts : nat -> configuration, 
-          sts 0 = c_eval t c /\
-          forall n, `(eam) sts n → sts (S n) /\ 
+
+      (**)sts 0 = c_eval t c /\
+
+      (**)forall n, `(eam) sts n → sts (S n) /\ 
                     ~ `(rs) decompile (sts n) → decompile (sts (S n)).
 
   Proof with eauto using init_ckind_alive.
     intros t k c [sts [H H0]].
     destruct (decompose c[t] ick) as [d H1]...
-    assert (H2 : ~dead_ckind k).
-    { intro H2; apply dec_term_from_dead with t k in H2. 
-      destruct (H0 0) as [H3 _].
-      rewrite H in H3.
-      inversion H3; congruence. }
+    assert (~dead_ckind k).
+    {
+        intro H2; apply dec_term_from_dead with t k in H2. 
+        destruct (H0 0) as [H3 _].
+        rewrite H in H3.
+        inversion H3;
+        congruence.
+    }
     apply dec_proc_eqv_dec in H1...
     destruct (dec_proc_sim _ _ _ [.] H1) as [n [sts' [H3 [H4 H5]]]].
     rewrite <- (compose_empty c) in *.
-    cut (forall m, (sts 0 :: sts')[@m] = sts m).
+    assert (H6 : forall m, (sts 0 :: sts')[@m] = sts m).
     {
-        intro H6.
-        destruct d.
-        - rewrite <- (compose_empty c0) in *.
-          destruct H4 as [[G G0] | [ec [v [G0 G]]]];
-              assert (H7 : n < S n) by eauto with arith;
-              rewrite vec_last_by_index with _ H7 in G;
-              rewrite <- H in G;
-              rewrite H6 in G;
-              destruct (H0 (Fin.of_nat_lt H7)) as [H8 H9];
-              rewrite G in H8; compute in H8;
-              dependent destruction H8; dep_subst; try congruence;
-              replace r0 with r in * by congruence;
-              apply H9.
-          + rewrite G; compute; rewrite <- x.
-            exists k' c0 r t1.
-            intuition unfold dec... 
-          + rewrite G; compute; rewrite <- x.
-            assert (H10 := dec_context_correct ec k' v); rewrite H4 in H10.
-            rewrite H10.
-            exists k' c0 r t0.
-            intuition unfold dec...
-        - assert (H7 : n < S n) by eauto with arith;
-          rewrite vec_last_by_index with _ H7 in H4.
-          rewrite <- H in H4.
-          rewrite H6 in H4.
-          destruct (H0 (Fin.of_nat_lt H7)) as [H8 _].
-          rewrite H4 in H8.
-          inversion H8.
+        rewrite <- H in H5.
+        clear t k c H d H1 H2 H3 H4; remember (sts 0) as st; revert sts H0 st Heqst H5;
+        induction sts'; 
+            intros sts H0 st Heqst H5 m;
+            dependent destruction m.
+        - auto.
+        - inversion m.
+        - auto.
+        - eapply (IHsts' (fun n => sts (S n)))...
+          + destruct (H0 0) as [H1 _].
+            assert (H2 := H5 Fin.F1); simpl in H2.
+            rewrite <- Heqst in H1.
+            rewrite trans_computable in H1, H2.
+            destruct H1, H2.
+            unfold next_conf in H, H1.
+            congruence.
+          + intro m0.
+            apply (H5 (Fin.FS m0)).
     }
-    rewrite <- H in H5.
-    clear t k c H d H1 H2 H3 H4. 
-    remember (sts 0) as st. revert sts H0 st Heqst H5.
-    induction sts'; intros.
-    - dependent destruction m.
-      + auto. 
-      + inversion m.
-    - dependent destruction m. 
-      + auto.
-      + eapply (IHsts' (fun n => sts (S n)))...
-        * destruct (H0 0) as [H1 _].
-          assert (H2 := H5 Fin.F1); simpl in H2.
-          rewrite <- Heqst in H1.
-          rewrite trans_computable in H1, H2.
-          destruct H1, H2.
-          unfold next_conf in H, H1; congruence.
-        * intro m0. apply (H5 (Fin.FS m0)).
+    destruct d as [k' r c0 | v].
+    - rewrite <- (compose_empty c0) in *.
+      destruct H4 as [[G G0] | [ec [v [G0 G]]]];
+          assert (H7 : n < S n) by eauto with arith;
+          rewrite vec_last_by_index with _ H7 in G;
+          rewrite <- H in G;
+          rewrite H6 in G;
+          destruct (H0 (Fin.of_nat_lt H7)) as [H8 H9];
+          rewrite G in H8; compute in H8;
+          dependent destruction H8 (*as [r0 t1/t0 x]*); dep_subst; try congruence;
+          replace r0 with r in * by congruence;
+          apply H9.
+      + rewrite G; compute; rewrite <- x.
+        exists k' c0 r t1.
+        intuition unfold dec... 
+      + rewrite G; compute; rewrite <- x.
+        assert (H10 := dec_context_correct ec k' v); rewrite H4 in H10.
+        rewrite H10.
+        exists k' c0 r t0.
+        intuition unfold dec...
+    - assert (H7 : n < S n) by eauto with arith;
+      rewrite vec_last_by_index with _ H7 in H4.
+      rewrite <- H in H4.
+      rewrite H6 in H4.
+      destruct (H0 (Fin.of_nat_lt H7)) as [H8 _].
+      rewrite H4 in H8.
+      inversion H8.
   Qed.
 
 
-  Lemma no_silent_loops_apply : forall {k} v (c : context ick k),
-      ~ exists sts : nat -> configuration, 
-          sts 0 = c_apply c v /\
-          forall n, `(eam) sts n → sts (S n) /\ 
+
+  Lemma no_silent_loops_apply :                         forall {k} v (c : context ick k),
+
+      ~exists sts : nat -> configuration, 
+
+      (**)sts 0 = c_apply c v /\
+
+      (**)forall n, `(eam) sts n → sts (S n) /\ 
                     ~ `(rs) decompile (sts n) → decompile (sts (S n)).
 
   Proof with eauto using init_ckind_alive.
     intros k v c [sts [H H0]].
     destruct (decompose c[v] ick) as [d H1]...
-    assert (H2 : ~dead_ckind k).
-    { destruct (H0 0) as [H3 _].
-      rewrite H in H3.
-      inversion H3; dep_subst;
-          intro H2; apply dec_context_from_dead with ec k0 v in H2; congruence. }
+    assert (~dead_ckind k).
+    {
+        destruct (H0 0) as [H3 _].
+        rewrite H in H3.
+        inversion H3; dep_subst;
+        match goal with H : dec_context ?ec ?k0 ?v = _ |- _ =>
+        intro H2; apply dec_context_from_dead with ec k0 v in H2; 
+        congruence
+        end.
+    }
     apply dec_proc_eqv_dec in H1...
     apply dec_proc_val_eqv_decctx in H1.
     destruct (decctx_proc_sim _ _ _ [.] H1) as [n [sts' [H3 [H4 H5]]]].
     rewrite <- (compose_empty c) in *.
-    cut (forall m, (sts 0 :: sts')[@m] = sts m).
+    assert (H6 : forall m, (sts 0 :: sts')[@m] = sts m).
     {
-        intro H6.
-        destruct d.
-        - rewrite <- (compose_empty c0) in *.
-          destruct H4 as [[G G0] | [ec [v0 [G0 G]]]];
-              assert (H7 : n < S n) by eauto with arith;
-              rewrite vec_last_by_index with _ H7 in G;
-              rewrite <- H in G;
-              rewrite H6 in G;
-              destruct (H0 (Fin.of_nat_lt H7)) as [H8 H9];
-              rewrite G in H8; compute in H8;
-              dependent destruction H8; dep_subst; try congruence;
-              replace r0 with r in * by congruence;
-              apply H9.
-          + rewrite G; compute; rewrite <- x.
-            exists k' c0 r t0.
-            intuition unfold dec... 
-          + rewrite G; compute; rewrite <- x;
-            assert (H10 := dec_context_correct ec k' v0); rewrite H4 in H10.
-            rewrite H10.
-            exists k' c0 r t.
-            intuition unfold dec...
-        - assert (H7 : n < S n) by eauto with arith;
-          rewrite vec_last_by_index with _ H7 in H4.
-          rewrite <- H in H4.
-          rewrite H6 in H4.
-          destruct (H0 (Fin.of_nat_lt H7)) as [H8 _].
-          rewrite H4 in H8.
-          inversion H8.
+        rewrite <- H in H5.
+        clear k v c H d H1 H2 H3 H4; remember (sts 0) as st; revert sts H0 st Heqst H5;
+        induction sts'; 
+            intros sts H0 st Heqst H5 m;
+            dependent destruction m.
+        - auto.
+        - inversion m.
+        - auto.
+        - eapply (IHsts' (fun n => sts (S n)))...
+          + destruct (H0 0) as [H1 _].
+            assert (H2 := H5 Fin.F1); simpl in H2.
+            rewrite <- Heqst in H1.
+            rewrite trans_computable in H1, H2.
+            destruct H1, H2.
+            unfold next_conf in H, H1.
+            congruence.
+          + intro m0.
+            apply (H5 (Fin.FS m0)).
     }
-    rewrite <- H in H5.
-    clear v k c H d H1 H2 H3 H4. 
-    remember (sts 0) as st. revert sts H0 st Heqst H5.
-    induction sts'; intros.
-    - dependent destruction m.
-      + auto. 
-      + inversion m.
-    - dependent destruction m. 
-      + auto.
-      + eapply (IHsts' (fun n => sts (S n)))...
-        * destruct (H0 0) as [H1 _].
-          assert (H2 := H5 Fin.F1); simpl in H2.
-          rewrite <- Heqst in H1.
-          rewrite trans_computable in H1, H2.
-          destruct H1, H2.
-          unfold next_conf in H, H1; congruence.
-        * intro m0. apply (H5 (Fin.FS m0)).
+    destruct d as [k' r c0 | v0].
+    - rewrite <- (compose_empty c0) in *.
+      destruct H4 as [[G G0] | [ec [v0 [G0 G]]]];
+          assert (H7 : n < S n) by eauto with arith;
+          rewrite vec_last_by_index with _ H7 in G;
+          rewrite <- H in G;
+          rewrite H6 in G;
+          destruct (H0 (Fin.of_nat_lt H7)) as [H8 H9];
+          rewrite G in H8; compute in H8;
+          dependent destruction H8 (*as [r0 t0/t x]*); dep_subst; try congruence;
+          replace r0 with r in * by congruence;
+          apply H9.
+      + rewrite G; compute; rewrite <- x.
+        exists k' c0 r t0.
+        intuition unfold dec... 
+      + rewrite G; compute; rewrite <- x.
+        assert (H10 := dec_context_correct ec k' v0); rewrite H4 in H10.
+        rewrite H10.
+        exists k' c0 r t.
+        intuition unfold dec...
+    - assert (H7 : n < S n) by eauto with arith;
+      rewrite vec_last_by_index with _ H7 in H4.
+      rewrite <- H in H4.
+      rewrite H6 in H4.
+      destruct (H0 (Fin.of_nat_lt H7)) as [H8 _].
+      rewrite H4 in H8.
+      inversion H8.
   Qed.
+
 
 
   Theorem no_silent_loops :
@@ -515,66 +496,11 @@ End SloppyRefEvalApplyMachine_Facts.
 
 
 
-Module RefEvalApplyMachine_Facts (R : PRECISE_RED_REF_SEM) (EAM : REF_EVAL_APPLY_MACHINE R).
-
-  Require Import Vector. 
-  Import VectorNotations R EAM.
-
+Module RefEvalApplyMachine_Facts                                (R : PRECISE_RED_REF_SEM)
+                                                        (EAM : REF_EVAL_APPLY_MACHINE R).
 
   Module RAWF := SloppyRefEvalApplyMachine_Facts R EAM.RAW.
-
-(*
-  Definition local1 (st : RAW.configuration) (H : alive_state st) : configuration :=
-      match st as st return RAWF.good_state st -> _ with
-      | RAW.c_eval t k c   => fun H => c_eval t c  (H `as witness of alive_ckind _)
-      | RAW.c_apply k c v  => fun H => c_apply c v (H `as witness of alive_ckind _)
-      end H.
-*)
-
-
-
-
-  Lemma local2 : forall {n} (sts : Vector.t configuration n) st1 st2,
-  (*1*)(forall m : Fin.t n, (st1 :: sts)[@m] → sts[@m]) ->
-  (*2*)last (st1 :: sts) → st2 ->
-
-      forall m : Fin.t (n + 1), (st1 :: sts ++ [st2])[@m] → (sts ++ [st2])[@m].
-
-  Proof.
-    intros n sts st1 st2 H H0. revert st1 H H0.
-    induction sts; intros.
-    - dependent destruction m.
-      + auto.
-      + inversion m.
-    - dependent destruction m.
-      + apply (H Fin.F1).
-      + apply IHsts.
-        * intro m0. apply (H (Fin.FS m0)).
-        * auto.
-  Qed.
-
-
-  Lemma local3 : forall {n} (sts : Vector.t RAW.configuration n) st1 st2,
-      (forall m : Fin.t (n + 1), (st1 :: sts ++ [st2])[@m] → (sts ++ [st2])[@m]) ->
-
-      (*1*)(forall m : Fin.t n, (st1 :: sts)[@m] → sts[@m]) /\
-      (*2*)last (st1 :: sts) → st2 .
-
-  Proof.
-    induction sts; intros st1 st2 H;
-        split.
-    - solve [inversion m].
-    - apply (H Fin.F1).
-    - intro m.
-      dependent destruction m.
-      + apply (H Fin.F1).
-      + eapply IHsts.
-        intro m0.
-        apply (H (Fin.FS m0)).
-    - apply IHsts.
-      intro m.
-      apply (H (Fin.FS m)). 
-  Qed.
+  Import R EAM.
 
 
   Instance following : RW_FOLLOWING EAM.rws R.rws := 
@@ -584,48 +510,51 @@ Module RefEvalApplyMachine_Facts (R : PRECISE_RED_REF_SEM) (EAM : REF_EVAL_APPLY
   }.
 
   Proof with eauto.
-  {
+
+  (*complete:*) {
     intros t1 t2 st1 H H0.
     assert (alive_state st1).
     { destruct st1; eapply (witness_elim)... }
     destruct (RAWF.am_complete t1 t2 st1 H) as [n [sts [st2 [H2 [[H3 H4] H5]]]]]...
-    
-    exists n (map2forall _ (fun st H => submember_by _ st (proj2 H)) sts H2) 
-           (submember_by _ st2 H4).
+    set (sts' := map2forall _ (fun st H => submember_by _ st (proj2 H)) sts H2).
+
+    exists n sts' (submember_by _ st2 H4).
     split; [| split].
     - clear st2 H3 H4 H5.
-      dependent induction sts.
+      induction sts as [ | st1' ? sts].
       + constructor.
-      + dependent destruction H2; dep_subst.
+      + dependent destruction H2 (*as [p H2]*); dep_subst.
         destruct p as [H3 H4].
         constructor.
         * clear.
-          destruct h, st1; auto.
+          destruct st1', st1; auto.
         * apply IHsts.
     - destruct st2; auto.
-    - apply local2.
-      + clear H0 H1. revert st1 H5.
-        induction sts; 
+    - apply (path_snoc (st1::sts') (submember_by alive_state st2 H4)).
+      + clear H0 H1; revert st1 H5.
+        induction sts as [ | st1' ? sts]; 
             intros st1 H5 m;
             dependent destruction m;
-            dependent destruction H2; dep_subst.
-        * destruct h;
-          solve [apply (H5 Fin.F1)].
+            dependent destruction H2 (*as [p H2]*); dep_subst.
+        * destruct st1';
+          solve [ apply (H5 Fin.F1) ].
         * apply IHsts.
           intro m0.
-          destruct h;
-          eapply (H5 (Fin.FS m0)).
+          destruct st1';
+          apply (H5 (Fin.FS m0)).
       + clear H0 H1; revert st1 H5.
-        induction sts; intros st1 H5.
-        * destruct st2; apply (H5 Fin.F1).
-        * dependent destruction H2; dep_subst.
+        induction sts as [ | st1' ? sts]; 
+            intros st1 H5.
+        * destruct st2; 
+          solve [ apply (H5 Fin.F1) ].
+        * dependent destruction H2 (*as [p H2]*); dep_subst.
           apply IHsts.
-          intro m; 
-          destruct h;
+          intro m.
+          destruct st1';
           apply (H5 (Fin.FS m)).
   }
 
-  {
+  (*no_silent_loops:*) {
     intros [crs H].
     apply RAWF.no_silent_loops.
     exists crs.
@@ -695,7 +624,4 @@ End RefEvalApplyMachine_Facts.
   Proof. etransitivity; eauto using PENSF.eval_preserved, eval_PENS_eqv_PEM. Qed.
 
 End PushEnterMachine_Facts.*)
-
-
-Close Scope vector.
 

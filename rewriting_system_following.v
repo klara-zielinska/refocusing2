@@ -4,7 +4,7 @@ Require Import Fin2
 
 
 
-Open Scope vector.
+Local Open Scope vector.
 
 Class RW_FOLLOWING                                    {configuration_er configuration_ed}
     (Follower : REWRITING_SYSTEM configuration_er) 
@@ -21,8 +21,7 @@ Class RW_FOLLOWING                                    {configuration_er configur
             exists n (crs : Vector.t configuration_er n) cr2,
             (**)Forall (fun cr => semantics cr = cd1) crs /\
             (**)semantics cr2 = cd2                       /\
-            (**)forall m : Fin.t (n+1), 
-                    (cr1 :: crs ++ [cr2])[@m] → (crs ++ [cr2])[@m];
+            (**)path (cr1 :: crs ++ [cr2]);
 
     no_silent_loops :
       ~ exists crs : nat -> configuration_er, (*a stream of configurations*)
@@ -30,5 +29,3 @@ Class RW_FOLLOWING                                    {configuration_er configur
           (**)  `(Follower) crs n  →  crs (S n)  /\ 
           (**)~ `(Followed) semantics (crs n)  →  semantics (crs (S n))
 }.
-
-Close Scope vector.

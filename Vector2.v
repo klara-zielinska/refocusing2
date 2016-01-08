@@ -1,11 +1,12 @@
 Require Export Vector.
+Require Import Program.
 
 
    Bind Scope vector_scope with Vector.t.
 Delimit Scope vector_scope with vector.
 
 
-Open Scope vector_scope.
+Local Open Scope vector_scope.
 
 Arguments nil {A}.
 Arguments cons {A} _ {n} _.
@@ -54,4 +55,14 @@ Definition map2forall                {A B} (P : A -> Prop) (f : forall x : A, P 
 
         (Forall_split H).
 
-Close Scope vector_scope.
+
+Lemma vec_last_by_index : forall {T n} (v : Vector.t T (S n)) (H : n < S n), 
+    last v = v[@ Fin.of_nat_lt H].
+
+Proof.
+  intros T n v H.
+  dependent induction v.
+  destruct v as [ | e ? v].
+  - auto.
+  - apply (IHv n (e :: v)); auto.
+Qed.

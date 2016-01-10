@@ -204,6 +204,15 @@ Module Type RED_SEM.
   (decompose :                                                                forall t k,
        ~dead_ckind k -> exists d : decomp k, dec t k d).
 
+
+  Class SafeKRegion (k : ckind) (P : term -> Prop) :=
+  { 
+      preservation :                                                        forall t1 t2,
+          P t1  ->  k |~ t1 → t2  ->  P t2;
+      progress :                                                               forall t1,
+          P t1  ->  (exists (v : value k), t1 = v) \/ (exists t2, k |~ t1 → t2)
+  }.
+
 End RED_SEM.
 
 

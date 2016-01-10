@@ -41,7 +41,16 @@ Module Type PRE_REF_SEM <: RED_STRATEGY_LANG.
   (redex_trivial1 :                                        forall {k} (r : redex k) ec t,
        ~dead_ckind (k+>ec) -> ec:[t] = r -> exists (v : value (k+>ec)), t = v)
   (wf_immediate_subterm : well_founded immediate_subterm)
-  (wf_subterm_order     : well_founded subterm_order). 
+  (wf_subterm_order     : well_founded subterm_order).
+
+
+  Class SafeKRegion (k : ckind) (P : term -> Prop) :=
+  { 
+      preservation :                                                        forall t1 t2,
+          P t1  ->  k |~ t1 → t2  ->  P t2;
+      progress :                                                               forall t1,
+          P t1  ->  (exists (v : value k), t1 = v) \/ (exists t2, k |~ t1 → t2)
+  }.
 
 End PRE_REF_SEM.
 

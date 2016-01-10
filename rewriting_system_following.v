@@ -9,8 +9,11 @@ Local Open Scope vector.
 Class RW_FOLLOWING                                    {configuration_er configuration_ed}
     (Follower : REWRITING_SYSTEM configuration_er) 
     (Followed : REWRITING_SYSTEM configuration_ed) :=
+
 {
     semantics : configuration_er -> configuration_ed;
+
+    semantics_surj : forall cd, exists cr, semantics cr = cd;
 
     correct :                                                             forall cr1 cr2,
         `(Follower) cr1 → cr2  ->  semantics cr1 = semantics cr2  \/  

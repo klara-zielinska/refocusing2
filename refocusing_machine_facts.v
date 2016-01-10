@@ -1,7 +1,8 @@
-Require Import Fin2 
+Require Import Program
+               Fin2 
                Vector2
+               Subset
                Util
-               Program
                rewriting_system
                rewriting_system_following
                refocusing_semantics
@@ -31,6 +32,16 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
 
   Local Hint Constructors EAM.trans clos_trans_1n.
   Local Hint Unfold transition.
+
+
+  Theorem decompile_surj : 
+      forall t, exists st, decompile st = t.
+
+  Proof.
+    intro t.
+    exists (c_eval t [.]).
+    auto.
+  Qed.
 
 
   Theorem am_correct :                                                    forall st1 st2,
@@ -490,6 +501,68 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
   Qed.
 
 
+
+  Instance safe_region_map {P} `{R.SafeKRegion init_ckind P} : 
+                           EAM.SafeRegion (fun st => alive_state st /\ P (decompile st)).
+
+  Proof with eautof. split.
+
+  (* preservation: *) {
+    intros st1 st2 [H1 H2] H3.
+    split.
+    - eapply trans_alive...
+    - destruct (am_correct _ _ H3).
+      + congruence.
+      + eapply R.preservation...
+  }
+
+  (* progress: *) {
+    intros st1 [H1 H2].
+    destruct st1.
+    {
+        right.
+        remember (dec_term t k) as DEC eqn: H3; symmetry in H3.
+        assert (H4 := dec_term_correct t k); rewrite H3 in H4.
+        destruct DEC; subst;
+        try solve
+        [ autof
+        | eexists; compute; eauto]. 
+        - assert (~dead_ckind k) by auto using (proper_death2 [.]). 
+          destruct (R.progress _ H2) as [[v H4] | [t2 H4]].
+          + apply value_trivial in H4...
+            destruct H4 as [v' H4]; symmetry in H4.
+            apply value_redex in H4...
+          + destruct (am_complete _ _ (c_eval r c) H4) as [n [sts [st2 [G [G0 G1]]]]]...
+            destruct sts as [ | st n sts];
+            [ exists st2 | exists st ]; 
+            apply (G1 F1).
+    }
+
+    {
+        destruct c as [ | ec k c].
+        - left; exists v...
+        - right.
+          remember (dec_context ec k v) as DEC eqn: H3; symmetry in H3.
+          assert (H4 := dec_context_correct ec k v); rewrite H3 in H4.
+          destruct DEC; subst;
+          try solve
+          [ autof
+          | eexists; compute; eauto].
+          + assert (~dead_ckind k) by auto using (proper_death2 [.]). 
+            destruct (R.progress _ H2) as [[v0 H5] | [t2 H5]].
+            * simpl in H5; rewrite H4 in H5.
+              apply value_trivial in H5...
+              destruct H5 as [v' H5]; symmetry in H5.
+              apply value_redex in H5...
+            * destruct (am_complete _ _ (c_apply (ec=:c) v) H5) 
+                                                        as [n [sts [st2 [G [G0 G1]]]]]...
+              destruct sts as [ | st n sts];
+              [ exists st2 | exists st ]; 
+              apply (G1 F1).
+    }
+  }
+  Qed.
+
 End SloppyRefEvalApplyMachine_Facts.
 
 
@@ -510,6 +583,12 @@ Module RefEvalApplyMachine_Facts                                (R : PRECISE_RED
   }.
 
   Proof with eauto.
+
+  (*semantics_surj:*) {
+    intro t.
+    exists (submember_by alive_state (c_eval t [.]) init_ckind_alive).
+    auto.
+  }
 
   (*complete:*) {
     intros t1 t2 st1 H H0.
@@ -559,6 +638,35 @@ Module RefEvalApplyMachine_Facts                                (R : PRECISE_RED
     apply RAWF.no_silent_loops.
     exists crs.
     solve [intuition].
+  }
+  Qed.
+
+
+
+  Instance safe_region_map {P} `{R.SafeKRegion init_ckind P} : 
+                           EAM.SafeRegion (fun st => P (decompile st)).
+
+  Proof. split.
+
+  (*preservation:*) {
+      intros [st1 H1] [st2 H2] H3 H4.
+      assert (H5 := witness_elim _ _ H1).
+      destruct (RAW.preservation st1 st2);
+      solve [intuition].
+  }
+
+  (*progress:*) {
+      intros [st1 H1] H2.
+      assert (H3 := witness_elim _ _ H1).
+      destruct (RAW.progress st1) as [[v H4] | [st2 H4]]; try solve [intuition];
+          subst.
+      - left. exists v. 
+        apply (f_equal (@exist _ _ _)).
+        apply witness_unique.
+      - right. 
+        assert (H5 : alive_state st2) by eauto using trans_alive.
+        exists (submember_by _ st2 H5).
+        auto.
   }
   Qed.
 

@@ -93,6 +93,7 @@ VFILES:=Fin2.v\
   reduction_strategy.v\
   reduction_strategy_facts.v\
   abstract_machine.v\
+  abstract_machine_facts.v\
   refocusing_semantics.v\
   refocusing_semantics_facts.v\
   refocusing_machine.v\

@@ -206,21 +206,19 @@ End MiniML_HandDecProc.
 
 
 
-Module MiniML_HandMachine.
+Module MiniML_HandMachine <: ABSTRACT_MACHINE.
 
   Import MiniML_EAM MiniML_PreRefSem.
 
+
   Notation "[$ t $]"         := (load t)                                 (t at level 99).
   Notation "[: v :]"         := (value_to_conf v)                        (v at level 99).
-  Notation "[$ t , c , H $]" := (exist _ (RAW.c_eval t c) H)                     (t, k, c at level 99).
-  Notation "[: c , v , H :]" := (exist _ (RAW.c_apply c v) H)                       (c, v at level 99).
-
-
-  (*Lemma ick_aw : init_ckind ? alive_ckind.
-  Proof. apply (init_ckind_alive `as witness of alive_ckind). Qed.*)
-
-  Notation "[$ t , c $]" := (submember_by _ (RAW.c_eval t c) init_ckind_alive)                     (t, k, c at level 99).
-  Notation "[: c , v :]" := (submember_by _ (RAW.c_apply c v) init_ckind_alive)                       (c, v at level 99).
+  Notation "[$ t , c , H $]" := (exist _ (RAW.c_eval t c) H)       (t, k, c at level 99).
+  Notation "[: c , v , H :]" := (exist _ (RAW.c_apply c v) H)         (c, v at level 99).
+  Notation "[$ t , c $]"     := (submember_by _ (RAW.c_eval t c) init_ckind_alive)
+                                                                   (t, k, c at level 99).
+  Notation "[: c , v :]"     := (submember_by _ (RAW.c_apply c v) init_ckind_alive)
+                                                                      (c, v at level 99).
 
   Definition next_conf0 (st : configuration) : option configuration :=
       match st with
@@ -331,7 +329,17 @@ Module MiniML_HandMachine.
   Definition value         := value init_ckind.
   Definition configuration := configuration.
   Definition load          := load.
-  Definition value_to_conf := value_to_conf.
+  Definition value_to_conf : value ->  configuration := value_to_conf.
+  Coercion   value_to_conf : value >-> configuration.
   Definition final         := final.
+
+
+  Class SafeRegion (P : configuration -> Prop) :=
+  { 
+      preservation :                                                        forall t1 t2,
+          P t1  ->  t1 → t2  ->  P t2;
+      progress :                                                               forall t1,
+          P t1  ->  (exists (v : value), t1 = v) \/ (exists t2, t1 → t2)
+  }.
 
 End MiniML_HandMachine.

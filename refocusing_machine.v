@@ -19,16 +19,16 @@ Module Type SLOPPY_REF_EVAL_APPLY_MACHINE (R : RED_REF_SEM) <: ABSTRACT_MACHINE.
   Notation ick     := init_ckind.
   Definition term  := term.
   Definition value := value ick.
+  Coercion   value_to_term (v : value) := (R.value_to_term v) : term.
 
 
   Inductive conf :=
   | c_eval  : term -> forall {k}, context init_ckind k -> conf
   | c_apply : forall {k}, context init_ckind k -> R.value k -> conf.
+
   Definition configuration := conf.
-
-
   Definition load t                    : configuration := c_eval t [.].
-  Coercion value_to_conf (v : value)   : configuration := c_apply [.] v.
+  Coercion   value_to_conf (v : value)   : configuration := c_apply [.] v.
   Definition final (c : configuration) : option value := 
       match c with
       | c_apply _ [.] v => Some v 
@@ -119,7 +119,18 @@ Module Type SLOPPY_REF_EVAL_APPLY_MACHINE (R : RED_REF_SEM) <: ABSTRACT_MACHINE.
        final st = Some v <-> st = v)
 
   (next_conf0_alive :                                                     forall st1 st2,
-      next_conf0 st1 = Some st2 -> alive_state st2).
+      next_conf0 st1 = Some st2 -> alive_state st2)
+  (trans_alive :                                                          forall st1 st2,
+      st1 → st2 -> alive_state st2).
+
+
+  Class SafeRegion (P : configuration -> Prop) :=
+  { 
+      preservation :                                                        forall t1 t2,
+          P t1  ->  t1 → t2  ->  P t2;
+      progress :                                                               forall t1,
+          P t1  ->  (exists (v : value), t1 = v) \/ (exists t2, t1 → t2)
+  }.
 
 End SLOPPY_REF_EVAL_APPLY_MACHINE.
 
@@ -135,10 +146,11 @@ Module Type REF_EVAL_APPLY_MACHINE (R : PRECISE_RED_REF_SEM) <: ABSTRACT_MACHINE
   Export RAW.
 
 
-  Notation ick         := init_ckind.
-  Definition term      := term.
-  Definition value     := RAW.value.
-  Notation alive_state := RAW.alive_state.
+  Notation   ick   := init_ckind.
+  Definition term  := term.
+  Definition value := RAW.value.
+  Coercion   value_to_term (v : value) := (R.value_to_term v) : term.
+  Notation   alive_state := RAW.alive_state.
 
 
   Instance alive_state_CompPred : CompPred _ alive_state :=
@@ -189,6 +201,15 @@ Module Type REF_EVAL_APPLY_MACHINE (R : PRECISE_RED_REF_SEM) <: ABSTRACT_MACHINE
        st1 → st2 <-> exists e, next_conf e st1 = Some st2)
   (finals_are_vals :                                                         forall st v,
        final st = Some v <-> st = v).
+
+
+  Class SafeRegion (P : configuration -> Prop) :=
+  { 
+      preservation :                                                        forall t1 t2,
+          P t1  ->  t1 → t2  ->  P t2;
+      progress :                                                               forall t1,
+          P t1  ->  (exists (v : value), t1 = v) \/ (exists t2, t1 → t2)
+  }.
 
 End REF_EVAL_APPLY_MACHINE.
 
@@ -320,9 +341,10 @@ Module SloppyRefEvalApplyMachine (R : RED_REF_SEM) <: SLOPPY_REF_EVAL_APPLY_MACH
   Import R RF ST SF.
 
 
-  Notation ick     := init_ckind.
+  Notation   ick   := init_ckind.
   Definition term  := term.
   Definition value := value ick.
+  Coercion   value_to_term (v : value) := (R.value_to_term v) : term.
 
 
   Inductive conf : Type :=
@@ -525,52 +547,26 @@ Module SloppyRefEvalApplyMachine (R : RED_REF_SEM) <: SLOPPY_REF_EVAL_APPLY_MACH
     end.
   Qed.
 
-(*
-  Lemma next_eval_alive :                              forall st t k (c : context ick k),
-      next_conf0 st = Some (c_eval t c) -> ~dead_ckind k.
+
+  Lemma trans_alive :                                                     forall st1 st2,
+      st1 → st2 -> alive_state st2.
 
   Proof.
-    intros st t k c H.
-    destruct st; unfold next_conf0 in H; simpl in H. 
-    - remember (dec_term t0 k0); symmetry in Heqi; 
-      destruct i; try discriminate.
-      + destruct (contract r); inversion H; dep_subst.
-        auto using (proper_death2 [.]).
-      + inversion H; dep_subst.
-        eauto using dec_term_next_alive.
-    - destruct c0; try discriminate.
-      remember (dec_context ec k2 v); symmetry in Heqi; destruct i; 
-      try discriminate.
-      + destruct (contract r); inversion H; dep_subst.
-        auto using (proper_death2 [.]).
-      + inversion H; dep_subst.
-        eauto using dec_context_next_alive.
+    intros st1 st2 H.
+    inversion H; subst;
+    simpl; 
+    eauto using (proper_death2 [.]), dec_term_val_alive, dec_term_next_alive,
+                dec_context_val_alive, dec_context_next_alive.
   Qed.
 
 
-  Lemma next_apply_alive :                             forall st k (c : context ick k) v,
-      next_conf0 st = Some (c_apply c v) -> ~dead_ckind k.
-
-  Proof.
-    intros st k c v H.
-    destruct st; unfold next_conf0 in H; simpl in H. 
-    - remember (dec_term t k0); symmetry in Heqi; destruct i; 
-      try discriminate.
-      + destruct (contract r); inversion H; dep_subst; auto.
-      + inversion H; dep_subst.
-        intro H.
-        apply (dec_term_from_dead t k) in H.
-        congruence.
-    - destruct c0; try discriminate.
-      remember (dec_context ec k2 v0); symmetry in Heqi; destruct i; 
-      try discriminate.
-      + destruct (contract r); discriminate.
-      + inversion H; dep_subst.
-        intro H.
-        assert (H0 : dead_ckind (k+>ec)) by auto using death_propagation.
-        apply (dec_context_from_dead ec k v0) in H0.
-        congruence.
-  Qed.*)
+  Class SafeRegion (P : configuration -> Prop) :=
+  { 
+      preservation :                                                        forall t1 t2,
+          P t1  ->  t1 → t2  ->  P t2;
+      progress :                                                               forall t1,
+          P t1  ->  (exists (v : value), t1 = v) \/ (exists t2, t1 → t2)
+  }.
 
 End SloppyRefEvalApplyMachine.
 
@@ -588,9 +584,10 @@ Module RefEvalApplyMachine (R : PRECISE_RED_REF_SEM) <: REF_EVAL_APPLY_MACHINE R
   Export RAW.
 
 
-  Notation   ick         := init_ckind.
-  Definition term        := term.
-  Definition value       := RAW.value.
+  Notation   ick   := init_ckind.
+  Definition term  := term.
+  Definition value := RAW.value.
+  Coercion   value_to_term (v : value) := (R.value_to_term v) : term.
   Notation   alive_state := RAW.alive_state.
 
 
@@ -707,6 +704,15 @@ Module RefEvalApplyMachine (R : PRECISE_RED_REF_SEM) <: REF_EVAL_APPLY_MACHINE R
         solve [try apply (f_equal (submember _ _)); auto].
       + intuition.
   Qed.
+
+
+  Class SafeRegion (P : configuration -> Prop) :=
+  { 
+      preservation :                                                        forall t1 t2,
+          P t1  ->  t1 → t2  ->  P t2;
+      progress :                                                               forall t1,
+          P t1  ->  (exists (v : value), t1 = v) \/ (exists t2, t1 → t2)
+  }.
 
 End RefEvalApplyMachine.
 

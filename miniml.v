@@ -293,6 +293,15 @@ Module MiniML_PreRefSem <: PRE_REF_SEM.
   Instance rws : REWRITING_SYSTEM term := 
   { transition := reduce init_ckind }.
 
+
+  Class SafeKRegion (k : ckind) (P : term -> Prop) :=
+  { 
+      preservation :                                                        forall t1 t2,
+          P t1  ->  k |~ t1 → t2  ->  P t2;
+      progress :                                                               forall t1,
+          P t1  ->  (exists (v : value k), t1 = v) \/ (exists t2, k |~ t1 → t2)
+  }.
+
 End MiniML_PreRefSem.
 
 

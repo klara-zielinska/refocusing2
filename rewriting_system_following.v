@@ -1,6 +1,7 @@
 Require Import Fin2
                Vector2
                rewriting_system.
+        Import rewriting_system.Paths.
 
 
 

@@ -45,8 +45,8 @@ Notation "l |~ c1 →* c2" := (clos_refl_trans_1n _ (ltransition l) c1 c2)
 
 
 
-Instance RWS_is_LRWS                                    {conf} `(REWRITING_SYSTEM conf) :
-                                                    LABELED_REWRITING_SYSTEM unit conf :=
+Instance RWS_is_LRWS                                                               {conf}
+    `(REWRITING_SYSTEM conf) : LABELED_REWRITING_SYSTEM unit conf :=
 {
     ltransition := fun (_ : unit) => transition
 }.
@@ -54,47 +54,93 @@ Instance RWS_is_LRWS                                    {conf} `(REWRITING_SYSTE
 
 
 
-Require Import Fin2 Vector2 Program.
+Module Paths.
 
-Open Local Scope vector.
-
-Definition path_in                                    {conf} `(REWRITING_SYSTEM conf) {n}
-    (cs : Vector.t conf n) : Prop :=
-
-    match cs with
-    | []          => False
-    | cons c n cs => forall m : Fin.t n, (c::cs)[@m] → cs[@m]
-    end.
-Definition path {conf} {rws : REWRITING_SYSTEM conf} {n} := @path_in conf rws n.
+  Require Import Program.
+  Require Export Fin2 Vector2.
+  Open Local Scope vector.
 
 
-Definition lpath_in               {label conf} `(LABELED_REWRITING_SYSTEM label conf) {n}
-    (cs : Vector.t conf (S n)) (ls : Vector.t label n) : Prop :=
+Section RWS.
 
-    match cs in Vector.t _ n return Vector.t label (pred n) -> Prop with
-    | []          => fun _  => False
-    | cons c n cs => fun ls => forall m : Fin.t n, ls[@m] |~ (c::cs)[@m] → cs[@m]
-    end ls.
-Definition lpath {label conf} {lrws : LABELED_REWRITING_SYSTEM label conf} {n} := 
-    @lpath_in label conf lrws n.
+  Context {conf : Set}.
+  Context `(REWRITING_SYSTEM conf).
 
 
-Lemma path_snoc                                     {conf} `{REWRITING_SYSTEM conf} {n} :
-    forall (cs : Vector.t conf (S n)) c, path cs -> (last cs) → c -> path (cs ++ [c]).
+  Definition path_in                                                                  {n}
+      (cs : Vector.t conf n) : Prop :=
 
-Proof.
-  intros cs c H0 H1.
-  dependent destruction cs.
-  revert h H0 H1.
-  induction cs; 
-      intros c0 H0 H1 m.
-  - dependent destruction m.
-    + auto.
-    + inversion m.
-  - dependent destruction m.
-    + apply (H0 Fin.F1).
-    + apply IHcs.
-      * intro m0; apply (H0 (Fin.FS m0)).
-      * auto.
-Qed.
+      match cs with
+      | []          => False
+      | cons c n cs => forall m : Fin.t n, (c::cs)[@m] → cs[@m]
+      end.
 
+
+  Lemma path_in_snoc :                           forall {n} (cs : Vector.t conf (S n)) c,
+      path_in cs -> (last cs) → c -> path_in (cs ++ [c]).
+
+  Proof.
+    intros n cs c H0 H1.
+    dependent destruction cs.
+    revert h H0 H1.
+    induction cs; 
+        intros c0 H0 H1 m.
+    - dependent destruction m.
+      + auto.
+      + inversion m.
+    - dependent destruction m.
+      + apply (H0 Fin.F1).
+      + apply IHcs.
+        * intro m0; apply (H0 (Fin.FS m0)).
+        * auto.
+  Qed.
+
+End RWS.
+
+
+Section LRWS.
+
+  Context {label : Set} {conf : Set}.
+  Context `(LABELED_REWRITING_SYSTEM label conf).
+
+  Definition lpath_in                                                                 {n}
+      (cs : Vector.t conf (S n)) (ls : Vector.t label n) : Prop :=
+
+      match cs in Vector.t _ n return Vector.t label (pred n) -> Prop with
+      | []          => fun _  => False
+      | cons c n cs => fun ls => forall m : Fin.t n, ls[@m] |~ (c::cs)[@m] → cs[@m]
+      end ls.
+
+
+  Lemma lpath_in_snoc :                             forall {n} (cs : Vector.t conf (S n))
+                                                             (ls : Vector.t label n) l c,
+      lpath_in cs ls  ->  l |~ (last cs) → c  ->  lpath_in (cs ++ [c]) (ls ++ [l]).
+
+  Proof.
+    intros n cs ls l c H0 H1.
+    dependent destruction cs.
+    revert h H0 H1.
+    induction cs; 
+        intros c0 H0 H1 m;
+        dependent destruction ls.
+    - dependent destruction m.
+      + auto.
+      + inversion m.
+    - dependent destruction m.
+      + apply (H0 Fin.F1).
+      + apply IHcs.
+        * intro m0; apply (H0 (Fin.FS m0)).
+        * auto.
+  Qed.
+
+End LRWS.
+
+
+  Definition path  := @path_in.   Arguments path  {conf}         {rws}  {n} _   : rename.
+  Definition lpath := @lpath_in.  Arguments lpath {label} {conf} {lrws} {n} _ _ : rename.
+  Definition path_snoc := @path_in_snoc.   Arguments path_snoc 
+                                                       {conf} {rws} {n} _ _ _ _ : rename.
+  Definition lpath_snoc := @lpath_in_snoc. Arguments lpath_snoc 
+                                                {conf} {lrws} {n} _ _ _ _ _ _ _ : rename.
+
+End Paths.

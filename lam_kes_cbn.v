@@ -793,7 +793,8 @@ Module EAKrivineMachine := RefEvalApplyMachine Lam_KES_CBN_RefSem.
 
 Module Example.
 
-  Require Import refocusing_machine_facts.
+  Require Import refocusing_machine_facts 
+                 List (* to patch a module bug in Coq *).
 
   Module RAWF := SloppyRefEvalApplyMachine_Facts  Lam_KES_CBN_RefSem 
                                                   EAKrivineMachine.RAW.

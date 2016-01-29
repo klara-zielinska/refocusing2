@@ -11,6 +11,7 @@ Require Import Program
                reduction_semantics_facts 
                reduction_strategy_facts
                refocusing_semantics_facts.
+        Import rewriting_system.Paths.
 
 
 
@@ -502,8 +503,9 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
 
 
 
-  Instance safe_region_map {P} `{R.SafeKRegion init_ckind P} : 
-                           EAM.SafeRegion (fun st => alive_state st /\ P (decompile st)).
+  Instance safe_region_map                                                            {P}
+      `(R.SafeKRegion init_ckind P) : 
+      EAM.SafeRegion (fun st => alive_state st /\ P (decompile st)).
 
   Proof with eautof. split.
 
@@ -643,8 +645,9 @@ Module RefEvalApplyMachine_Facts                                (R : PRECISE_RED
 
 
 
-  Instance safe_region_map {P} `{R.SafeKRegion init_ckind P} : 
-                           EAM.SafeRegion (fun st => P (decompile st)).
+  Instance safe_region_map                                                            {P}
+      `(R.SafeKRegion init_ckind P) : 
+      EAM.SafeRegion (fun st => P (decompile st)).
 
   Proof. split.
 
@@ -671,6 +674,7 @@ Module RefEvalApplyMachine_Facts                                (R : PRECISE_RED
   Qed.
 
 End RefEvalApplyMachine_Facts.
+
 
 
 

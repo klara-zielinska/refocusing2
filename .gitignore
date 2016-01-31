@@ -1,5 +1,5 @@
+*.aux
 *.glob
-*.v.d
 *.vo
-*.v#
-temp.v
+*.d
+*.zip

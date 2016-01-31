@@ -85,27 +85,34 @@ VFILES:=Fin2.v\
   Util.v\
   Subset.v\
   Entropy.v\
-  rewriting_system.v\
-  rewriting_system_following.v\
-  reduction_semantics.v\
-  reduction_languages_facts.v\
-  reduction_semantics_facts.v\
-  reduction_strategy.v\
-  reduction_strategy_facts.v\
-  abstract_machine.v\
-  abstract_machine_facts.v\
-  refocusing_semantics.v\
-  refocusing_semantics_facts.v\
-  refocusing_machine.v\
-  refocusing_machine_facts.v\
-  lam_no.v\
-  lam_no_check.v\
-  miniml.v\
-  miniml_check.v\
-  lam_ses_no.v\
-  lam_ses_no_check.v\
-  lam_kes_cbn.v
+  rewriting_system/rewriting_system.v\
+  rewriting_system/rewriting_system_following.v\
+  reduction_semantics/reduction_semantics.v\
+  reduction_semantics/reduction_languages_facts.v\
+  reduction_semantics/reduction_semantics_facts.v\
+  reduction_semantics/reduction_strategy.v\
+  reduction_semantics/reduction_strategy_facts.v\
+  abstract_machine/abstract_machine.v\
+  abstract_machine/abstract_machine_facts.v\
+  refocusing/refocusing_semantics.v\
+  refocusing/refocusing_semantics_facts.v\
+  refocusing/refocusing_machine.v\
+  refocusing/refocusing_machine_facts.v\
+  refocusing_examples/lam_no.v\
+  refocusing_examples/lam_no_check.v\
+  refocusing_examples/miniml.v\
+  refocusing_examples/miniml_check.v\
+  refocusing_examples/lam_ses_no.v\
+  refocusing_examples/lam_ses_no_check.v\
+  refocusing_examples/lam_kes_cbn.v
 
+INCLUDES:=-I rewriting_system\
+  -I reduction_semantics\
+  -I abstract_machine\
+  -I refocusing\
+  -I refocusing_examples
+  
+  
 -include $(addsuffix .d,$(VFILES))
 .SECONDARY: $(addsuffix .d,$(VFILES))
 
@@ -215,10 +222,10 @@ printenv:
 ###################
 
 %.vo %.glob: %.v
-	$(COQC) $(COQDEBUG) $(COQFLAGS) $*
+	$(COQC) $(INCLUDES) $(COQDEBUG) $(COQFLAGS) $*
 
 %.vi: %.v
-	$(COQC) -i $(COQDEBUG) $(COQFLAGS) $*
+	$(COQC) $(INCLUDES) -i $(COQDEBUG) $(COQFLAGS) $*
 
 %.g: %.v
 	$(GALLINA) $<
@@ -236,10 +243,10 @@ printenv:
 	$(COQDOC) $(COQDOCFLAGS)  -html -g $< -o $@
 
 %.v.d: %.v
-	$(COQDEP) -slash $(COQLIBS) "$<" > "$@" || ( RV=$$?; rm -f "$@"; exit $${RV} )
+	$(COQDEP) $(INCLUDES) -slash $(COQLIBS) "$<" > "$@" || ( RV=$$?; rm -f "$@"; exit $${RV} )
 
 %.v.beautified:
-	$(COQC) $(COQDEBUG) $(COQFLAGS) -beautify $*
+	$(COQC) $(INCLUDES) $(COQDEBUG) $(COQFLAGS) -beautify $*
 
 # WARNING
 #

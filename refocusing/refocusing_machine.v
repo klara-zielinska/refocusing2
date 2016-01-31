@@ -31,18 +31,18 @@ Module Type SLOPPY_REF_EVAL_APPLY_MACHINE (R : RED_REF_SEM) <: ABSTRACT_MACHINE.
   Coercion   value_to_conf (v : value)   : configuration := c_apply [.] v.
   Definition final (c : configuration) : option value := 
       match c with
-      | c_apply _ [.] v => Some v 
-      | _               => None
+      | c_apply [.] v => Some v 
+      | _             => None
       end.
   Definition decompile (c : configuration) : term :=
       match c with
-      | c_eval t _ c  => c[t]
-      | c_apply _ c v => c[v]
+      | c_eval t c  => c[t]
+      | c_apply c v => c[v]
       end.
   Definition alive_state (st : configuration) := 
       match st with 
-      | c_eval _ k _  => ~dead_ckind k 
-      | c_apply k _ _ => ~dead_ckind k
+      | @c_eval _ k _  => ~dead_ckind k 
+      | @c_apply k _ _ => ~dead_ckind k
       end.
 
 
@@ -86,21 +86,21 @@ Module Type SLOPPY_REF_EVAL_APPLY_MACHINE (R : RED_REF_SEM) <: ABSTRACT_MACHINE.
 
   Definition next_conf0 (st : configuration) : option configuration :=
       match st with
-      | c_eval t k c  => 
+      | @c_eval t k c  => 
             match dec_term t k with
             | in_red r     => option_map (fun t' => c_eval t' c) (contract r)
             | in_val v     => Some (c_apply c v)
             | in_term t ec => Some (c_eval t (ec=:c))
             | in_dead      => None
             end
-      | c_apply _ (ccons ec k c) v => 
+      | c_apply (@ccons _ ec k c) v => 
             match dec_context ec k v with
             | in_red r     => option_map (fun t' => c_eval t' c) (contract r)
             | in_val v     => Some (c_apply c v)
             | in_term t ec => Some (c_eval t (ec=:c))
             | in_dead      => None
             end
-      | c_apply _ [.] _ => 
+      | c_apply [.] _ => 
             None
       end.
   Definition next_conf (_ : entropy) := next_conf0.
@@ -157,8 +157,8 @@ Module Type REF_EVAL_APPLY_MACHINE (R : PRECISE_RED_REF_SEM) <: ABSTRACT_MACHINE
   {
       satisfyingness_comp := fun st => 
           match st with 
-          | c_eval _ k _  => is_satisfied (fun k => ~dead_ckind k) k 
-          | c_apply k _ _ => is_satisfied (fun k => ~dead_ckind k) k 
+          | @c_eval _ k _  => is_satisfied (fun k => ~dead_ckind k) k 
+          | @c_apply k _ _ => is_satisfied (fun k => ~dead_ckind k) k 
           end
   }.
 
@@ -357,18 +357,18 @@ Module SloppyRefEvalApplyMachine (R : RED_REF_SEM) <: SLOPPY_REF_EVAL_APPLY_MACH
   Coercion   value_to_conf (v : value) : configuration := c_apply [.] v.
   Definition final (c : configuration) : option value := 
       match c with
-      | c_apply _ [.] v => Some v 
-      | _               => None
+      | c_apply [.] v => Some v 
+      | _             => None
       end.
   Definition decompile (c : configuration) : term :=
       match c with
-      | c_eval t _ c  => c[t]
-      | c_apply _ c v => c[v]
+      | c_eval t c  => c[t]
+      | c_apply c v => c[v]
       end.
   Definition alive_state (st : configuration) := 
       match st with 
-      | c_eval _ k _  => ~dead_ckind k 
-      | c_apply k _ _ => ~dead_ckind k
+      | @c_eval _ k _  => ~dead_ckind k 
+      | @c_apply k _ _ => ~dead_ckind k
       end.
 
 
@@ -412,21 +412,21 @@ Module SloppyRefEvalApplyMachine (R : RED_REF_SEM) <: SLOPPY_REF_EVAL_APPLY_MACH
 
   Definition next_conf0 (st : configuration) : option configuration :=
       match st with
-      | c_eval t k c  => 
+      | @c_eval t k c  => 
             match dec_term t k with
             | in_red r     => option_map (fun t' => c_eval t' c) (contract r)
             | in_val v     => Some (c_apply c v)
             | in_term t ec => Some (c_eval t (ec=:c))
             | in_dead      => None
             end
-      | c_apply _ (ccons ec k c) v => 
+      | c_apply (@ccons _ ec k c) v => 
             match dec_context ec k v with
             | in_red r     => option_map (fun t' => c_eval t' c) (contract r)
             | in_val v     => Some (c_apply c v)
             | in_term t ec => Some (c_eval t (ec=:c))
             | in_dead      => None
             end
-      | c_apply _ [.] _ => 
+      | c_apply [.] _ => 
             None
       end.
   Definition next_conf (_ : entropy) := next_conf0.
@@ -595,8 +595,8 @@ Module RefEvalApplyMachine (R : PRECISE_RED_REF_SEM) <: REF_EVAL_APPLY_MACHINE R
   {
       satisfyingness_comp := fun st => 
           match st with 
-          | c_eval _ k _  => is_satisfied (fun k => ~dead_ckind k) k 
-          | c_apply k _ _ => is_satisfied (fun k => ~dead_ckind k) k 
+          | @c_eval _ k _  => is_satisfied (fun k => ~dead_ckind k) k 
+          | @c_apply k _ _ => is_satisfied (fun k => ~dead_ckind k) k 
           end
   }.
 

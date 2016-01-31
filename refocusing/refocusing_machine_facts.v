@@ -67,7 +67,7 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
 
     - right.
       simpl; unfold reduce, dec.
-      exists k c r t0.
+      exists k, c, r, t0.
       intuition.
       + eapply proper_death_trans...
       + simpl.
@@ -75,7 +75,7 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
 
     - right.
       simpl; unfold reduce, dec.
-      exists k c r t.
+      exists k, c, r, t.
       intuition.
       + eapply proper_death_trans...
       + simpl.
@@ -94,7 +94,7 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
           (**)match d with 
               | d_val v      => last (c_eval t (c ~+ c0) :: sts) = c_apply c0 v 
 
-              | d_red k r c' => last (c_eval t (c ~+ c0) :: sts) = c_eval r (c'~+c0) /\
+              | @d_red _ k r c' => last (c_eval t (c ~+ c0) :: sts) = c_eval r (c'~+c0) /\
                                 dec_term r k = in_red r  \/
 
                                 exists ec v, dec_context ec k v = in_red r /\
@@ -115,7 +115,7 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
         (**)match d with 
             | d_val v      => last (c_apply (c ~+ c0) v' :: sts) = c_apply c0 v 
 
-            | d_red k r c' => last (c_apply (c ~+ c0) v' :: sts) = c_eval r (c'~+c0) /\
+            | @d_red _ k r c' => last (c_apply (c ~+ c0) v' :: sts) = c_eval r (c'~+c0) /\
                               dec_term r k = in_red r  \/
 
                               exists ec v, dec_context ec k v = in_red r /\
@@ -137,13 +137,13 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
         end;
         subst;
 
-    [ exists    0  [](configuration)
-    | exists (S n) (c_apply (c~+c0) v :: sts)
-    | exists (S n) (c_eval t0 (ec =: c~+c0) :: sts) 
-    | exists    0  [](configuration)
-    | exists    0  [](configuration)
-    | exists (S n) (c_apply (c ~+ c0) v0 :: sts)
-    | exists (S n) (c_eval t (ec0 =: c ~+ c0) :: sts) ];
+    [ exists    0,  [](configuration)
+    | exists (S n), (c_apply (c~+c0) v :: sts)
+    | exists (S n), (c_eval t0 (ec =: c~+c0) :: sts) 
+    | exists    0,  [](configuration)
+    | exists    0,  [](configuration)
+    | exists (S n), (c_apply (c ~+ c0) v0 :: sts)
+    | exists (S n), (c_eval t (ec0 =: c ~+ c0) :: sts) ];
 
     solve 
     [ split; [ | split ];
@@ -175,7 +175,7 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
           (**)match d with 
               | d_val v      => last (c_apply (c ~+ c0) v' :: sts) = c_apply c0 v 
 
-              | d_red k r c' => last (c_apply (c ~+ c0) v' :: sts) = c_eval r (c'~+c0) /\
+              | @d_red _ k r c' => last (c_apply (c ~+ c0) v' :: sts) = c_eval r (c'~+c0) /\
                                 dec_term r k = in_red r \/
 
                                 exists ec v, dec_context ec k v = in_red r /\
@@ -197,7 +197,7 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
         (**)match d with 
             | d_val v      => last (c_eval t (c ~+ c0) :: sts) = c_apply c0 v 
 
-            | d_red k r c' => last (c_eval t (c ~+ c0) :: sts) = c_eval r (c'~+c0) /\
+            | @d_red _ k r c' => last (c_eval t (c ~+ c0) :: sts) = c_eval r (c'~+c0) /\
                               dec_term r k = in_red r \/
 
                               exists ec v, dec_context ec k v = in_red r           /\
@@ -219,13 +219,13 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
          end;
          subst;
 
-    [ exists    0  [](configuration)
-    | exists (S n) (c_apply (c~+c0) v :: sts)
-    | exists (S n) (c_eval t0 (ec =: c~+c0) :: sts) 
-    | exists    0  [](configuration)
-    | exists    0  [](configuration)
-    | exists (S n) (c_apply (c ~+ c0) v0 :: sts)
-    | exists (S n) (c_eval t (ec0 =: c ~+ c0) :: sts) ];
+    [ exists    0,  [](configuration)
+    | exists (S n), (c_apply (c~+c0) v :: sts)
+    | exists (S n), (c_eval t0 (ec =: c~+c0) :: sts) 
+    | exists    0,  [](configuration)
+    | exists    0,  [](configuration)
+    | exists (S n), (c_apply (c ~+ c0) v0 :: sts)
+    | exists (S n), (c_eval t (ec0 =: c ~+ c0) :: sts) ];
 
     solve [ split; [ | split ];
     [ constructor; simpl; 
@@ -268,7 +268,7 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
     destruct                          G1 as [[G0 G1] | [ec [v [G1 G0]]]];
         rewrite <- (compose_empty c) in *;
         rewrite <- (compose_empty (c2)) in *;
-        exists n sts (c_eval t' c2);
+        exists n, sts, (c_eval t' c2);
     (
         split; [ | split];
         [ rewrite H1; auto
@@ -305,7 +305,7 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
     destruct                             G1 as[[G0 G1] | [ec [v' [G1 G0]]]];
         rewrite <- (compose_empty c) in *;
         rewrite <- (compose_empty (c2)) in *;
-        exists n sts (c_eval t' c2);
+        exists n, sts, (c_eval t' c2);
     (
         split; [ | split];
         [ rewrite H1; auto
@@ -392,12 +392,12 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
           replace r0 with r in * by congruence;
           apply H9.
       + rewrite G; compute; rewrite <- x.
-        exists k' c0 r t1.
+        exists k', c0, r, t1.
         intuition unfold dec... 
       + rewrite G; compute; rewrite <- x.
         assert (H10 := dec_context_correct ec k' v); rewrite H4 in H10.
         rewrite H10.
-        exists k' c0 r t0.
+        exists k', c0, r, t0.
         intuition unfold dec...
     - assert (H7 : n < S n) by eauto with arith;
       rewrite vec_last_by_index with _ H7 in H4.
@@ -470,12 +470,12 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
           replace r0 with r in * by congruence;
           apply H9.
       + rewrite G; compute; rewrite <- x.
-        exists k' c0 r t0.
+        exists k', c0, r, t0.
         intuition unfold dec... 
       + rewrite G; compute; rewrite <- x.
         assert (H10 := dec_context_correct ec k' v0); rewrite H4 in H10.
         rewrite H10.
-        exists k' c0 r t.
+        exists k', c0, r, t.
         intuition unfold dec...
     - assert (H7 : n < S n) by eauto with arith;
       rewrite vec_last_by_index with _ H7 in H4.
@@ -599,7 +599,7 @@ Module RefEvalApplyMachine_Facts                                (R : PRECISE_RED
     destruct (RAWF.am_complete t1 t2 st1 H) as [n [sts [st2 [H2 [[H3 H4] H5]]]]]...
     set (sts' := map2forall _ (fun st H => submember_by _ st (proj2 H)) sts H2).
 
-    exists n sts' (submember_by _ st2 H4).
+    exists n, sts', (submember_by _ st2 H4).
     split; [| split].
     - clear st2 H3 H4 H5.
       induction sts as [ | st1' ? sts].

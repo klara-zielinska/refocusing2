@@ -376,7 +376,7 @@ Module Lam_SES_NO_PreRefSem <: PRE_PRECISE_REF_SEM.
   Definition decomp_to_term {k} (d : decomp k) :=
       match d with
       | d_val v     => value_to_term v
-      | d_red _ r c => c[r]
+      | d_red r c => c[r]
       end.
   Coercion decomp_to_term : decomp >-> term.
   Notation decomp'   := (@decomp ()).

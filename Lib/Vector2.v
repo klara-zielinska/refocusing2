@@ -33,8 +33,8 @@ Definition Forall_split {A n} {v : Vector.t A n} {P} (H : Forall P v) :
                                                          | x :: v' => P x /\ Forall P v' 
                                                          end : Prop
     with 
-    | Forall_nil              => I
-    | Forall_cons n x v H0 H1 => conj H0 H1
+    | Forall_nil _            => I
+    | Forall_cons _ x v H0 H1 => conj H0 H1
     end.
 
 

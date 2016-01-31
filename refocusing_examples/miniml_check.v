@@ -213,10 +213,10 @@ Module MiniML_HandMachine <: ABSTRACT_MACHINE.
 
   Notation "[$ t $]"         := (load t)                                 (t at level 99).
   Notation "[: v :]"         := (value_to_conf v)                        (v at level 99).
-  Notation "[$ t , c , H $]" := (exist _ (RAW.c_eval t c) H)       (t, k, c at level 99).
+  Notation "[$ t , c , H $]" := (exist _ (RAW.c_eval t c) H)          (t, c at level 99).
   Notation "[: c , v , H :]" := (exist _ (RAW.c_apply c v) H)         (c, v at level 99).
   Notation "[$ t , c $]"     := (submember_by _ (RAW.c_eval t c) init_ckind_alive)
-                                                                   (t, k, c at level 99).
+                                                                      (t, c at level 99).
   Notation "[: c , v :]"     := (submember_by _ (RAW.c_apply c v) init_ckind_alive)
                                                                       (c, v at level 99).
 

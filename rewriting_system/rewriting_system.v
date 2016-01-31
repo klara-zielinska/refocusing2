@@ -72,7 +72,7 @@ Section RWS.
 
       match cs with
       | []          => False
-      | cons c n cs => forall m : Fin.t n, (c::cs)[@m] → cs[@m]
+      | @cons _ c n cs => forall m : Fin.t n, (c::cs)[@m] → cs[@m]
       end.
 
 
@@ -108,7 +108,7 @@ Section LRWS.
 
       match cs in Vector.t _ n return Vector.t label (pred n) -> Prop with
       | []          => fun _  => False
-      | cons c n cs => fun ls => forall m : Fin.t n, ls[@m] |~ (c::cs)[@m] → cs[@m]
+      | @cons _ c n cs => fun ls => forall m : Fin.t n, ls[@m] |~ (c::cs)[@m] → cs[@m]
       end ls.
 
 

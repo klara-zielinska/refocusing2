@@ -385,7 +385,7 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
     induction t using (well_founded_ind wf_subterm_order); intros; subst.
 
     dependent destruction H0;
-        assert (hh := dec_term_correct (v:term) k2); rewrite H0 in hh.
+        assert (hh := dec_term_correct (v:term) k2); rewrite H in hh.
 
     - contradiction (value_redex _ _ hh).
 
@@ -396,11 +396,11 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
           subst t0;
           capture_all value @value_to_term.
 
-      clear H0; revert x H1 hh.
+      clear H; revert x H0 hh.
       induction ec using (well_founded_ind (wf_search k2 (v:term))); intros.
 
       assert (decctx_proc x (ec=:c) d).
-      { apply (H x)... do 2 econstructor... }
+      { apply (H1 x)... do 2 econstructor... }
 
       dependent destruction H2;
           assert (G1 := ccons_inj _ _ _ _ x1 x);
@@ -423,7 +423,7 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
         destruct (value_trivial v (ec1=:[.]) t); auto;
             try solve [ simpl; congruence ];
             subst t.
-        eapply (H0 ec1); eauto.
+        eapply (H ec1); eauto.
         * rewrite hh; eapply dec_context_term_next; eauto.
         * congruence. 
   Qed.
@@ -563,13 +563,13 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
       (P  := fun k2' t c0 d (_ : dec_proc t c0 d) => 
                  match d with
                  | d_val v      => True
-                 | d_red k' r' c1 => forall (c : context k1 k2), 
+                 | d_red r' c1 => forall (c : context k1 k2), 
                                          dec_proc t (c0~+c) (d_red r' (c1~+c))
                  end)
       (P0 := fun k2' v c0 d (_ : decctx_proc v c0 d) => 
                  match d with
                  | d_val v      => True
-                 | d_red k' r' c1 => forall (c : context k1 k2), 
+                 | d_red r' c1 => forall (c : context k1 k2), 
                                          decctx_proc v (c0~+c) (d_red r' (c1~+c))
                  end)
       (d0 := H);

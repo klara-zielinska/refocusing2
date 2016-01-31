@@ -1,11 +1,10 @@
-Require Import Util.
-Require Import Program.
-Require Import refocusing_lang.
-Require Import reduction_semantics_facts.
+Require Import Util
+               Program
+               refocusing_semantics.
 
 
 
-Module MiniML_RefLang <: REF_LANG.
+Module MiniML_PreRefSem <: PRE_REF_SEM.
 
   Parameter var : Set.
 
@@ -40,6 +39,8 @@ Module MiniML_RefLang <: REF_LANG.
   Hint Unfold value.
   Notation value' := (value ()).
 
+  Coercion val_value := id : val -> value'.
+
 
   Inductive red :=
   | rApp : value' -> value' -> red
@@ -51,6 +52,8 @@ Module MiniML_RefLang <: REF_LANG.
   Definition redex (_ : ckind) := red.
   Hint Unfold redex.
   Notation redex' := (redex ()).
+
+  Coercion red_redex := id : red -> redex'.
 
 
   Inductive ec :=
@@ -74,6 +77,7 @@ Module MiniML_RefLang <: REF_LANG.
   Definition init_ckind : ckind     := ().
   Definition dead_ckind (_ : ckind) := False.
   Hint Unfold init_ckind dead_ckind.
+
 
   Inductive context (k1 : ckind) : ckind -> Set :=
   | empty : context k1 k1
@@ -107,6 +111,16 @@ Module MiniML_RefLang <: REF_LANG.
       | rCase v t1 x t2 => Case (v : term) t1 x t2
       end.
   Coercion redex_to_term : redex >-> term.
+
+
+  Instance dead_is_comp : CompPred ckind dead_ckind.
+      split. auto. 
+  Defined.
+
+
+  Lemma init_ckind_alive :
+      ~dead_ckind init_ckind.
+  Proof. auto. Qed.
 
 
   Lemma value_to_term_injective : 
@@ -184,7 +198,7 @@ Module MiniML_RefLang <: REF_LANG.
 
 
   Lemma death_propagation : 
-      forall k, dead_ckind k -> forall ec, dead_ckind (k+>ec).
+      forall k ec, dead_ckind k -> dead_ckind (k+>ec).
 
   Proof. auto. Qed.
 
@@ -209,12 +223,12 @@ Module MiniML_RefLang <: REF_LANG.
   Notation contract' := (@contract ()).
 
 
-  Lemma value_trivial1 : forall {k} (v : value k) ec t, 
-                             ~dead_ckind (k+>ec) -> ec:[t] = v ->
-                                 exists (v' : value (k+>ec)), t = v'.
+  Lemma value_trivial1 : forall {k} ec t, 
+      forall (v : value k), ~dead_ckind (k+>ec) -> ec:[t] = v ->
+          exists (v' : value (k+>ec)), t = v'.
 
   Proof.
-    intros k v ec t H H0.
+    intros k ec t v H H0.
     destruct ec, v; inversion H0; subst; 
     eauto.
   Qed.
@@ -259,19 +273,43 @@ Module MiniML_RefLang <: REF_LANG.
   Definition decomp_to_term {k} (d : decomp k) :=
       match d with
       | d_val v     => value_to_term v
-      | d_red _ r c => c[r]
+      | d_red r c => c[r]
       end.
   Coercion decomp_to_term : decomp >-> term.
   Notation decomp'   := (@decomp ()).
 
-End MiniML_RefLang.
+
+  Definition dec (t : term) k (d : decomp k) : Prop := 
+      ~dead_ckind k /\ t = d.
+
+
+  Definition reduce k t1 t2 := 
+      exists {k'} (c : context k k') (r : redex k') t,  dec t1 k (d_red r c) /\
+          contract r = Some t /\ t2 = c[t].
+
+
+  Instance lrws : LABELED_REWRITING_SYSTEM ckind term :=
+  { ltransition := reduce }. 
+  Instance rws : REWRITING_SYSTEM term := 
+  { transition := reduce init_ckind }.
+
+
+  Class SafeKRegion (k : ckind) (P : term -> Prop) :=
+  { 
+      preservation :                                                        forall t1 t2,
+          P t1  ->  k |~ t1 → t2  ->  P t2;
+      progress :                                                               forall t1,
+          P t1  ->  (exists (v : value k), t1 = v) \/ (exists t2, k |~ t1 → t2)
+  }.
+
+End MiniML_PreRefSem.
 
 
 
 
-Module MiniML_Strategy <: REF_STRATEGY MiniML_RefLang.
+Module MiniML_Strategy <: REF_STRATEGY MiniML_PreRefSem.
 
-  Import MiniML_RefLang.
+  Import MiniML_PreRefSem.
 
 
   Inductive interm_dec k : Set :=
@@ -377,7 +415,7 @@ Module MiniML_Strategy <: REF_STRATEGY MiniML_RefLang.
       | _, _               => False
       end.
   Notation "k , t |~  ec1 << ec2 " := (search_order k t ec1 ec2) 
-               (at level 70, no associativity).
+               (at level 70, t, ec1, ec2 at level 50, no associativity).
 
 
   Lemma wf_search : forall k t, well_founded (search_order k t).
@@ -413,13 +451,13 @@ Module MiniML_Strategy <: REF_STRATEGY MiniML_RefLang.
 
 
 
-  Lemma search_order_comp_if : forall t ec0 ec1, 
+  Lemma search_order_comp_if : forall t ec0 ec1 k, 
       immediate_ec ec0 t -> immediate_ec ec1 t -> 
-      forall k, ~ dead_ckind (k+>ec0) -> ~ dead_ckind (k+>ec1) ->
+      ~ dead_ckind (k+>ec0) -> ~ dead_ckind (k+>ec1) ->
           k,t |~ ec0 << ec1 \/ k,t |~ ec1 << ec0 \/ ec0 = ec1.
 
   Proof.
-    intros t ec0 ec1 H H0 k _ _.
+    intros t ec0 ec1 k H H0 _ _.
 
     assert (G := H); assert (G0 := H0).
     destruct H as (t0, H), H0 as (t1, H0).
@@ -525,29 +563,11 @@ End MiniML_Strategy.
 
 
 
-Module MiniML_Cal.
-  Module RefLang := MiniML_RefLang.
-  Module RefStrategy := MiniML_Strategy.
-  Module RedLang := RedRefLang RefLang RefStrategy.
-
-  (*Module Extras.
-
-    Import MiniML_RefLang.
-
-    Notation context'  := (@context () ()).
-    Notation value'    := (@value ()).
-    Notation redex'    := (@redex ()).
-    Notation contract' := (@contract ()).
-    Notation decomp'   := (@decomp ()).
-
-  End Extras.*)
-
-End MiniML_Cal.
+Module MiniML_RefSem := PreciseRedRefSem MiniML_PreRefSem MiniML_Strategy.
 
 
 
-Require Import refocusing_semantics_derivation.
+
 Require Import refocusing_machine.
 
-Module MiniML_RefSem := RedRefSem MiniML_Cal.
-Module MiniML_EAM    := RefEvalApplyMachine MiniML_Cal.RedLang MiniML_RefSem.
+Module MiniML_EAM := RefEvalApplyMachine MiniML_RefSem.

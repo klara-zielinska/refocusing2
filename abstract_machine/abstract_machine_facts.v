@@ -1,6 +1,37 @@
 Require Import abstract_machine.
 
 
+
+Module ABSTRACT_MACHINE_Facts (AM : ABSTRACT_MACHINE).
+
+  Import AM.
+
+
+  Lemma preservation_refl_trans {P} `{SafeRegion P} : forall c1 c2, 
+      P c1 -> c1 →* c2 -> P c2.
+
+  Proof with auto.
+    intros c1 c2 H1 H2.
+    induction H2.
+    - auto.
+    - apply preservation in H0;
+      auto.
+  Qed.
+
+
+  Lemma progress_refl_trans {P} `{SafeRegion P} : forall c1 c2, 
+      P c1 -> c1 →* c2 -> (exists (v : value), c2 = v) \/ (exists c3, c2 → c3).
+
+  Proof with auto.
+    intros c1 c2 H1 H2.
+    apply preservation_refl_trans in H2...
+    apply progress...
+  Qed.
+
+End ABSTRACT_MACHINE_Facts.
+
+
+(*
 Module DetAbstractMachine_Sim (AM : DET_ABSTRACT_MACHINE).
 
   Import AM.
@@ -114,21 +145,6 @@ End DetAbstractMachine_Sim.
 
 
 
-Module AM_SafeRegion_Facts (AM : ABSTRACT_MACHINE) (S : AM_SAFE_REGION AM).
-
-  Import AM S.
-
-  Lemma preservation_trans : forall c1 c2, safe c1 -> c1 →+ c2 -> safe c2.
-  Proof.
-    induction 2;
-    eauto using preservation.
-  Qed.
-
-End AM_SafeRegion_Facts.
-
-
-
-
 Module Type AM_INIT_SAFE (AM : ABSTRACT_MACHINE) (S : AM_SAFE_REGION AM).
 
   Import AM S.
@@ -160,5 +176,5 @@ Module AM_ProgressFromSafety (AM : ABSTRACT_MACHINE) (S : AM_SAFE_REGION AM)
       eauto using IS.init_safe.
   Qed.
 
-End AM_ProgressFromSafety.
+End AM_ProgressFromSafety.*)
 

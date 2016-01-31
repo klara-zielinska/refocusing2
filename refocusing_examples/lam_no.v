@@ -1,12 +1,10 @@
-Require Import Util.
-Require Import Program.
-Require Import refocusing_lang.
-Require Import reduction_semantics_facts.
+Require Import Program
+               Util
+               refocusing_semantics.
 
 
 
-
-Module Lam_NO_RefLang <: REF_LANG.
+Module Lam_NO_PreRefSem <: PRE_REF_SEM.
 
   Parameter var : Set.
 
@@ -79,10 +77,10 @@ Module Lam_NO_RefLang <: REF_LANG.
 
 
   Lemma death_propagation : 
-      forall k, dead_ckind k -> forall ec, dead_ckind (k+>ec).
+      forall k ec, dead_ckind k -> dead_ckind (k+>ec).
 
   Proof.
-    intros k H.
+    intros k ec H.
     destruct k;
     inversion H;
     reflexivity.
@@ -126,6 +124,10 @@ Module Lam_NO_RefLang <: REF_LANG.
       | rECaApp x t1 t2 => App (Lam x t1) t2
       end.
   Coercion redex_to_term : redex >-> term.
+
+
+  Lemma init_ckind_alive : ~dead_ckind init_ckind.
+  Proof. auto. Qed.
 
 
   Lemma value_to_term_injective : 
@@ -206,13 +208,17 @@ Module Lam_NO_RefLang <: REF_LANG.
   Parameter subst : var -> term -> term -> term.
 
 
-  Definition contract {k} (r : redex k) : option term :=
+  Definition contract0 {k} (r : redex k) : term :=
       match r with
-      | rCApp   x t0 t1 => Some (subst x t1 t0)
-      | rECaApp x t0 t1 => Some (subst x t1 t0)
+      | rCApp   x t0 t1 => subst x t1 t0
+      | rECaApp x t0 t1 => subst x t1 t0
       end.
+  Definition contract {k} (r : redex k) := Some (contract0 r).
 
 
+  Instance dead_is_comp : CompPred ckind dead_ckind.
+      split. destruct x; auto.
+  Defined.
 
 
   Lemma valCa_is_valECa : 
@@ -225,11 +231,11 @@ Module Lam_NO_RefLang <: REF_LANG.
   Qed.
 
 
-  Lemma value_trivial1 : forall {k} (v : value k) ec t, 
-                             ~dead_ckind (k+>ec) -> ec:[t] = v ->
-                                 exists (v' : value (k+>ec)), t = v'.
+  Lemma value_trivial1 : forall {k} ec t, 
+      forall (v : value k), ~dead_ckind (k+>ec) -> ec:[t] = v ->
+          exists (v' : value (k+>ec)), t = v'.
   Proof.
-    intros k v ec t H H0.
+    intros k ec t v H H0.
     destruct ec, v; inversion H0; subst; 
     solve 
     [ eautof
@@ -281,10 +287,13 @@ Module Lam_NO_RefLang <: REF_LANG.
   Definition decomp_to_term {k} (d : decomp k) :=
       match d with
       | d_val v     => value_to_term v
-      | d_red _ r c => c[r]
+      | d_red r c => c[r]
       end.
   Coercion decomp_to_term : decomp >-> term.
 
+
+  Definition dec (t : term) k (d : decomp k) : Prop := 
+      ~dead_ckind k /\ t = d.
 
 
   Definition immediate_subterm t0 t := exists ec, t = ec:[t0].
@@ -299,14 +308,33 @@ Module Lam_NO_RefLang <: REF_LANG.
       := wf_clos_trans_l _ _ wf_immediate_subterm.
 
 
-End Lam_NO_RefLang.
+  Definition reduce k t1 t2 := 
+      exists {k'} (c : context k k') (r : redex k') t,  dec t1 k (d_red r c) /\
+          contract r = Some t /\ t2 = c[t].
+
+
+  Instance lrws : LABELED_REWRITING_SYSTEM ckind term :=
+  { ltransition := reduce }. 
+  Instance rws : REWRITING_SYSTEM term := 
+  { transition := reduce init_ckind }.
+
+
+  Class SafeKRegion (k : ckind) (P : term -> Prop) :=
+  { 
+      preservation :                                                        forall t1 t2,
+          P t1  ->  k |~ t1 → t2  ->  P t2;
+      progress :                                                               forall t1,
+          P t1  ->  (exists (v : value k), t1 = v) \/ (exists t2, k |~ t1 → t2)
+  }.
+
+End Lam_NO_PreRefSem.
 
 
 
 
-Module Lam_NO_Strategy <: REF_STRATEGY Lam_NO_RefLang.
+Module Lam_NO_Strategy <: REF_STRATEGY Lam_NO_PreRefSem.
 
-  Import Lam_NO_RefLang.
+  Import Lam_NO_PreRefSem.
 
 
   Inductive interm_dec k : Set :=
@@ -449,7 +477,7 @@ Module Lam_NO_Strategy <: REF_STRATEGY Lam_NO_RefLang.
                   end
       end.
   Notation "k , t |~  ec1 << ec2 " := (search_order k t ec1 ec2) 
-               (at level 70, no associativity).
+                                     (no associativity, at level 70, ec1, t at level 69).
 
 
   Lemma wf_search : forall k t, well_founded (search_order k t).
@@ -477,13 +505,13 @@ Module Lam_NO_Strategy <: REF_STRATEGY Lam_NO_RefLang.
   Qed.
 
 
-  Lemma search_order_comp_if : forall t ec0 ec1, 
+  Lemma search_order_comp_if :                                        forall t ec0 ec1 k,
       immediate_ec ec0 t -> immediate_ec ec1 t -> 
-      forall k, ~ dead_ckind (k+>ec0) -> ~ dead_ckind (k+>ec1) ->
-          k,t |~ ec0 << ec1 \/ k,t |~ ec1 << ec0 \/ ec0 = ec1.
+      ~dead_ckind (k+>ec0) -> ~dead_ckind (k+>ec1) ->
+          k, t |~ ec0 << ec1 \/ k,t |~ ec1 << ec0 \/ ec0 = ec1.
 
   Proof.
-    intros t ec0 ec1 H0 H1 k H2 H3.
+    intros t k ec0 ec1 H0 H1 H2 H3.
 
     destruct H0 as (t0, H4); destruct H1 as (t1, H5).
     subst t.
@@ -594,15 +622,10 @@ End Lam_NO_Strategy.
 
 
 
-Module Lam_NO_Cal.
-  Module RefLang := Lam_NO_RefLang. 
-  Module RefStrategy := Lam_NO_Strategy. 
-  Module RedLang := RedRefLang Lam_NO_RefLang Lam_NO_Strategy.
-End Lam_NO_Cal.
+Module Lam_NO_RefSem := PreciseRedRefSem Lam_NO_PreRefSem Lam_NO_Strategy.
 
 
-Require Import refocusing_semantics_derivation.
+
 Require Import refocusing_machine.
 
-Module Lam_NO_RefSem := RedRefSem Lam_NO_Cal.
-Module Lam_NO_EAM    := RefEvalApplyMachine Lam_NO_Cal.RedLang Lam_NO_RefSem.
+Module Lam_NO_EAM := RefEvalApplyMachine Lam_NO_RefSem.

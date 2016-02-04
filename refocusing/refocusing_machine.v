@@ -28,7 +28,7 @@ Module Type SLOPPY_REF_EVAL_APPLY_MACHINE (R : RED_REF_SEM) <: ABSTRACT_MACHINE.
 
   Definition configuration := conf.
   Definition load t                    : configuration := c_eval t [.].
-  Coercion   value_to_conf (v : value)   : configuration := c_apply [.] v.
+  (*Coercion   value_to_conf (v : value)   : configuration := c_apply [.] v.*)
   Definition final (c : configuration) : option value := 
       match c with
       | c_apply [.] v => Some v 
@@ -44,6 +44,7 @@ Module Type SLOPPY_REF_EVAL_APPLY_MACHINE (R : RED_REF_SEM) <: ABSTRACT_MACHINE.
       | @c_eval _ k _  => ~dead_ckind k 
       | @c_apply k _ _ => ~dead_ckind k
       end.
+  Definition is_final c := exists v, final c = Some v.
 
 
   Section S1.
@@ -115,8 +116,8 @@ Module Type SLOPPY_REF_EVAL_APPLY_MACHINE (R : RED_REF_SEM) <: ABSTRACT_MACHINE.
        final st <> None -> ~exists st', st → st')
   (trans_computable :                                                     forall st1 st2,
        st1 → st2 <-> exists e, next_conf e st1 = Some st2)
-  (finals_are_vals :                                                         forall st v,
-       final st = Some v <-> st = v)
+  (*finals_are_vals :                                                         forall st v,
+       final st = Some v <-> st = v*)
 
   (next_conf0_alive :                                                     forall st1 st2,
       next_conf0 st1 = Some st2 -> alive_state st2)
@@ -125,11 +126,11 @@ Module Type SLOPPY_REF_EVAL_APPLY_MACHINE (R : RED_REF_SEM) <: ABSTRACT_MACHINE.
 
 
   Class SafeRegion (P : configuration -> Prop) :=
-  { 
-      preservation :                                                        forall t1 t2,
-          P t1  ->  t1 → t2  ->  P t2;
-      progress :                                                               forall t1,
-          P t1  ->  (exists (v : value), t1 = v) \/ (exists t2, t1 → t2)
+  {
+      preservation :                                                      forall st1 st2,
+          P st1  ->  st1 → st2  ->  P st2;
+      progress :                                                              forall st1,
+          P st1  ->  is_final st1 \/ exists st2, st1 → st2
   }.
 
 End SLOPPY_REF_EVAL_APPLY_MACHINE.
@@ -170,13 +171,14 @@ Module Type REF_EVAL_APPLY_MACHINE (R : PRECISE_RED_REF_SEM) <: ABSTRACT_MACHINE
   Definition load t : configuration := 
       submember_by alive_state (RAW.c_eval t [.]) init_ckind_alive.
 
-  Definition value_to_conf (v : value) : configuration := 
+  (*Definition value_to_conf (v : value) : configuration := 
      submember_by alive_state (RAW.c_apply [.] v) init_ckind_alive.
-  Coercion value_to_conf : value >-> configuration.
+  Coercion value_to_conf : value >-> configuration.*)
 
   Definition final (c : configuration)     : option value := RAW.final c. 
   Definition decompile (c : configuration) : term         := RAW.decompile c.
   Definition transition (st1 st2 : configuration)         := RAW.transition st1 st2.
+  Definition is_final c                                   := exists v, final c = Some v.
 
   Instance rws : REWRITING_SYSTEM configuration :=
   { transition := transition }.
@@ -199,16 +201,16 @@ Module Type REF_EVAL_APPLY_MACHINE (R : PRECISE_RED_REF_SEM) <: ABSTRACT_MACHINE
        final st <> None -> ~exists st', st → st')
   (trans_computable :                                                     forall st1 st2,
        st1 → st2 <-> exists e, next_conf e st1 = Some st2)
-  (finals_are_vals :                                                         forall st v,
-       final st = Some v <-> st = v).
+  (*finals_are_vals :                                                         forall st v,
+       final st = Some v <-> st = v*).
 
 
   Class SafeRegion (P : configuration -> Prop) :=
   { 
-      preservation :                                                        forall t1 t2,
-          P t1  ->  t1 → t2  ->  P t2;
-      progress :                                                               forall t1,
-          P t1  ->  (exists (v : value), t1 = v) \/ (exists t2, t1 → t2)
+      preservation :                                                      forall st1 st2,
+          P st1  ->  st1 → st2  ->  P st2;
+      progress :                                                              forall st1,
+          P st1  ->  is_final st1 \/ exists st2, st1 → st2
   }.
 
 End REF_EVAL_APPLY_MACHINE.
@@ -354,7 +356,7 @@ Module SloppyRefEvalApplyMachine (R : RED_REF_SEM) <: SLOPPY_REF_EVAL_APPLY_MACH
 
 
   Definition load t                    : configuration := c_eval t [.].
-  Coercion   value_to_conf (v : value) : configuration := c_apply [.] v.
+  (*Coercion   value_to_conf (v : value) : configuration := c_apply [.] v.*)
   Definition final (c : configuration) : option value := 
       match c with
       | c_apply [.] v => Some v 
@@ -370,6 +372,7 @@ Module SloppyRefEvalApplyMachine (R : RED_REF_SEM) <: SLOPPY_REF_EVAL_APPLY_MACH
       | @c_eval _ k _  => ~dead_ckind k 
       | @c_apply k _ _ => ~dead_ckind k
       end.
+  Definition is_final c := exists v, final c = Some v.
 
 
   Section S1.
@@ -506,7 +509,7 @@ Module SloppyRefEvalApplyMachine (R : RED_REF_SEM) <: SLOPPY_REF_EVAL_APPLY_MACH
   Qed.
 
 
-  Lemma finals_are_vals :                                                     forall c v,
+  (*Lemma finals_are_vals :                                                     forall c v,
        final c = Some v <-> c = v.
 
   Proof.
@@ -518,7 +521,7 @@ Module SloppyRefEvalApplyMachine (R : RED_REF_SEM) <: SLOPPY_REF_EVAL_APPLY_MACH
             inversion H; dep_subst;
         solve [auto].
       + intuition.
-  Qed.
+  Qed.*)
 
 
   Lemma next_conf0_alive :                                                forall st1 st2,
@@ -562,10 +565,10 @@ Module SloppyRefEvalApplyMachine (R : RED_REF_SEM) <: SLOPPY_REF_EVAL_APPLY_MACH
 
   Class SafeRegion (P : configuration -> Prop) :=
   { 
-      preservation :                                                        forall t1 t2,
-          P t1  ->  t1 → t2  ->  P t2;
-      progress :                                                               forall t1,
-          P t1  ->  (exists (v : value), t1 = v) \/ (exists t2, t1 → t2)
+      preservation :                                                      forall st1 st2,
+          P st1  ->  st1 → st2  ->  P st2;
+      progress :                                                              forall st1,
+          P st1  ->  is_final st1 \/ exists st2, st1 → st2
   }.
 
 End SloppyRefEvalApplyMachine.
@@ -615,6 +618,7 @@ Module RefEvalApplyMachine (R : PRECISE_RED_REF_SEM) <: REF_EVAL_APPLY_MACHINE R
   Definition final (c : configuration) : option value := RAW.final c. 
   Definition decompile (c : configuration) : term     := RAW.decompile c.
   Definition transition (st1 st2 : configuration)     := RAW.transition st1 st2.
+  Definition is_final c := exists v, final c = Some v.
 
   Instance rws : REWRITING_SYSTEM configuration :=
   { transition := transition }.
@@ -708,10 +712,10 @@ Module RefEvalApplyMachine (R : PRECISE_RED_REF_SEM) <: REF_EVAL_APPLY_MACHINE R
 
   Class SafeRegion (P : configuration -> Prop) :=
   { 
-      preservation :                                                        forall t1 t2,
-          P t1  ->  t1 → t2  ->  P t2;
-      progress :                                                               forall t1,
-          P t1  ->  (exists (v : value), t1 = v) \/ (exists t2, t1 → t2)
+      preservation :                                                      forall st1 st2,
+          P st1  ->  st1 → st2  ->  P st2;
+      progress :                                                              forall st1,
+          P st1  ->  is_final st1 \/ exists st2, st1 → st2
   }.
 
 End RefEvalApplyMachine.

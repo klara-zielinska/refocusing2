@@ -20,7 +20,7 @@ Module ABSTRACT_MACHINE_Facts (AM : ABSTRACT_MACHINE).
 
 
   Lemma progress_refl_trans {P} `{SafeRegion P} : forall c1 c2, 
-      P c1 -> c1 →* c2 -> (exists (v : value), c2 = v) \/ (exists c3, c2 → c3).
+      P c1 -> c1 →* c2 -> is_final c2 \/ exists c3, c2 → c3.
 
   Proof with auto.
     intros c1 c2 H1 H2.

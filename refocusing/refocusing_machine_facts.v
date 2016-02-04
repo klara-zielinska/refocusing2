@@ -663,9 +663,9 @@ Module RefEvalApplyMachine_Facts                                (R : PRECISE_RED
       assert (H3 := witness_elim _ _ H1).
       destruct (RAW.progress st1) as [[v H4] | [st2 H4]]; try solve [intuition];
           subst.
-      - left. exists v. 
-        apply (f_equal (@exist _ _ _)).
-        apply witness_unique.
+      - left. exists v. auto.
+        (*apply (f_equal (@exist _ _ _)).
+        apply witness_unique.*)
       - right. 
         assert (H5 : alive_state st2) by eauto using trans_alive.
         exists (submember_by _ st2 H5).

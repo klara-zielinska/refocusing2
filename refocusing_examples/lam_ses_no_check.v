@@ -209,9 +209,8 @@ Module Lam_SES_NO_HandMachine <: ABSTRACT_MACHINE.
   Definition value         := value init_ckind.
   Definition configuration := configuration.
   Definition load          := load.
-  Definition value_to_conf := value_to_conf : value -> configuration.
-  Coercion   value_to_conf : value >-> configuration.
   Definition final         := final.
+  Definition is_final c    := exists v, final c = Some v.
 
 
   Definition contextD := (context C C + context C ECa + context C D) %type.
@@ -371,18 +370,12 @@ Module Lam_SES_NO_HandMachine <: ABSTRACT_MACHINE.
   Qed.
 
 
-  Fact finals_are_vals :                                                     forall st v,
-       final st = Some v <-> st = v. 
-
-  Proof. exact Lam_SES_NO_EAM.finals_are_vals. Qed.
-
-
   Class SafeRegion (P : configuration -> Prop) :=
   { 
-      preservation :                                                        forall t1 t2,
-          P t1  ->  t1 → t2  ->  P t2;
-      progress :                                                               forall t1,
-          P t1  ->  (exists (v : value), t1 = v) \/ (exists t2, t1 → t2)
+      preservation :                                                      forall st1 st2,
+          P st1  ->  st1 → st2  ->  P st2;
+      progress :                                                              forall st1,
+          P st1  ->  is_final st1 \/ exists st2, st1 → st2
   }.
 
 End Lam_SES_NO_HandMachine.

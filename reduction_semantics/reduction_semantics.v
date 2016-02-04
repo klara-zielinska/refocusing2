@@ -218,7 +218,9 @@ End RED_SEM.
 
 
 
-Module Type RED_SEM_DET (R : RED_SEM).  Import R.
-  Axiom dec_is_det : forall {t k} {d d0 : decomp k}, 
-                         dec t k d -> dec t k d0 -> d = d0.
+Module Type RED_SEM_DET (R : RED_SEM). Import R.
+
+  Axiom dec_is_det :                                      forall {t k} {d d0 : decomp k},
+      dec t k d -> dec t k d0 -> d = d0.
+
 End RED_SEM_DET.

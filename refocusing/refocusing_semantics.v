@@ -79,9 +79,6 @@ Module Type REF_STRATEGY (PR : PRE_REF_SEM) <: RED_STRATEGY PR.
   (wf_search :                                                                forall k t,
        well_founded (search_order k t))
 
-  (search_order_antisym :                                              forall k t ec ec0,
-       k, t |~ ec << ec0 -> ~ k, t |~ ec0 << ec)
-
   (search_order_trans :                                           forall k t ec0 ec1 ec2,
        k, t |~ ec0 << ec1 -> k, t |~ ec1 << ec2 -> k,t |~ ec0 << ec2)
 

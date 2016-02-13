@@ -126,5 +126,31 @@ Proof.
 Qed.
 
 
-Hint Resolve witness_intro witness_unique.
+Lemma subset_elem_eq :                              forall {A : Set} {P} `{CompPred A P},
+    forall e1 e2 : subset P, ¹e1 = ¹e2 -> e1 = e2.
+
+Proof.
+  intros A P H e1 e2 H0.
+  destruct e1, e2.
+  simpl in H0.
+  subst.
+  f_equal.
+  apply witness_unique.
+Qed.
+
+
+Lemma subtype_elem_eq :                            forall {A : Type} {P} `{CompPred A P},
+    forall e1 e2 : subtype P, ¹e1 = ¹e2 -> e1 = e2.
+
+Proof.
+  intros A P H e1 e2 H0.
+  destruct e1, e2.
+  simpl in H0.
+  subst.
+  f_equal.
+  apply witness_unique.
+Qed.
+
+
+Hint Resolve witness_intro witness_unique subset_elem_eq subtype_elem_eq.
 

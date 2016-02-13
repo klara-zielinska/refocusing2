@@ -160,7 +160,7 @@ Module Lam_NO_PreRefSem <: PRE_REF_SEM.
     destruct k;
 
     solve
-    [ induction r; 
+    [ destruct r; 
       dependent destruction r'; 
       inversion H;
       f_equal; auto ].
@@ -266,7 +266,7 @@ Module Lam_NO_PreRefSem <: PRE_REF_SEM.
     try match goal with 
     | |- App (valCa_to_term ?v) _ <> _ => dependent_destruction2 v
     end;
-    
+
     solve [ discriminate ].
   Qed.
 
@@ -482,16 +482,6 @@ Module Lam_NO_Strategy <: REF_STRATEGY Lam_NO_PreRefSem.
 
   Lemma wf_search : forall k t, well_founded (search_order k t).
   Proof. REF_LANG_Help.prove_ec_wf. Qed.
-
-
-  Lemma search_order_antisym : forall k t ec ec0, 
-      k, t |~ ec << ec0 -> ~ k, t |~ ec0 << ec.
-
-  Proof.
-    intros k t ec ec0 H.
-    destruct k, ec, ec0;
-    solve [ autof ].
-  Qed.
 
 
   Lemma search_order_trans :  forall k t ec0 ec1 ec2, 

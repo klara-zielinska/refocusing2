@@ -25,10 +25,10 @@ Module Lam_NO_HandDecProc.
                  dec_proc (Var x) c d 
   | d_VarECa : forall x (c : context k1 ECa) d,
                  decctx_proc (vECaVar x) c d ->
-                 dec_proc (Var x) c d 
+                 dec_proc (Var x) c d
 
   | d_LamC   : forall x t (c : context k1 C) d,
-                 dec_proc t (lam_c x =: c) d -> (*!*)
+                 dec_proc t (lam_c x =: c) d ->   (*!*)
                  dec_proc (Lam x t) c d
   | d_LamECa : forall x t (c : context k1 ECa) d,
                  decctx_proc (vECaLam x t) c d -> (*!*)
@@ -156,65 +156,81 @@ End Lam_NO_HandDecProc.
 
 
 
-
 Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
 
-  Import Lam_NO_EAM Lam_NO_PreRefSem.
+  Module R  := Lam_NO_PreRefSem.
+  Module RF := RED_LANG_Facts R.
 
 
-  Definition term          := term.
-  Definition value         := value init_ckind.
-  Definition configuration := configuration.
-  Definition load          := load.
-  Definition final         := final.
-  Definition is_final c    := exists v, final c = Some v.
-
-  Notation "[$ t $]" := (submember_by _ (c_eval t [.]) init_ckind_alive
-                             : configuration)                            (t at level 99).
-  Notation "[: v :]" := (submember_by _ (c_apply [.] v) init_ckind_alive
-                             : configuration)                            (v at level 99).
-  Notation "[$ t , k , c , H $]" := (@c_eval t k c ?& H)           (t, k, c at level 99).
-  Notation "[: c , v , H :]"     := (c_apply c v ?& H)                (c, v at level 99).
-  Notation "[: ( ec , k ) =: c , v , H :]" := 
-      (c_apply (@ccons _ ec k c) v ?& H)                       (ec, k, c, v at level 99).
+  Definition term := R.term.
+  Inductive ckind := E | F | A.
 
 
-  Definition next_conf0 (st : configuration) : option configuration. refine (
+  Definition ckind_to_R k : R.ckind :=
+      match k with E => R.C | F => R.ECa | A => R.CBot end.
+
+  Definition ckind_from_R k : ckind :=
+      match k with R.C => E | R.ECa => F | R.CBot => A end.
+
+
+  Definition val k := R.value (ckind_to_R k).
+  Definition value := val E.
+
+
+  Inductive context : ckind -> Set :=
+  | ap_r  : R.term  -> forall k, context k -> context F
+  | ap_l  : R.valCa -> forall k, context k -> context E
+  | lam_c : R.var   ->           context E -> context E
+  | hole  : context E.
+
+
+  Inductive conf :=
+  | Ev : R.term -> forall k, context k   -> conf
+  | Ap : forall k (c : context k), val k -> conf.
+  Definition configuration := conf.
+
+
+  Definition load (t : term) : configuration := Ev t E hole.
+
+
+  Definition final (st : configuration) : option value :=
       match st with
-      | [$ Var x, C,   c, _ $]     => Some [: c, vCVar x, _ :]
-      | [$ Var x, ECa, c, _ $]     => Some [: c, vECaVar x, _ :]
+      | Ap E hole v => Some v
+      | _           => None
+      end.
 
-      | [$ Lam x t, C,   c, _ $]   => Some [$ t, C, lam_c x=:c, _ $] (*!*)
-      | [$ Lam x t, ECa, c, _ $]   => Some [: c, vECaLam x t, _ :]   (*!*)
 
-      | [$ App t1 t2, C,   c, _ $] => Some [$ t1, ECa, ap_r t2=:c, _ $]
-      | [$ App t1 t2, ECa, c, _ $] => Some [$ t1, ECa, ap_r t2=:c, _ $]
+  Definition is_final (st : configuration) := exists v, final st = Some v.
 
-      | [: (ap_r t2, C)=:c,   vECaLam x t1, _ :] => 
-                                   Some [$ contract0 (rCApp x t1 t2), C, c, _ $]
-      | [: (ap_r t2, ECa)=:c, vECaLam x t1, _ :] => 
-                                   Some [$ contract0 (rECaApp x t1 t2), ECa, c, _ $]
 
-      | [: (ap_r t,  C)=:c,   vECaVar x, _ :] => 
-                                   Some [$ t, C, ap_l (vCaVar x)=:c, _ $]
-      | [: (ap_r t,  ECa)=:c, vECaVar x, _ :] =>
-                                   Some [$ t, C, ap_l (vCaVar x)=:c, _ $]
+  Definition next_conf0 (st : configuration) : option configuration :=
+      match st with
+      | Ev (R.Var x) E c     => Some (Ap E c (R.vCVar x))
+      | Ev (R.Var x) F c     => Some (Ap F c (R.vECaVar x))
 
-      | [: (ap_r t,  C)=:c,   vECaApp v1 v2, _ :] =>
-                                   Some [$ t, C, ap_l (vCaApp v1 v2)=:c, _ $]
-      | [: (ap_r t,  ECa)=:c, vECaApp v1 v2, _ :] =>
-                                   Some [$ t, C, ap_l (vCaApp v1 v2)=:c, _ $]
+      | Ev (R.Lam x t) E c   => Some (Ev t _ (lam_c x c))     (*!*)
+      | Ev (R.Lam x t) F c   => Some (Ap _ c (R.vECaLam x t)) (*!*)
 
-      | [: (ap_l v1, C)=:c,   v2, _ :] => Some [: c, vCApp v1 v2, _ :]
-      | [: (ap_l v1, ECa)=:c, v2, _ :] => Some [: c, vECaApp v1 v2, _ :]
+      | Ev (R.App t1 t2) k c => Some (Ev t1 F (ap_r t2 k c))
 
-      | [: (lam_c x, C)=:c, v, _ :]    => Some [: c, vCLam x v, _ :]
+      | Ap F (ap_r t2 E c) (R.vECaLam x t1) =>
+                                Some (Ev (R.subst x t2 t1) E c)
+      | Ap F (ap_r t2 F c) (R.vECaLam x t1) =>
+                                Some (Ev (R.subst x t2 t1) F c)
+
+      | Ap F (ap_r t k c)  (R.vECaVar x)    =>
+                                Some (Ev t E (ap_l (R.vCaVar x) k c))
+
+      | Ap F (ap_r t k c)  (R.vECaApp a v)  =>
+                                Some (Ev t E (ap_l (R.vCaApp a v) k c))
+
+      | Ap E (ap_l a E c) v  => Some (Ap E c (R.vCApp   a v))
+      | Ap E (ap_l a F c) v  => Some (Ap F c (R.vECaApp a v))
+
+      | Ap E (lam_c x c) v   => Some (Ap E c (R.vCLam x v))
 
       | _ => None
-      end);
-
-      solve [apply Subset.witness_intro; compute; auto].
-  Defined.
+      end.
   Definition next_conf (_ : entropy) := next_conf0.
 
   Definition transition st1 st2 := next_conf0 st1 = Some st2.
@@ -223,7 +239,7 @@ Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
   { transition := transition }.
 
 
-  Fact trans_computable0 :                               forall (st1 st2 : configuration),
+  Fact trans_computable0 :                              forall (st1 st2 : configuration),
        `(rws) st1 → st2 <-> next_conf0 st1 = Some st2.
 
   Proof. intuition. Qed.
@@ -232,41 +248,10 @@ Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
   Fact trans_computable :                                                 forall st1 st2,
        `(rws) st1 → st2 <-> exists e, next_conf e st1 = Some st2.
 
-  Proof. 
-   intuition. 
-   - destruct (draw_fin_correct 1 Fin.F1) as [e _]; exists e; auto.
+  Proof.
+   intuition.
+   - destruct (entropy_exists) as [e _]; exists e; auto.
    - destruct H; eauto.
-  Qed.
-
-
-
-
-  Theorem next_conf0_eq_EAM :                                                  forall st,
-      next_conf0 st = Lam_NO_EAM.next_conf0 st.
-
-  Proof.
-    destruct st as [[t k ? | k c v] ?].
-    - destruct t, k; eauto.
-    - destruct c as [| ec k c]; eauto.
-      destruct ec, k; dependent destruction v; eauto.
-  Qed.
-
-
-  Corollary next_conf_eq_EAM :                                               forall e st,
-      next_conf e st = Lam_NO_EAM.next_conf e st.
-
-  Proof. eauto using next_conf0_eq_EAM. Qed.
-
-
-  Corollary transition_eqv_EAM :                                          forall st1 st2,
-      `(Lam_NO_EAM.rws) st1 → st2  <->  `(rws) st1 → st2.
-
-  Proof.
-    intros.
-    rewrite trans_computable, Lam_NO_EAM.trans_computable.
-    unfold Lam_NO_EAM.next_conf, next_conf.
-    rewrite next_conf0_eq_EAM.
-    intuition.
   Qed.
 
 
@@ -274,7 +259,7 @@ Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
        final st <> None -> ~exists st', `(rws) st → st'.
 
   Proof.
-    destruct st as [[? | ? c v] ?]; auto.
+    destruct st as [? | ? c v]; auto.
     destruct c; auto.
     intros _ [st' H].
     inversion H.
@@ -282,11 +267,185 @@ Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
 
 
   Class SafeRegion (P : configuration -> Prop) :=
-  { 
+  {
       preservation :                                                      forall st1 st2,
           P st1  ->  st1 → st2  ->  P st2;
       progress :                                                              forall st1,
           P st1  ->  is_final st1 \/ exists st2, st1 → st2
   }.
+
+
+
+
+  Program Fixpoint context_to_R {k} (c : context k) : R.context R.C (ckind_to_R k) :=
+      match c with
+      | ap_r t k' c' => R.ccons (R.ap_r t)  (context_to_R c')
+      | ap_l a k' c' => R.ccons (R.ap_l a)  (context_to_R c')
+      | lam_c x c'   => R.ccons (R.lam_c x) (context_to_R c')
+      | hole         => R.empty
+      end.
+  Next Obligation. destruct k'; auto. inversion c'. Defined.
+  Next Obligation. destruct k'; auto. inversion c'. Defined.
+
+
+  Program Fixpoint context_from_R
+      {k} (c : R.context R.C k) (H : ~R.dead_ckind k) : context (ckind_from_R k) :=
+
+      match c with
+      | R.empty => hole
+      | @R.ccons _ (R.ap_r t) k' c' => ap_r t (ckind_from_R k') (context_from_R c' _)
+      | @R.ccons _ (R.ap_l a) k' c' => ap_l a (ckind_from_R k') (context_from_R c' _)
+      | R.ccons    (R.lam_c x)   c' => lam_c x  (context_from_R c' _)
+      end.
+
+  Ltac ob_solve1 := solve [eauto using RF.death_propagation2
+                          | destruct_all R.ckind; autof ].
+  Next Obligation. ob_solve1. Defined.
+  Next Obligation. ob_solve1. Defined.
+  Next Obligation. ob_solve1. Defined.
+  Next Obligation. ob_solve1. Defined.
+  Next Obligation. ob_solve1. Defined.
+  Next Obligation. ob_solve1. Defined.
+  Next Obligation. ob_solve1. Defined.
+
+
+  Lemma context_from_to_R_eq :                              forall {k} (c : context k) H,
+      context_from_R (context_to_R c) H ~= c.
+
+  Proof.
+    induction c as [t k c | v k c | x c | ]; intro H;
+    [ destruct c
+    | destruct c
+    | simpl
+    | ].
+
+    all: try solve [
+         apply JM_eq_from_eq;
+         simpl; f_equal;
+         apply JMeq_eq; 
+         apply IHc ].
+
+    1:   solve [auto].
+  Qed.
+
+
+  Lemma context_to_from_R_eq :                        forall {k} (c : R.context R.C k) H,
+      context_to_R (context_from_R c H) ~= c.
+
+  Proof.
+    induction c as [ | [x | v | t ] k c]; intro H;
+    [
+    | destruct k
+    | destruct k
+    | ].
+
+    1:   solve [auto].
+
+    all: try solve [
+      apply JM_eq_from_eq;
+      simpl; f_equal;
+      apply JMeq_eq; 
+      apply IHc].
+
+    all: try solve [autof].
+
+    all:
+      let tac := (
+          apply JM_eq_from_eq;
+          simpl; f_equal;
+          apply JMeq_eq;
+          apply IHc)
+      in
+
+      solve 
+      [ dependent destruction c; auto; destruct k2, ec; inversion x0; dep_subst; tac
+      | dependent destruction c; auto; destruct k2, ec; autof; tac].
+  Qed.
+
+
+
+
+  Module EAM := Lam_NO_EAM.
+
+  Program Definition conf_to_R (st : configuration) : EAM.configuration :=
+      match st with
+      | Ev t k c => submember_by _ (EAM.RAW.c_eval t (context_to_R c)) _
+      | Ap A c v => match (_ : False) with end
+      | Ap E c v => submember_by _ (EAM.RAW.c_apply  (context_to_R c) v) _
+      | Ap F c v => submember_by _ (EAM.RAW.c_apply  (context_to_R c) v) _
+      end.
+
+  Next Obligation. destruct c; auto. Defined.
+  Next Obligation. dependent destruction c. Defined.
+
+
+  Program Definition conf_from_R (st : EAM.configuration) : configuration :=
+      let (st, H) := st in
+      match st with
+      | @EAM.RAW.c_eval t k c  => Ev t (ckind_from_R k) (context_from_R c _)
+      | @EAM.RAW.c_apply k c v => Ap   (ckind_from_R k) (context_from_R c _) v
+      end.
+
+  Ltac ob_solve2 := solve [destruct_all R.ckind; autof ].
+  Next Obligation. ob_solve2. Defined.
+  Next Obligation. ob_solve2. Defined.
+  Next Obligation. ob_solve2. Defined.
+
+
+  Theorem conf_from_to_R_eq :                                forall (st : configuration),
+      conf_from_R (conf_to_R st) = st.
+
+  Proof.
+    intro st.
+    destruct st as [t k c | k c v].
+    all: set (k0 := k);
+         destruct k; try solve [inversion c].
+    all: first [apply (f_equal (Ev t k0)) | apply (f_equal2 (Ap k0))].
+    all: apply JMeq_eq;
+         eauto using (context_from_to_R_eq c).
+  Qed.
+
+
+  Theorem conf_to_from_R_eq :                            forall (st : EAM.configuration),
+      conf_to_R (conf_from_R st) = st.
+
+  Proof.
+    intro st.
+    destruct st as [[t k c | k c v] W].
+    all: apply subset_elem_eq;
+         set (k0 := k);
+         destruct k; try solve [inversion W].
+    all: first [ apply (f_equal  (@EAM.RAW.c_eval t k0)) 
+               | apply (f_equal2 (@EAM.RAW.c_apply k0))].
+    all: apply JMeq_eq;
+         eauto using (context_to_from_R_eq c).
+  Qed.
+
+
+  Theorem next0_imp_EAM :                                                      forall st,
+      option_map conf_to_R (next_conf0 st) = EAM.next_conf0 (conf_to_R st).
+
+  Proof.
+    intro st.
+    destruct st as [t k c | k c v].
+    - destruct t, c; simpl; 
+      solve [auto].
+    - destruct c as [ ? ? c | ? ? c | ? ? | ]; compute in v; dependent destruction v;
+      try destruct c;
+      solve [simpl; autof].
+  Qed.
+
+
+  Corollary next0_fol_EAM :                                                    forall st,
+      option_map conf_from_R (EAM.next_conf0 st) = next_conf0 (conf_from_R st).
+
+  Proof.
+    intro st.
+    rewrite <- (conf_to_from_R_eq st) at 1.
+    rewrite <- (next0_imp_EAM (conf_from_R st)).
+    destruct (next_conf0 (conf_from_R st)); simpl.
+    1  : rewrite conf_from_to_R_eq.
+    all: solve [auto].
+  Qed.
 
 End Lam_NO_HandMachine.

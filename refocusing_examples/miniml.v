@@ -120,6 +120,7 @@ Module MiniML_PreRefSem <: PRE_REF_SEM.
 
   Lemma init_ckind_alive :
       ~dead_ckind init_ckind.
+
   Proof. auto. Qed.
 
 
@@ -422,13 +423,13 @@ Module MiniML_Strategy <: REF_STRATEGY MiniML_PreRefSem.
   Proof. REF_LANG_Help.prove_ec_wf. Qed.
 
 
-  Lemma search_order_antisym : forall k t ec ec0, 
+  (*Lemma search_order_antisym : forall k t ec ec0, 
       k, t |~ ec << ec0 -> ~ k, t |~ ec0 << ec.
   Proof.
     intros k ? ec ec0.
     destruct k, ec, ec0; 
     solve [ autof ].
-  Qed.
+  Qed.*)
 
 
   Lemma search_order_trans :  forall k t ec0 ec1 ec2, 

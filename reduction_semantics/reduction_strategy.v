@@ -61,7 +61,7 @@ Module Type RED_STRATEGY_LANG.
 
 
   Axioms
-  (init_ckind_alive : 
+  (init_ckind_alive :
        ~dead_ckind init_ckind)
 
   (death_propagation :                                                       forall k ec,
@@ -80,11 +80,11 @@ Module Type RED_STRATEGY_LANG.
        ec:[t0] = ec:[t1] -> t0 = t1)
 
   (value_trivial1 :                                                      forall {k} ec t,
-       forall v : value k, ~dead_ckind (k+>ec) -> ec:[t] = v -> 
+       forall v : value k, ~dead_ckind (k+>ec) -> ec:[t] = v ->
            exists (v' : value (k+>ec)), t = v')
 
-  (value_redex :                                  forall {k} (v : value k) (r : redex k),
-       value_to_term v <> redex_to_term r).
+  (value_redex :                                                             forall {k},
+       forall (v : value k) (r : redex k), value_to_term v <> redex_to_term r).
 
 End RED_STRATEGY_LANG.
 
@@ -165,7 +165,7 @@ Module Type RED_STRATEGY (R : RED_STRATEGY_LANG).
 
 
   Parameter search_order : ckind -> term -> elem_context -> elem_context -> Prop.
-  Notation "k , t |~  ec1 << ec2 " := (search_order k t ec1 ec2) 
+  Notation "k , t |~  ec1 << ec2 " := (search_order k t ec1 ec2)
                (at level 70, t, ec1, ec2 at level 50, no associativity).
 
   Axiom dec_term_term_top : 

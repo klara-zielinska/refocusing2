@@ -259,3 +259,8 @@ Ltac discriminateJM H :=
     [ apply JMeq_eq_depT; auto | discriminate (eq_dep_eq_sigT _ _ _ _ _ _ H) ]
     end.
 
+
+Lemma JM_eq_from_eq :                                               forall {A} (x y : A),
+    x = y -> x ~= y.
+
+Proof. intuition subst; auto. Qed.

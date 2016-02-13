@@ -198,8 +198,8 @@ Module Type RED_SEM.
        forall v : value k,  ~dead_ckind (k+>ec)  ->  ec:[t] = v -> 
            exists (v' : value (k+>ec)), t = v')
 
-  (value_redex :                                  forall {k} (v : value k) (r : redex k),
-       value_to_term v <> redex_to_term r)
+  (value_redex :                                                              forall {k},
+       forall (v : value k) (r : redex k), value_to_term v <> redex_to_term r)
 
   (decompose :                                                                forall t k,
        ~dead_ckind k -> exists d : decomp k, dec t k d).

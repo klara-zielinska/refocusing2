@@ -719,9 +719,9 @@ Module Lam_KES_CBN_Strategy <: REF_STRATEGY Lam_KES_CBN_PreRefSem.
   Proof. intros k t ec. constructor. inversion 1. Qed.
 
 
-  Lemma search_order_antisym : forall k t ec ec0, 
+  (*Lemma search_order_antisym : forall k t ec ec0, 
       k, t |~ ec << ec0 -> ~ k, t |~ ec0 << ec.
-  Proof. auto. Qed.
+  Proof. auto. Qed.*)
 
 
   Lemma search_order_trans   : forall k t ec0 ec1 ec2,

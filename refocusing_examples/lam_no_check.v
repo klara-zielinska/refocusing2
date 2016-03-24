@@ -20,24 +20,24 @@ Module Lam_NO_HandDecProc.
 
   Inductive dec_proc {k1} : forall {k2}, term -> context k1 k2 -> decomp k1 -> Prop :=
 
-  | d_VarC   : forall x (c : context k1 C) d,
-                 decctx_proc (vCVar x) c d ->
+  | d_VarE   : forall x (c : context k1 Eᵏ) d,
+                 decctx_proc (vEVar x) c d ->
                  dec_proc (Var x) c d 
-  | d_VarECa : forall x (c : context k1 ECa) d,
-                 decctx_proc (vECaVar x) c d ->
+  | d_VarF   : forall x (c : context k1 Fᵏ) d,
+                 decctx_proc (vFVar x) c d ->
                  dec_proc (Var x) c d
 
-  | d_LamC   : forall x t (c : context k1 C) d,
+  | d_LamE   : forall x t (c : context k1 Eᵏ) d,
                  dec_proc t (lam_c x =: c) d ->   (*!*)
                  dec_proc (Lam x t) c d
-  | d_LamECa : forall x t (c : context k1 ECa) d,
-                 decctx_proc (vECaLam x t) c d -> (*!*)
+  | d_LamF   : forall x t (c : context k1 Fᵏ) d,
+                 decctx_proc (vFLam x t) c d -> (*!*)
                  dec_proc (Lam x t) c d
 
-  | d_AppC   : forall t1 t2 (c : context k1 C) d,
+  | d_AppE   : forall t1 t2 (c : context k1 Eᵏ) d,
                  dec_proc t1 (ap_r t2 =: c) d ->
                  dec_proc (App t1 t2) c d
-  | d_AppECa : forall t1 t2 (c : context k1 ECa) d,
+  | d_AppF   : forall t1 t2 (c : context k1 Fᵏ) d,
                  dec_proc t1 (ap_r t2 =: c) d ->
                  dec_proc (App t1 t2) c d
 
@@ -49,34 +49,34 @@ Module Lam_NO_HandDecProc.
                       ~ dead_ckind k1 ->
                       decctx_proc v [.] (d_val v)
 
-  | dc_ap_rLamC   : forall x t0 t (c : context k1 C),
-                      decctx_proc (vECaLam x t0) (ap_r t =: c) (d_red (rCApp x t0 t) c)
-  | dc_ap_rLamECa : forall x t0 t (c : context k1 ECa),
-                      decctx_proc (vECaLam x t0) (ap_r t =: c) (d_red (rECaApp x t0 t) c)
+  | dc_ap_rLamE   : forall x t0 t (c : context k1 Eᵏ),
+                      decctx_proc (vFLam x t0) (ap_r t =: c) (d_red (rEApp x t0 t) c)
+  | dc_ap_rLamF   : forall x t0 t (c : context k1 Fᵏ),
+                      decctx_proc (vFLam x t0) (ap_r t =: c) (d_red (rFApp x t0 t) c)
 
-  | dc_ap_rVarC   : forall x t (c : context k1 C) d,
-                      dec_proc t (ap_l (vCaVar x) =: c) d ->
-                      decctx_proc (vECaVar x) (ap_r t =: c) d
-  | dc_ap_rVarECa : forall x t (c : context k1 ECa) d,
-                      dec_proc t (ap_l (vCaVar x) =: c) d ->
-                      decctx_proc (vECaVar x) (ap_r t =: c) d
+  | dc_ap_rVarE   : forall x t (c : context k1 Eᵏ) d,
+                      dec_proc t (ap_l (vAVar x) =: c) d ->
+                      decctx_proc (vFVar x) (ap_r t =: c) d
+  | dc_ap_rVarF   : forall x t (c : context k1 Fᵏ) d,
+                      dec_proc t (ap_l (vAVar x) =: c) d ->
+                      decctx_proc (vFVar x) (ap_r t =: c) d
 
-  | dc_ap_rAppC   : forall v1 v2 t (c : context k1 C) d,
-                      dec_proc t (ap_l (vCaApp v1 v2) =: c) d ->
-                      decctx_proc (vECaApp v1 v2) (ap_r t =: c) d
-  | dc_ap_rAppECa : forall v1 v2 t (c : context k1 ECa) d,
-                      dec_proc t (ap_l (vCaApp v1 v2) =: c) d ->
-                      decctx_proc (vECaApp v1 v2) (ap_r t =: c) d
+  | dc_ap_rAppE   : forall v1 v2 t (c : context k1 Eᵏ) d,
+                      dec_proc t (ap_l (vAApp v1 v2) =: c) d ->
+                      decctx_proc (vFApp v1 v2) (ap_r t =: c) d
+  | dc_ap_rAppF   : forall v1 v2 t (c : context k1 Fᵏ) d,
+                      dec_proc t (ap_l (vAApp v1 v2) =: c) d ->
+                      decctx_proc (vFApp v1 v2) (ap_r t =: c) d
 
-  | dc_ap_lC      : forall v1 v2 (c : context k1 C) d,
-                      decctx_proc (vCApp v1 v2) c d ->
+  | dc_ap_lE      : forall v1 v2 (c : context k1 Eᵏ) d,
+                      decctx_proc (vEApp v1 v2) c d ->
                       decctx_proc v2 (ap_l v1 =: c) d
-  | dc_ap_lECa    : forall v1 v2 (c : context k1 ECa) d,
-                      decctx_proc (vECaApp v1 v2) c d ->
+  | dc_ap_lF      : forall v1 v2 (c : context k1 Fᵏ) d,
+                      decctx_proc (vFApp v1 v2) c d ->
                       decctx_proc v2 (ap_l v1 =: c) d
 
-  | dc_lam_cC     : forall v x (c : context k1 C) d,
-                      decctx_proc (vCLam x v) c d ->
+  | dc_lam_cE     : forall v x (c : context k1 Eᵏ) d,
+                      decctx_proc (vELam x v) c d ->
                       decctx_proc v (lam_c x =: c) d.
 
   Scheme dec_proc_Ind    := Induction for dec_proc    Sort Prop
@@ -163,25 +163,25 @@ Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
 
 
   Definition term := R.term.
-  Inductive ckind := E | F | A.
+  Inductive ckind := Eᵏ | Fᵏ | Aᵏ.
 
 
   Definition ckind_to_R k : R.ckind :=
-      match k with E => R.C | F => R.ECa | A => R.CBot end.
+      match k with Eᵏ => R.Eᵏ | Fᵏ => R.Fᵏ | Aᵏ => R.Botᵏ end.
 
   Definition ckind_from_R k : ckind :=
-      match k with R.C => E | R.ECa => F | R.CBot => A end.
+      match k with R.Eᵏ => Eᵏ | R.Fᵏ => Fᵏ | R.Botᵏ => Aᵏ end.
 
 
   Definition val k := R.value (ckind_to_R k).
-  Definition value := val E.
+  Definition value := val Eᵏ.
 
 
   Inductive context : ckind -> Set :=
-  | ap_r  : R.term  -> forall k, context k -> context F
-  | ap_l  : R.valCa -> forall k, context k -> context E
-  | lam_c : R.var   ->           context E -> context E
-  | hole  : context E.
+  | ap_r  : R.term  -> forall k, context k  -> context Fᵏ
+  | ap_l  : R.valA  -> forall k, context k  -> context Eᵏ
+  | lam_c : R.var   ->           context Eᵏ -> context Eᵏ
+  | hole  : context Eᵏ.
 
 
   Inductive conf :=
@@ -190,7 +190,7 @@ Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
   Definition configuration := conf.
 
 
-  Definition load (t : term) : configuration := Ev t E hole.
+  Definition load (t : term) : configuration := Ev t Eᵏ hole.
 
 
   Definition final (st : configuration) : option value :=
@@ -203,44 +203,44 @@ Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
   Definition is_final (st : configuration) := exists v, final st = Some v.
 
 
-  Definition next_conf0 (st : configuration) : option configuration :=
+  Definition dnext_conf (st : configuration) : option configuration :=
       match st with
-      | Ev (R.Var x) E c     => Some (Ap E c (R.vCVar x))
-      | Ev (R.Var x) F c     => Some (Ap F c (R.vECaVar x))
+      | Ev (R.Var x) Eᵏ c     => Some (Ap Eᵏ c (R.vEVar x))
+      | Ev (R.Var x) Fᵏ c     => Some (Ap Fᵏ c (R.vFVar x))
 
-      | Ev (R.Lam x t) E c   => Some (Ev t _ (lam_c x c))     (*!*)
-      | Ev (R.Lam x t) F c   => Some (Ap _ c (R.vECaLam x t)) (*!*)
+      | Ev (R.Lam x t) Eᵏ c   => Some (Ev t _ (lam_c x c))   (*!*)
+      | Ev (R.Lam x t) Fᵏ c   => Some (Ap _ c (R.vFLam x t)) (*!*)
 
-      | Ev (R.App t1 t2) k c => Some (Ev t1 F (ap_r t2 k c))
+      | Ev (R.App t1 t2) k c  => Some (Ev t1 Fᵏ (ap_r t2 k c))
 
-      | Ap F (ap_r t2 E c) (R.vECaLam x t1) =>
-                                Some (Ev (R.subst x t2 t1) E c)
-      | Ap F (ap_r t2 F c) (R.vECaLam x t1) =>
-                                Some (Ev (R.subst x t2 t1) F c)
+      | Ap Fᵏ (ap_r t2 Eᵏ c) (R.vFLam x t1) =>
+                                Some (Ev (R.subst x t2 t1) Eᵏ c)
+      | Ap Fᵏ (ap_r t2 Fᵏ c) (R.vFLam x t1) =>
+                                Some (Ev (R.subst x t2 t1) Fᵏ c)
 
-      | Ap F (ap_r t k c)  (R.vECaVar x)    =>
-                                Some (Ev t E (ap_l (R.vCaVar x) k c))
+      | Ap Fᵏ (ap_r t k c)   (R.vFVar x)    =>
+                                Some (Ev t Eᵏ (ap_l (R.vAVar x) k c))
 
-      | Ap F (ap_r t k c)  (R.vECaApp a v)  =>
-                                Some (Ev t E (ap_l (R.vCaApp a v) k c))
+      | Ap Fᵏ (ap_r t k c)   (R.vFApp a v)  =>
+                                Some (Ev t Eᵏ (ap_l (R.vAApp a v) k c))
 
-      | Ap E (ap_l a E c) v  => Some (Ap E c (R.vCApp   a v))
-      | Ap E (ap_l a F c) v  => Some (Ap F c (R.vECaApp a v))
+      | Ap Eᵏ (ap_l a Eᵏ c)  v  => Some (Ap Eᵏ c (R.vEApp a v))
+      | Ap Eᵏ (ap_l a Fᵏ c)  v  => Some (Ap Fᵏ c (R.vFApp a v))
 
-      | Ap E (lam_c x c) v   => Some (Ap E c (R.vCLam x v))
+      | Ap Eᵏ (lam_c x c)    v => Some (Ap Eᵏ c (R.vELam x v))
 
       | _ => None
       end.
-  Definition next_conf (_ : entropy) := next_conf0.
+  Definition next_conf (_ : entropy) := dnext_conf.
 
-  Definition transition st1 st2 := next_conf0 st1 = Some st2.
+  Definition transition st1 st2 := dnext_conf st1 = Some st2.
 
   Instance rws : REWRITING_SYSTEM configuration :=
   { transition := transition }.
 
 
-  Fact trans_computable0 :                              forall (st1 st2 : configuration),
-       `(rws) st1 → st2 <-> next_conf0 st1 = Some st2.
+  Fact trans_dcomputable :                              forall (st1 st2 : configuration),
+       `(rws) st1 → st2 <-> dnext_conf st1 = Some st2.
 
   Proof. intuition. Qed.
 
@@ -277,7 +277,7 @@ Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
 
 
 
-  Program Fixpoint context_to_R {k} (c : context k) : R.context R.C (ckind_to_R k) :=
+  Program Fixpoint context_to_R {k} (c : context k) : R.context R.Eᵏ (ckind_to_R k) :=
       match c with
       | ap_r t k' c' => R.ccons (R.ap_r t)  (context_to_R c')
       | ap_l a k' c' => R.ccons (R.ap_l a)  (context_to_R c')
@@ -289,7 +289,7 @@ Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
 
 
   Program Fixpoint context_from_R
-      {k} (c : R.context R.C k) (H : ~R.dead_ckind k) : context (ckind_from_R k) :=
+      {k} (c : R.context R.Eᵏ k) (H : ~R.dead_ckind k) : context (ckind_from_R k) :=
 
       match c with
       | R.empty => hole
@@ -329,7 +329,7 @@ Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
   Qed.
 
 
-  Lemma context_to_from_R_eq :                        forall {k} (c : R.context R.C k) H,
+  Lemma context_to_from_R_eq :                       forall {k} (c : R.context R.Eᵏ k) H,
       context_to_R (context_from_R c H) ~= c.
 
   Proof.
@@ -369,10 +369,10 @@ Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
 
   Program Definition conf_to_R (st : configuration) : EAM.configuration :=
       match st with
-      | Ev t k c => submember_by _ (EAM.RAW.c_eval t (context_to_R c)) _
-      | Ap A c v => match (_ : False) with end
-      | Ap E c v => submember_by _ (EAM.RAW.c_apply  (context_to_R c) v) _
-      | Ap F c v => submember_by _ (EAM.RAW.c_apply  (context_to_R c) v) _
+      | Ev t k c  => submember_by _ (EAM.RAW.c_eval t (context_to_R c)) _
+      | Ap Aᵏ c v => match (_ : False) with end
+      | Ap Eᵏ c v => submember_by _ (EAM.RAW.c_apply  (context_to_R c) v) _
+      | Ap Fᵏ c v => submember_by _ (EAM.RAW.c_apply  (context_to_R c) v) _
       end.
 
   Next Obligation. destruct c; auto. Defined.
@@ -422,8 +422,8 @@ Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
   Qed.
 
 
-  Theorem next0_imp_EAM :                                                      forall st,
-      option_map conf_to_R (next_conf0 st) = EAM.next_conf0 (conf_to_R st).
+  Theorem dnext_imp_EAM :                                                      forall st,
+      option_map conf_to_R (dnext_conf st) = EAM.dnext_conf (conf_to_R st).
 
   Proof.
     intro st.
@@ -437,13 +437,13 @@ Module Lam_NO_HandMachine <: ABSTRACT_MACHINE.
 
 
   Corollary next0_fol_EAM :                                                    forall st,
-      option_map conf_from_R (EAM.next_conf0 st) = next_conf0 (conf_from_R st).
+      option_map conf_from_R (EAM.dnext_conf st) = dnext_conf (conf_from_R st).
 
   Proof.
     intro st.
     rewrite <- (conf_to_from_R_eq st) at 1.
-    rewrite <- (next0_imp_EAM (conf_from_R st)).
-    destruct (next_conf0 (conf_from_R st)); simpl.
+    rewrite <- (dnext_imp_EAM (conf_from_R st)).
+    destruct (dnext_conf (conf_from_R st)); simpl.
     1  : rewrite conf_from_to_R_eq.
     all: solve [auto].
   Qed.

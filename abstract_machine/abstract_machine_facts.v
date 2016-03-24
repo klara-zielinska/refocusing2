@@ -1,4 +1,5 @@
-Require Import abstract_machine.
+Require Import Entropy 
+               abstract_machine.
 
 
 
@@ -31,55 +32,98 @@ Module ABSTRACT_MACHINE_Facts (AM : ABSTRACT_MACHINE).
 End ABSTRACT_MACHINE_Facts.
 
 
-(*
-Module DetAbstractMachine_Sim (AM : DET_ABSTRACT_MACHINE).
+
+
+Module DET_ABSTRACT_MACHINE_Facts (AM : DET_ABSTRACT_MACHINE).
 
   Import AM.
+
+
+  Lemma trans_det :                                                      forall c1 c2 c3,
+      c1 → c2  ->  c1 → c3  ->  c2 = c3.
+
+  Proof.
+    intros ? ? ? H H0.
+    compute in H, H0.
+    rewrite trans_computable in *.
+    destruct H as [? H], H0 as [? H0].
+    rewrite dnext_is_next in *.
+    congruence.
+  Qed.
+
+
+  Lemma dnext_correct : forall c1 c2,
+      c1 → c2 <-> dnext_conf c1 = Some c2.
+
+  Proof.
+    intros.
+    compute -[iff].
+    rewrite trans_computable.
+    split; intro H.
+    - destruct H as [e H].
+      rewrite <- (dnext_is_next e).
+      auto.
+    - destruct entropy_exists as [e _].
+      exists e.
+      rewrite (dnext_is_next e).
+      auto.
+  Qed.
+
+End DET_ABSTRACT_MACHINE_Facts.
+
+
+
+
+Module DetAbstractMachine_Sim (AM : DET_ABSTRACT_MACHINE).
+
+  Module AMF := DET_ABSTRACT_MACHINE_Facts AM.
+  Import AM AMF.
 
 
   Fixpoint n_steps c n : option configuration :=
       match n with
       | 0   => Some c
-      | S n => match next_conf c with
+      | S n => match dnext_conf c with
                | None    => None
                | Some c' => n_steps c' n
                end
       end.
 
 
-  Lemma n_steps_correct : forall c1 n c2, n_steps c1 (S n) = Some c2 -> c1 →+ c2.
+  Lemma n_steps_correct : forall c1 n c2, 
+      n_steps c1 n = Some c2 -> c1 →* c2.
 
-  Proof.
+  Proof with auto.
     intros c1 n c2; revert c1.
 
     induction n; 
-        intros c1 H;
-        remember (next_conf c1) as c1'; destruct c1';
-        simpl in H;
-        rewrite <- Heqc1' in *;
-        try discriminate.
+        intros c1 H.
 
-    - constructor 1.
-      apply next_correct. 
-      congruence.
-    - econstructor 2.
-      + apply next_correct. 
-        symmetry; exact Heqc1'.
-      + apply IHn.
-        simpl; auto.
+    - compute in H.
+      inversion H; subst.
+      constructor 1.
+
+    - remember (dnext_conf c1) as c1'; 
+      destruct c1';
+      simpl in H;
+      rewrite <- Heqc1' in *;
+      try discriminate.
+
+      constructor 2 with c.
+      + apply dnext_correct...
+      + auto.
   Qed.
 
 
   Lemma n_steps_complete : 
-      forall c1 c2,  c1 →+ c2  -> exists n, n_steps c1 n = Some c2.
+      forall c1 c2,  c1 →* c2  -> exists n, n_steps c1 n = Some c2.
 
   Proof.
     induction 1.
-    - exists 1; simpl. 
-      apply next_correct in H.
-      rewrite H; auto.
-    - destruct IHtrans_close as (n, H1).
-      apply next_correct in H.
+    - exists 0; simpl.
+      auto.
+    - destruct IHclos_refl_trans_1n as (n, H1).
+      apply dnext_correct in H.
       eexists (S n).
       simpl.
       rewrite H; auto.
@@ -144,7 +188,7 @@ End DetAbstractMachine_Sim.
 
 
 
-
+(*
 Module Type AM_INIT_SAFE (AM : ABSTRACT_MACHINE) (S : AM_SAFE_REGION AM).
 
   Import AM S.

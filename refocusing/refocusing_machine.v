@@ -12,7 +12,7 @@ Require Export abstract_machine.
 
 
 
-Module Type SLOPPY_REF_EVAL_APPLY_MACHINE (R : RED_REF_SEM) <: ABSTRACT_MACHINE.
+Module Type SLOPPY_REF_EVAL_APPLY_MACHINE (R : RED_REF_SEM) <: DET_ABSTRACT_MACHINE.
 
   Import R ST.
 
@@ -85,7 +85,7 @@ Module Type SLOPPY_REF_EVAL_APPLY_MACHINE (R : RED_REF_SEM) <: ABSTRACT_MACHINE.
   End S1.
 
 
-  Definition next_conf0 (st : configuration) : option configuration :=
+  Definition dnext_conf (st : configuration) : option configuration :=
       match st with
       | @c_eval t k c  => 
             match dec_term t k with
@@ -104,7 +104,7 @@ Module Type SLOPPY_REF_EVAL_APPLY_MACHINE (R : RED_REF_SEM) <: ABSTRACT_MACHINE.
       | c_apply [.] _ => 
             None
       end.
-  Definition next_conf (_ : entropy) := next_conf0.
+  Definition next_conf (_ : entropy) := dnext_conf.
 
 
   Instance rws : REWRITING_SYSTEM configuration :=
@@ -116,13 +116,15 @@ Module Type SLOPPY_REF_EVAL_APPLY_MACHINE (R : RED_REF_SEM) <: ABSTRACT_MACHINE.
        final st <> None -> ~exists st', st → st')
   (trans_computable :                                                     forall st1 st2,
        st1 → st2 <-> exists e, next_conf e st1 = Some st2)
-  (*finals_are_vals :                                                         forall st v,
+  (*finals_are_vals :                                                        forall st v,
        final st = Some v <-> st = v*)
 
-  (next_conf0_alive :                                                     forall st1 st2,
-      next_conf0 st1 = Some st2 -> alive_state st2)
+  (dnext_conf_alive :                                                     forall st1 st2,
+      dnext_conf st1 = Some st2 -> alive_state st2)
   (trans_alive :                                                          forall st1 st2,
-      st1 → st2 -> alive_state st2).
+      st1 → st2 -> alive_state st2)
+  (dnext_is_next :                                                            forall e c,
+      next_conf e c = dnext_conf c).
 
 
   Class SafeRegion (P : configuration -> Prop) :=
@@ -139,7 +141,7 @@ End SLOPPY_REF_EVAL_APPLY_MACHINE.
 
 
 
-Module Type REF_EVAL_APPLY_MACHINE (R : PRECISE_RED_REF_SEM) <: ABSTRACT_MACHINE.
+Module Type REF_EVAL_APPLY_MACHINE (R : PRECISE_RED_REF_SEM) <: DET_ABSTRACT_MACHINE.
 
   Import R ST.
 
@@ -184,16 +186,16 @@ Module Type REF_EVAL_APPLY_MACHINE (R : PRECISE_RED_REF_SEM) <: ABSTRACT_MACHINE
   { transition := transition }.
 
 
-  Definition next_conf0 (st : configuration) : option configuration :=
+  Definition dnext_conf (st : configuration) : option configuration :=
 
-      match RAW.next_conf0 st                                                      as sto
-                                   return RAW.next_conf0 st = sto -> option configuration
+      match RAW.dnext_conf st                                                      as sto
+                                   return RAW.dnext_conf st = sto -> option configuration
       with
-      | Some st' => fun H => Some (submember_by _ st' (next_conf0_alive st st' H))
+      | Some st' => fun H => Some (submember_by _ st' (dnext_conf_alive st st' H))
       | None     => fun _ => None
       end eq_refl.
 
-  Definition next_conf (_ : entropy) := next_conf0.
+  Definition next_conf (_ : entropy) := dnext_conf.
 
 
   Axioms
@@ -201,8 +203,10 @@ Module Type REF_EVAL_APPLY_MACHINE (R : PRECISE_RED_REF_SEM) <: ABSTRACT_MACHINE
        final st <> None -> ~exists st', st → st')
   (trans_computable :                                                     forall st1 st2,
        st1 → st2 <-> exists e, next_conf e st1 = Some st2)
-  (*finals_are_vals :                                                         forall st v,
-       final st = Some v <-> st = v*).
+  (*finals_are_vals :                                                        forall st v,
+       final st = Some v <-> st = v*)
+  (dnext_is_next :                                                            forall e c,
+      next_conf e c = dnext_conf c).
 
 
   Class SafeRegion (P : configuration -> Prop) :=
@@ -413,7 +417,7 @@ Module SloppyRefEvalApplyMachine (R : RED_REF_SEM) <: SLOPPY_REF_EVAL_APPLY_MACH
   End S1.
 
 
-  Definition next_conf0 (st : configuration) : option configuration :=
+  Definition dnext_conf (st : configuration) : option configuration :=
       match st with
       | @c_eval t k c  => 
             match dec_term t k with
@@ -432,7 +436,7 @@ Module SloppyRefEvalApplyMachine (R : RED_REF_SEM) <: SLOPPY_REF_EVAL_APPLY_MACH
       | c_apply [.] _ => 
             None
       end.
-  Definition next_conf (_ : entropy) := next_conf0.
+  Definition next_conf (_ : entropy) := dnext_conf.
 
 
   Instance rws : REWRITING_SYSTEM configuration :=
@@ -451,7 +455,7 @@ Module SloppyRefEvalApplyMachine (R : RED_REF_SEM) <: SLOPPY_REF_EVAL_APPLY_MACH
 
 
   Lemma trans_computable0 :                                                 forall c1 c2,
-       c1 → c2 <-> next_conf0 c1 = Some c2.
+       c1 → c2 <-> dnext_conf c1 = Some c2.
 
   Proof.
     intros c1 c2; split; intro H.
@@ -509,7 +513,7 @@ Module SloppyRefEvalApplyMachine (R : RED_REF_SEM) <: SLOPPY_REF_EVAL_APPLY_MACH
   Qed.
 
 
-  (*Lemma finals_are_vals :                                                     forall c v,
+  (*Lemma finals_are_vals :                                                   forall c v,
        final c = Some v <-> c = v.
 
   Proof.
@@ -524,13 +528,13 @@ Module SloppyRefEvalApplyMachine (R : RED_REF_SEM) <: SLOPPY_REF_EVAL_APPLY_MACH
   Qed.*)
 
 
-  Lemma next_conf0_alive :                                                forall st1 st2,
-      next_conf0 st1 = Some st2 -> alive_state st2.
+  Lemma dnext_conf_alive :                                                forall st1 st2,
+      dnext_conf st1 = Some st2 -> alive_state st2.
 
   Proof.
     intros st1 st2 H.
     destruct st1 as [t k c | k [ | ec c] v], st2; 
-    unfold next_conf0 in H; simpl in *;
+    unfold dnext_conf in H; simpl in *;
     try discriminate;
     try match goal with
     | H : context [dec_term ?t ?k] |- _ =>
@@ -560,6 +564,14 @@ Module SloppyRefEvalApplyMachine (R : RED_REF_SEM) <: SLOPPY_REF_EVAL_APPLY_MACH
     simpl; 
     eauto using (proper_death2 [.]), dec_term_val_alive, dec_term_next_alive,
                 dec_context_val_alive, dec_context_next_alive.
+  Qed.
+
+
+  Lemma dnext_is_next :                                                      forall e c,
+      next_conf e c = dnext_conf c.
+
+  Proof.
+    auto.
   Qed.
 
 
@@ -624,16 +636,16 @@ Module RefEvalApplyMachine (R : PRECISE_RED_REF_SEM) <: REF_EVAL_APPLY_MACHINE R
   { transition := transition }.
 
 
-  Definition next_conf0 (st : configuration) : option configuration :=
+  Definition dnext_conf (st : configuration) : option configuration :=
 
-      match RAW.next_conf0 st                                                      as sto
-                                   return RAW.next_conf0 st = sto -> option configuration
+      match RAW.dnext_conf st                                                      as sto
+                                   return RAW.dnext_conf st = sto -> option configuration
       with
-      | Some st' => fun H => Some (submember_by _ st' (next_conf0_alive st st' H))
+      | Some st' => fun H => Some (submember_by _ st' (dnext_conf_alive st st' H))
       | None     => fun _ => None
       end eq_refl.
 
-  Definition next_conf (_ : entropy) := next_conf0.
+  Definition next_conf (_ : entropy) := dnext_conf.
 
 
   Lemma final_correct :                                                         forall c,
@@ -650,7 +662,7 @@ Module RefEvalApplyMachine (R : PRECISE_RED_REF_SEM) <: REF_EVAL_APPLY_MACHINE R
 
 
   Lemma RAW_trans_computable0 :                           forall st1 st2 : configuration,
-      st1 → st2 <-> RAW.next_conf0 st1 = Some (st2 : RAW.configuration).
+      st1 → st2 <-> RAW.dnext_conf st1 = Some (st2 : RAW.configuration).
 
   Proof.
     destruct st1, st2.
@@ -660,16 +672,16 @@ Module RefEvalApplyMachine (R : PRECISE_RED_REF_SEM) <: REF_EVAL_APPLY_MACHINE R
 
 
   Lemma trans_computable0 :                                                 forall c1 c2,
-      c1 → c2 <-> next_conf0 c1 = Some c2.
+      c1 → c2 <-> dnext_conf c1 = Some c2.
 
   Proof. 
     intros c1 c2. 
 
     rewrite (RAW_trans_computable0 c1 c2).
-    unfold next_conf0.
-    generalize (eq_refl : RAW.next_conf0 c1 = RAW.next_conf0 c1) as H.
+    unfold dnext_conf.
+    generalize (eq_refl : RAW.dnext_conf c1 = RAW.dnext_conf c1) as H.
     intro H.
-    set (RAW.next_conf0 c1) as sto in H at 2 |- * at 2.
+    set (RAW.dnext_conf c1) as sto in H at 2 |- * at 2.
     destruct sto.
     - destruct c as [t k c | k c v];
           rewrite H at 1; destruct c2;
@@ -707,6 +719,14 @@ Module RefEvalApplyMachine (R : PRECISE_RED_REF_SEM) <: REF_EVAL_APPLY_MACHINE R
             unfold value_to_conf;
         solve [try apply (f_equal (submember _ _)); auto].
       + intuition.
+  Qed.
+
+
+  Lemma dnext_is_next :                                                      forall e c,
+      next_conf e c = dnext_conf c.
+
+  Proof.
+    auto.
   Qed.
 
 

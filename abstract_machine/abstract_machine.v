@@ -32,7 +32,7 @@ Module Type ABSTRACT_MACHINE.
 
 
   Class SafeRegion (P : configuration -> Prop) :=
-  { 
+  {
       preservation :                                                        forall c1 c2,
           P c1  ->  c1 → c2  ->  P c2;
       progress :                                                               forall c1,
@@ -44,12 +44,12 @@ End ABSTRACT_MACHINE.
 
 
 
-Module Type ABSTRACT_MACHINE_DET (AM : ABSTRACT_MACHINE).
+Module Type DET_ABSTRACT_MACHINE.
 
-  Include AM.
+  Include ABSTRACT_MACHINE.
 
-  Axiom trans_det :                                                      forall c1 c2 c3,
-      c1 → c2  ->  c1 → c3  ->  c2 = c3.
+  Parameter dnext_conf : configuration -> option configuration.
+  Axiom dnext_is_next  : forall e c, next_conf e c = dnext_conf c.
 
-End ABSTRACT_MACHINE_DET.
+End DET_ABSTRACT_MACHINE.
 

@@ -220,7 +220,7 @@ Module MiniML_HandMachine <: ABSTRACT_MACHINE.
   Notation "[: c , v :]"     := (submember_by _ (RAW.c_apply c v) init_ckind_alive)
                                                                       (c, v at level 99).
 
-  Definition next_conf0 (st : configuration) : option configuration :=
+  Definition dnext_conf (st : configuration) : option configuration :=
       match st with
       | [$ Z, c, _ $]               => Some [: c, vZ :]
       | [$ S t, c, _ $]             => Some [$ t, s_c =: c $]
@@ -247,17 +247,17 @@ Module MiniML_HandMachine <: ABSTRACT_MACHINE.
 
       | _ => None
       end.
-  Definition next_conf (_ : entropy) := next_conf0.
+  Definition next_conf (_ : entropy) := dnext_conf.
 
-  Definition transition st1 st2 := next_conf0 st1 = Some st2.
+  Definition transition st1 st2 := dnext_conf st1 = Some st2.
 
 
   Instance rws : REWRITING_SYSTEM configuration :=
   { transition := transition }.
 
 
-  Fact trans_computable0 :                              forall (st1 st2 : configuration),
-       `(rws) st1 → st2 <-> next_conf0 st1 = Some st2.
+  Fact trans_dcomputable :                              forall (st1 st2 : configuration),
+       `(rws) st1 → st2 <-> dnext_conf st1 = Some st2.
 
   Proof. intuition. Qed.
 
@@ -274,8 +274,8 @@ Module MiniML_HandMachine <: ABSTRACT_MACHINE.
 
 
 
-  Theorem next_conf0_eq_EAM :                                                  forall st,
-      next_conf0 st = MiniML_EAM.next_conf0 st.
+  Theorem dnext_conf_eq_EAM :                                                  forall st,
+      dnext_conf st = MiniML_EAM.dnext_conf st.
 
   Proof.
     destruct st as [[t k ? | k c v] ?].
@@ -293,7 +293,7 @@ Module MiniML_HandMachine <: ABSTRACT_MACHINE.
   Corollary next_conf_eq_EAM :                                               forall e st,
       next_conf e st = MiniML_EAM.next_conf e st.
 
-  Proof. eauto using next_conf0_eq_EAM. Qed.
+  Proof. eauto using dnext_conf_eq_EAM. Qed.
 
 
   Corollary transition_eqv_EAM :                                          forall st1 st2,
@@ -303,7 +303,7 @@ Module MiniML_HandMachine <: ABSTRACT_MACHINE.
     intros.
     rewrite trans_computable, MiniML_EAM.trans_computable.
     unfold MiniML_EAM.next_conf, next_conf.
-    rewrite next_conf0_eq_EAM.
+    rewrite dnext_conf_eq_EAM.
     intuition.
   Qed.
 

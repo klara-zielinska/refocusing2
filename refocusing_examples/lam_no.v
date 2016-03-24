@@ -16,40 +16,39 @@ Module Lam_NO_PreRefSem <: PRE_REF_SEM.
   Definition term := expr.
   Hint Unfold term.
 
-
-  Inductive ck := C | ECa | CBot.
+  Inductive ck := Eᵏ | Fᵏ | Botᵏ.
   Definition ckind := ck.
   Hint Unfold  ckind.
 
 
   Inductive val : ckind -> Type :=
 
-  | vCLam   : var -> val C -> val C
-  | vCVar   : var -> val C
-  | vCApp   : valCa -> val C -> val C
+  | vELam : var -> val Eᵏ -> val Eᵏ
+  | vEVar : var -> val Eᵏ
+  | vEApp : valA -> val Eᵏ -> val Eᵏ
   
-  | vECaLam : var -> term -> val ECa
-  | vECaVar : var -> val ECa
-  | vECaApp : valCa -> val C -> val ECa
+  | vFLam : var -> term -> val Fᵏ
+  | vFVar : var -> val Fᵏ
+  | vFApp : valA -> val Eᵏ -> val Fᵏ
   
-  | vCBot   : term -> val CBot
+  | vBot  : term -> val Botᵏ
   
-  with valCa :=
+  with valA :=
 
-  | vCaVar : var -> valCa
-  | vCaApp : valCa -> val C -> valCa.
+  | vAVar : var -> valA
+  | vAApp : valA -> val Eᵏ -> valA.
 
 
   Definition value := val.
   Hint Unfold value.
 
   Scheme val_Ind   := Induction for val Sort Prop
-    with valCa_Ind := Induction for valCa Sort Prop.
+    with valCa_Ind := Induction for valA Sort Prop.
 
 
   Inductive red : ckind -> Type :=
-  | rCApp   : var -> term -> term -> red C
-  | rECaApp : var -> term -> term -> red ECa.
+  | rEApp : var -> term -> term -> red Eᵏ
+  | rFApp : var -> term -> term -> red Fᵏ.
   Definition redex := red.
   Hint Unfold redex.
 
@@ -57,22 +56,22 @@ Module Lam_NO_PreRefSem <: PRE_REF_SEM.
   Inductive ec :=
   | lam_c : var -> ec
   | ap_r  : term -> ec
-  | ap_l  : valCa -> ec.
+  | ap_l  : valA -> ec.
   Definition elem_context := ec.
   Hint Unfold elem_context.
 
 
   Definition ckind_trans (k : ckind) (ec : elem_context) := 
       match k with
-      | C    => match ec with lam_c _ => C    | ap_r _ => ECa | ap_l _ => C end
-      | ECa  => match ec with lam_c _ => CBot | ap_r _ => ECa | ap_l _ => C end
-      | _    => CBot
+      | Eᵏ => match ec with lam_c _ => Eᵏ   | ap_r _ => Fᵏ | ap_l _ => Eᵏ end
+      | Fᵏ => match ec with lam_c _ => Botᵏ | ap_r _ => Fᵏ | ap_l _ => Eᵏ end
+      | _  => Botᵏ
       end.
   Notation "k +> ec" := (ckind_trans k ec) (at level 50, left associativity).
 
 
-  Definition init_ckind : ckind     :=  C.
-  Definition dead_ckind (k : ckind) :=  k = CBot.
+  Definition init_ckind : ckind     :=  Eᵏ.
+  Definition dead_ckind (k : ckind) :=  k = Botᵏ.
   Hint Unfold init_ckind dead_ckind.
 
 
@@ -85,8 +84,8 @@ Module Lam_NO_PreRefSem <: PRE_REF_SEM.
     inversion H;
     reflexivity.
   Qed.
-  
-  
+
+
   Inductive context (k1 : ckind) : ckind -> Set :=
   | empty : context k1 k1
   | ccons : forall (ec : elem_context) {k2}, context k1 k2 -> context k1 (k2+>ec).
@@ -95,33 +94,33 @@ Module Lam_NO_PreRefSem <: PRE_REF_SEM.
   Notation "[.]"      := empty.
   Notation "[.]( k )" := (@empty k).
   Infix "=:"          := ccons (at level 60, right associativity).
-  
-  
+
+
   Fixpoint value_to_term {k} (v : value k) : term :=
       match v with
-      | vCLam x v => Lam x (value_to_term v)
-      | vCVar x => Var x
-      | vCApp v1 v2 => App (valCa_to_term v1) (value_to_term v2)
-      | vECaLam x t => Lam x t
-      | vECaVar x => Var x
-      | vECaApp v1 v2 => App (valCa_to_term v1) (value_to_term v2)
-      | vCBot t => t
+      | vELam x v => Lam x (value_to_term v)
+      | vEVar x => Var x
+      | vEApp v1 v2 => App (valA_to_term v1) (value_to_term v2)
+      | vFLam x t => Lam x t
+      | vFVar x => Var x
+      | vFApp v1 v2 => App (valA_to_term v1) (value_to_term v2)
+      | vBot t => t
       end
 
-  with valCa_to_term v : term :=
+  with valA_to_term v : term :=
       match v with
-      | vCaVar x => Var x
-      | vCaApp v1 v2 => App (valCa_to_term v1) (value_to_term v2)
+      | vAVar x => Var x
+      | vAApp v1 v2 => App (valA_to_term v1) (value_to_term v2)
       end.
 
   Coercion value_to_term : value >-> term.
-  Coercion valCa_to_term : valCa >-> term.
+  Coercion valA_to_term  : valA >-> term.
 
 
   Definition redex_to_term {k} (r : redex k) : term :=
       match r with
-      | rCApp x t1 t2   => App (Lam x t1) t2
-      | rECaApp x t1 t2 => App (Lam x t1) t2
+      | rEApp x t1 t2   => App (Lam x t1) t2
+      | rFApp x t1 t2 => App (Lam x t1) t2
       end.
   Coercion redex_to_term : redex >-> term.
 
@@ -136,18 +135,18 @@ Module Lam_NO_PreRefSem <: PRE_REF_SEM.
   Proof with auto.
     induction v using val_Ind with 
     (P  := fun k v => forall v' : value k, value_to_term v = value_to_term v' -> v = v')
-    (P0 := fun v   => forall v' : valCa,   valCa_to_term v = valCa_to_term v' -> v = v');
+    (P0 := fun v   => forall v' : valA,    valA_to_term v  = valA_to_term v'  -> v = v');
     dependent destruction v'; intro H; inversion H; f_equal...
   Qed.
 
 
-  Lemma valCa_to_term_injective : 
-      forall v v', valCa_to_term v = valCa_to_term v' -> v = v'.
+  Lemma valA_to_term_injective :
+      forall v v', valA_to_term v = valA_to_term v' -> v = v'.
 
   Proof with auto.
     induction v using valCa_Ind with 
     (P  := fun k v => forall v' : value k, value_to_term v = value_to_term v' -> v = v')
-    (P0 := fun v   => forall v' : valCa,   valCa_to_term v = valCa_to_term v' -> v = v');
+    (P0 := fun v   => forall v' : valA,    valA_to_term v  = valA_to_term v'  -> v = v');
     dependent destruction v'; intro H; inversion H; f_equal...
   Qed.
 
@@ -202,7 +201,7 @@ Module Lam_NO_PreRefSem <: PRE_REF_SEM.
   Notation "c [ t ]" := (plug t c) (at level 0).
 
 
-  Definition immediate_ec ec t := exists t', ec:[t'] = t. 
+  Definition immediate_ec ec t := exists t', ec:[t'] = t.
 
 
   Parameter subst : var -> term -> term -> term.
@@ -210,8 +209,8 @@ Module Lam_NO_PreRefSem <: PRE_REF_SEM.
 
   Definition contract0 {k} (r : redex k) : term :=
       match r with
-      | rCApp   x t0 t1 => subst x t1 t0
-      | rECaApp x t0 t1 => subst x t1 t0
+      | rEApp x t0 t1 => subst x t1 t0
+      | rFApp x t0 t1 => subst x t1 t0
       end.
   Definition contract {k} (r : redex k) := Some (contract0 r).
 
@@ -221,13 +220,13 @@ Module Lam_NO_PreRefSem <: PRE_REF_SEM.
   Defined.
 
 
-  Lemma valCa_is_valECa : 
-      forall v1 : valCa, exists v2 : value ECa, valCa_to_term v1 = value_to_term v2.
+  Lemma valA_is_valF : 
+      forall v1 : valA, exists v2 : value Fᵏ, valA_to_term v1 = value_to_term v2.
 
   Proof with auto.
     destruct v1; intros.
-    - exists (vECaVar v)...
-    - exists (vECaApp v1 v)...
+    - exists (vFVar v)...
+    - exists (vFApp v1 v)...
   Qed.
 
 
@@ -239,7 +238,7 @@ Module Lam_NO_PreRefSem <: PRE_REF_SEM.
     destruct ec, v; inversion H0; subst; 
     solve 
     [ eautof
-    | auto using valCa_is_valECa ].
+    | auto using valA_is_valF ].
   Qed.
 
 
@@ -250,8 +249,8 @@ Module Lam_NO_PreRefSem <: PRE_REF_SEM.
     intros k r ec t H H0.
     destruct ec, r; inversion H0; subst;
     solve 
-    [ eexists (vECaLam _ _); reflexivity
-    | eauto using valCa_is_valECa
+    [ eexists (vFLam _ _); reflexivity
+    | eauto using valA_is_valF
     | destruct v; inversion H2 ].
   Qed.
 
@@ -264,7 +263,7 @@ Module Lam_NO_PreRefSem <: PRE_REF_SEM.
     dependent destruction r; dependent destruction v; 
     simpl;
     try match goal with 
-    | |- App (valCa_to_term ?v) _ <> _ => dependent_destruction2 v
+    | |- App (valA_to_term ?v) _ <> _ => dependent_destruction2 v
     end;
 
     solve [ discriminate ].
@@ -349,17 +348,17 @@ Module Lam_NO_Strategy <: REF_STRATEGY Lam_NO_PreRefSem.
   Definition dec_term t k : interm_dec k :=
 
       match k as k0 return interm_dec k0 with 
-      | C    => match t with
+      | Eᵏ   => match t with
                 | App t1 t2 => in_term t1 (ap_r t2)
-                | Var x     => in_val (vCVar x)
+                | Var x     => in_val (vEVar x)
                 | Lam x t1  => in_term t1 (lam_c x)
                   end
-      | ECa  => match t with
+      | Fᵏ   => match t with
                 | App t1 t2 => in_term t1 (ap_r t2)
-                | Var x     => in_val (vECaVar x)
-                | Lam x t1  => in_val (vECaLam x t1)
+                | Var x     => in_val (vFVar x)
+                | Lam x t1  => in_val (vFLam x t1)
                 end
-      | CBot => in_dead
+      | Botᵏ => in_dead
       end.
 
 
@@ -368,33 +367,33 @@ Module Lam_NO_Strategy <: REF_STRATEGY Lam_NO_PreRefSem.
       match ec as ec0 return value (k+>ec0) -> interm_dec k with
 
       | lam_c x  => match k as k0 return value (k0+>lam_c x) -> interm_dec k0 with
-                    | C    => fun v => in_val (vCLam x v)
-                    | ECa  => fun v => in_dead
-                    | CBot => fun v => in_dead
+                    | Eᵏ   => fun v => in_val (vELam x v)
+                    | Fᵏ   => fun v => in_dead
+                    | Botᵏ => fun v => in_dead
                     end
 
       | ap_r t   => match k as k0 return value (k0+>(ap_r t)) -> interm_dec k0 with
-                    | C    => fun v => 
+                    | Eᵏ   => fun v => 
                                   match v with
-                                  | vECaLam x t0  => in_red (rCApp x t0 t)
-                                  | vECaVar x     => in_term t (ap_l (vCaVar x))
-                                  | vECaApp v1 v2 => in_term t (ap_l (vCaApp v1 v2))
-                                  | _ => @in_dead C
+                                  | vFLam x t0  => in_red (rEApp x t0 t)
+                                  | vFVar x     => in_term t (ap_l (vAVar x))
+                                  | vFApp v1 v2 => in_term t (ap_l (vAApp v1 v2))
+                                  | _ => @in_dead Eᵏ
                                   end
-                    | ECa  => fun v => 
+                    | Fᵏ   => fun v => 
                                   match v with
-                                  | vECaLam x t0  => in_red (rECaApp x t0 t)
-                                  | vECaVar x     => in_term t (ap_l (vCaVar x))
-                                  | vECaApp v1 v2 => in_term t (ap_l (vCaApp v1 v2))
-                                  | _ => @in_dead ECa
+                                  | vFLam x t0  => in_red (rFApp x t0 t)
+                                  | vFVar x     => in_term t (ap_l (vAVar x))
+                                  | vFApp v1 v2 => in_term t (ap_l (vAApp v1 v2))
+                                  | _ => @in_dead Fᵏ
                                   end
-                    | CBot => fun v => in_dead
+                    | Botᵏ => fun v => in_dead
                     end
 
       | ap_l v0  => match k as k0 return value (k0+>(ap_l v0)) -> interm_dec k0 with
-                    | C    => fun v => in_val (vCApp v0 v)
-                    | ECa  => fun v => in_val (vECaApp v0 v)
-                    | CBot => fun v => in_dead
+                    | Eᵏ   => fun v => in_val (vEApp v0 v)
+                    | Fᵏ   => fun v => in_val (vFApp v0 v)
+                    | Botᵏ => fun v => in_dead
                     end
       end v.
 
@@ -470,11 +469,11 @@ Module Lam_NO_Strategy <: REF_STRATEGY Lam_NO_PreRefSem.
 
   Definition search_order (k : ckind) (t : term) (ec ec0 : elem_context) : Prop :=
       match k with
-      | CBot => False
-      | _      => match ec, ec0 with 
-                  | ap_l _, ap_r _ => immediate_ec ec t /\ immediate_ec ec0 t 
-                  | _, _           => False
-                  end
+      | Botᵏ => False
+      | _    => match ec, ec0 with 
+                | ap_l _, ap_r _ => immediate_ec ec t /\ immediate_ec ec0 t 
+                | _, _           => False
+                end
       end.
   Notation "k , t |~  ec1 << ec2 " := (search_order k t ec1 ec2) 
                                      (no associativity, at level 70, ec1, t at level 69).
@@ -512,7 +511,7 @@ Module Lam_NO_Strategy <: REF_STRATEGY Lam_NO_PreRefSem.
     [ compute; eautof 7
     | do 2 right; 
       f_equal;
-      apply valCa_to_term_injective; auto ].
+      apply valA_to_term_injective; auto ].
   Qed.
 
 
@@ -599,7 +598,7 @@ Module Lam_NO_Strategy <: REF_STRATEGY Lam_NO_PreRefSem.
 
     destruct k, ec0, ec'; autof;
     unfold search_order in H0; destruct H0 as (H, _);
-    destruct (valCa_is_valECa v) as (v0, H0);
+    destruct (valA_is_valF v) as (v0, H0);
 
     solve
     [ exists v0;

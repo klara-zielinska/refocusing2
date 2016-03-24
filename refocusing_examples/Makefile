@@ -101,6 +101,7 @@ VFILES:=lam_kes_cbn.v\
   lam_no_check.v\
   lam_ses_no.v\
   lam_ses_no_check.v\
+  lam_ses_no_test.v\
   miniml.v\
   miniml_check.v
 

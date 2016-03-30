@@ -60,36 +60,19 @@ Require Export rewriting_system.
 
 Module Type RED_SEM.
 
-  (* Preconditions: To instaniate this module you need to determinizethe grammar of 
-     contextes. *)
-
-
   Parameters 
   (term         : Set)
   (elem_context : Set)
-  (ckind        : Set) (* kinds of contexts, that is, non-terminal context symbols 
-                          in the grammar *)
-  (ckind_trans  : ckind -> elem_context -> ckind) (* 
-          function that determinates the productions in the grammar, that is,
-          if ckind_trans k1 ec = k2, then k1 -> EC[k2] where ec matches EC or
-          there is no such production and k2 is a sink. 
-          In other words, it is the transition function of a finite automaton 
-          representing the totalized grammar. *)
+  (ckind        : Set)
+  (ckind_trans  : ckind -> elem_context -> ckind)
   (elem_plug     : term -> elem_context -> term)
-  (redex         : ckind -> Set) (* representations of redexes that may occur in 
-                                    a hole of a given kind *) 
-  (value         : ckind -> Set) (* 
-          representations of values that may occure in a hole of a given kind; 
-          if the kind is not a sink then the values need to represent a subset of 
-          normal forms of the kind, otherwise they may be represent any subset of 
-          terms *)
+  (redex         : ckind -> Set)
+  (value         : ckind -> Set)
   (value_to_term : forall {k}, value k -> term)
   (redex_to_term : forall {k}, redex k -> term)
-  (init_ckind    : ckind)         (* a start symbol in the grammar *)
-  (dead_ckind    : ckind -> Prop) (* a set of sink symbols; if your grammar is not 
-                                     total you need to introduce at least one *)
-  (contract : forall {k}, redex k -> option term). (* reduction of a redex, which 
-                                                      may get stuck *)
+  (init_ckind    : ckind)
+  (dead_ckind    : ckind -> Prop)
+  (contract : forall {k}, redex k -> option term).
 
   Infix "+>"           := ckind_trans (at level 50, left associativity).
   Notation "ec :[ t ]" := (elem_plug t ec) (at level 0).
@@ -111,9 +94,6 @@ Module Type RED_SEM.
   Notation "[.]"      := empty.
   Notation "[.]( k )" := (@empty k).
   Infix    "=:"       := ccons (at level 60, right associativity).
-
-  (* Note: Contexts are reversed, because during evaluation by refocusing we always 
-     access the elem. context nearest to the hole of a context. *)
 
   (* Definition: The hole of a context is called >dead< if its kind is a sink symbol. *)
 
@@ -187,10 +167,8 @@ Module Type RED_SEM.
   (redex_to_term_injective :                                 forall {k} (r r' : redex k),
        redex_to_term r = redex_to_term r' -> r = r')
 
-  (* The following axiom, somehow, relates our representation of contexts to the 
-     real eval. contexts, but generally we can instantiate the module with 
-     elem. contexts that do not represent real elem. contexts and so not
-     every module of this signature is a proper. *)
+  (* The following axiom, somehow, relates our representation of contexts to the real
+     reduction contexts. *)
   (elem_plug_injective1 :                                                forall ec t0 t1,
        ec:[t0] = ec:[t1] -> t0 = t1)
 

@@ -70,8 +70,8 @@ Module DET_RED_SEM_Facts (R : DET_RED_MINI_SEM).
     intros k1 k2 c r t H.
     assert (G: ~dead_ckind k1) by (intro; eapply proper_death_trans; eauto).
     destruct H as [k' [c' [r' [t' [H0 [H1 H2]]]]]].
-    
-    assert (H3 : d_red r c = d_red r' c'). 
+
+    assert (H3 : d_red r c = d_red r' c').
     { eapply dec_is_det; solve [reflexivity | unfold dec; eauto]. }
     inversion H3; dep_subst.
     eauto.

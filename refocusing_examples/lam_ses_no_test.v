@@ -10,6 +10,7 @@ Module Example.
 
   Definition t1 := Lam (App (Lam (Lam (Var 1))) (Var 0)).
 
+
   Eval compute in 
     Sim.n_steps 
     ( load t1 )

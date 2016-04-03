@@ -23,8 +23,8 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
 
   Module RLF := RED_LANG_Facts R.
   Module RSF := RED_STRATEGY_STEP_Facts R R.ST.
-  Module RRSDet := RedRefSemDet R.
-  Import R.R R RLF RSF RRSDet ST EAM.
+  Module RF := RED_REF_SEM_Facts R.
+  Import R.R R RLF RSF RF ST EAM.
 
 
   Notation eam := EAM.rws.
@@ -84,28 +84,29 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
 
 
 
-  Lemma dec_proc_sim :               forall t {k1 k2} (d : decomp k1) (c : context k1 k2)
+  Lemma refocus_in_sim :             forall t {k1 k2} (d : decomp k1) (c : context k1 k2)
                                                                    (c0 : context ick k1),
-      dec_proc t c d ->
+      refocus_in t c d ->
           exists n (sts : Vector.t configuration n), (*such that: *)
 
           (**)Forall (fun st => decompile st = (c~+c0)[t] /\ alive_state st) sts /\
 
           (**)match d with 
-              | d_val v      => last (c_eval t (c ~+ c0) :: sts) = c_apply c0 v 
+              | d_val v => last (c_eval t (c ~+ c0) :: sts) = c_apply c0 v 
 
-              | @d_red _ k r c' => last (c_eval t (c ~+ c0) :: sts) = c_eval r (c'~+c0) /\
-                                dec_term r k = in_red r  \/
+              | @d_red _ k r c' => 
+                           last (c_eval t (c ~+ c0) :: sts) = c_eval r (c'~+c0) /\
+                           dec_term r k = in_red r  \/
 
-                                exists ec v, dec_context ec k v = in_red r /\
-                                last (c_eval t (c ~+ c0) :: sts) = c_apply (ec=:c'~+c0) v
+                           exists ec v, dec_context ec k v = in_red r /\
+                           last (c_eval t (c ~+ c0) :: sts) = c_apply (ec=:c'~+c0) v
               end /\
 
           (**)path (c_eval t (c~+c0) :: sts).
 
   Proof with eauto.
     intros t k1 k2 d c c0 H.
-    induction H using dec_proc_Ind with
+    induction H using refocus_in_Ind with
     (P0 := fun k2 (v' : R.value k2) (c : context k1 k2) d _ =>
 
         exists n (sts : Vector.t configuration n),
@@ -113,20 +114,21 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
         (**)Forall (fun st => decompile st = (c ~+ c0) [v'] /\ alive_state st) sts /\
 
         (**)match d with 
-            | d_val v      => last (c_apply (c ~+ c0) v' :: sts) = c_apply c0 v 
+            | d_val v  => last (c_apply (c ~+ c0) v' :: sts) = c_apply c0 v 
 
-            | @d_red _ k r c' => last (c_apply (c ~+ c0) v' :: sts) = c_eval r (c'~+c0) /\
-                              dec_term r k = in_red r  \/
+            | @d_red _ k r c' => 
+                          last (c_apply (c ~+ c0) v' :: sts) = c_eval r (c'~+c0) /\
+                          dec_term r k = in_red r  \/
 
-                              exists ec v, dec_context ec k v = in_red r /\
-                              last (c_apply (c ~+ c0) v' :: sts) = c_apply (ec=:c'~+c0) v
+                          exists ec v, dec_context ec k v = in_red r /\
+                          last (c_apply (c ~+ c0) v' :: sts) = c_apply (ec=:c'~+c0) v
             end /\
 
         (**)path (c_apply (c ~+ c0) v' :: sts)
     );
 
         subst;
-        try destruct IHdec_proc as [n [sts [H0 [H1 H2]]]]; auto;
+        try destruct IHrefocus_in as [n [sts [H0 [H1 H2]]]]; auto;
         repeat match goal with
         | H : dec_term ?t ?k = _ |- _ => 
               assert (G := dec_term_correct t k);
@@ -165,50 +167,51 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
 
 
 
-  Lemma decctx_proc_sim :                         forall {k1 k2} v' d (c : context k1 k2)
+  Lemma refocus_out_sim :                         forall {k1 k2} v' d (c : context k1 k2)
                                                                    (c0 : context ick k1),
-      decctx_proc v' c d ->
+      refocus_out v' c d ->
           exists n (sts : Vector.t configuration n),
 
           (**)Forall (fun st => decompile st = (c ~+ c0) [v'] /\ alive_state st) sts /\
 
           (**)match d with 
-              | d_val v      => last (c_apply (c ~+ c0) v' :: sts) = c_apply c0 v 
+              | d_val v => last (c_apply (c ~+ c0) v' :: sts) = c_apply c0 v 
 
-              | @d_red _ k r c' => last (c_apply (c ~+ c0) v' :: sts) = c_eval r (c'~+c0) /\
-                                dec_term r k = in_red r \/
+              | @d_red _ k r c' => 
+                           last (c_apply (c ~+ c0) v' :: sts) = c_eval r (c'~+c0) /\
+                           dec_term r k = in_red r \/
 
-                                exists ec v, dec_context ec k v = in_red r /\
-                                last (c_apply (c ~+ c0) v' :: sts) = 
-                                                                   c_apply (ec=:c'~+c0) v
+                           exists ec v, dec_context ec k v = in_red r /\
+                           last (c_apply (c ~+ c0) v' :: sts) = c_apply (ec=:c'~+c0) v
               end /\
 
           (**)path (c_apply (c ~+ c0) v' :: sts).
 
   Proof with eauto.
     intros k1 k2 v' d c c0 H.
-    induction H using decctx_proc_Ind with
-    (P := fun k2 t (c : context k1 k2) d (_ : dec_proc t c d) =>
+    induction H using refocus_out_Ind with
+    (P := fun k2 t (c : context k1 k2) d (_ : refocus_in t c d) =>
 
         exists n (sts : Vector.t configuration n),
 
         (**)Forall (fun st => decompile st = (c ~+ c0) [t] /\ alive_state st) sts /\
 
         (**)match d with 
-            | d_val v      => last (c_eval t (c ~+ c0) :: sts) = c_apply c0 v 
+            | d_val v => last (c_eval t (c ~+ c0) :: sts) = c_apply c0 v 
 
-            | @d_red _ k r c' => last (c_eval t (c ~+ c0) :: sts) = c_eval r (c'~+c0) /\
-                              dec_term r k = in_red r \/
+            | @d_red _ k r c' => 
+                         last (c_eval t (c ~+ c0) :: sts) = c_eval r (c'~+c0) /\
+                         dec_term r k = in_red r \/
 
-                              exists ec v, dec_context ec k v = in_red r           /\
-                              last (c_eval t (c ~+ c0) :: sts) = c_apply (ec=:c'~+c0) v
+                         exists ec v, dec_context ec k v = in_red r           /\
+                         last (c_eval t (c ~+ c0) :: sts) = c_apply (ec=:c'~+c0) v
             end /\
 
         (**)path (c_eval t (c ~+ c0) :: sts)
     );
 
          subst;
-         try destruct IHdecctx_proc as [n [sts [H0 [H1 H2]]]]; auto;
+         try destruct IHrefocus_out as [n [sts [H0 [H1 H2]]]]; auto;
          repeat match goal with
          | H : dec_term ?t ?k = _ |- _ => 
                assert (G := dec_term_correct t k);
@@ -263,8 +266,8 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
         solve [subst; simpl; eauto using dead_context_dead, plug_compose].
     }
     assert (~dead_ckind k2) by eauto using (proper_death2 [.]).
-    apply dec_proc_eqv_dec in H5...
-    destruct (dec_proc_sim _ _ _ [.] H5) as [n [sts [G [G1 G2] ]]];
+    apply refocus_in_eqv_dec in H5...
+    destruct (refocus_in_sim _ _ _ [.] H5) as [n [sts [G [G1 G2] ]]];
     destruct                          G1 as [[G0 G1] | [ec [v [G1 G0]]]];
         rewrite <- (compose_empty c) in *;
         rewrite <- (compose_empty (c2)) in *;
@@ -299,9 +302,9 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
         solve [subst; simpl; eauto using dead_context_dead, plug_compose].
     }
     assert (~dead_ckind k2) by eauto using (proper_death2 [.]).
-    apply dec_proc_eqv_dec in H5...
-    apply dec_proc_val_eqv_decctx in H5.
-    destruct (decctx_proc_sim _ _ _ [.] H5) as [n [sts [G [G1 G2] ]]];
+    apply refocus_in_eqv_dec in H5...
+    apply refocus_in_val_eqv_refocus_out in H5.
+    destruct (refocus_out_sim _ _ _ [.] H5) as [n [sts [G [G1 G2] ]]];
     destruct                             G1 as[[G0 G1] | [ec [v' [G1 G0]]]];
         rewrite <- (compose_empty c) in *;
         rewrite <- (compose_empty (c2)) in *;
@@ -355,8 +358,8 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
         inversion H3;
         congruence.
     }
-    apply dec_proc_eqv_dec in H1...
-    destruct (dec_proc_sim _ _ _ [.] H1) as [n [sts' [H3 [H4 H5]]]].
+    apply refocus_in_eqv_dec in H1...
+    destruct (refocus_in_sim _ _ _ [.] H1) as [n [sts' [H3 [H4 H5]]]].
     rewrite <- (compose_empty c) in *.
     assert (H6 : forall m, (sts 0 :: sts')[@m] = sts m).
     {
@@ -432,9 +435,9 @@ Module SloppyRefEvalApplyMachine_Facts (R   : RED_REF_SEM)
         congruence
         end.
     }
-    apply dec_proc_eqv_dec in H1...
-    apply dec_proc_val_eqv_decctx in H1.
-    destruct (decctx_proc_sim _ _ _ [.] H1) as [n [sts' [H3 [H4 H5]]]].
+    apply refocus_in_eqv_dec in H1...
+    apply refocus_in_val_eqv_refocus_out in H1.
+    destruct (refocus_out_sim _ _ _ [.] H1) as [n [sts' [H3 [H4 H5]]]].
     rewrite <- (compose_empty c) in *.
     assert (H6 : forall m, (sts 0 :: sts')[@m] = sts m).
     {
@@ -604,7 +607,7 @@ Module RefEvalApplyMachine_Facts                                (R : PRECISE_RED
     - clear st2 H3 H4 H5.
       induction sts as [ | st1' ? sts].
       + constructor.
-      + dependent destruction H2 (*as [p H2]*); dep_subst.
+      + dependent destruction H2 (*as [p ?]*); dep_subst.
         destruct p as [H3 H4].
         constructor.
         * clear.
@@ -616,7 +619,7 @@ Module RefEvalApplyMachine_Facts                                (R : PRECISE_RED
         induction sts as [ | st1' ? sts]; 
             intros st1 H5 m;
             dependent destruction m;
-            dependent destruction H2 (*as [p H2]*); dep_subst.
+            dependent destruction H2; dep_subst.
         * destruct st1';
           solve [ apply (H5 Fin.F1) ].
         * apply IHsts.
@@ -628,7 +631,7 @@ Module RefEvalApplyMachine_Facts                                (R : PRECISE_RED
             intros st1 H5.
         * destruct st2; 
           solve [ apply (H5 Fin.F1) ].
-        * dependent destruction H2 (*as [p H2]*); dep_subst.
+        * dependent destruction H2; dep_subst.
           apply IHsts.
           intro m.
           destruct st1';
@@ -664,9 +667,7 @@ Module RefEvalApplyMachine_Facts                                (R : PRECISE_RED
       destruct (RAW.progress st1) as [[v H4] | [st2 H4]]; try solve [intuition];
           subst.
       - left. exists v. auto.
-        (*apply (f_equal (@exist _ _ _)).
-        apply witness_unique.*)
-      - right. 
+      - right.
         assert (H5 : alive_state st2) by eauto using trans_alive.
         exists (submember_by _ st2 H5).
         auto.

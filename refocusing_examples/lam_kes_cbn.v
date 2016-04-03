@@ -1,3 +1,8 @@
+
+
+(*** Krivin machine example ***)
+
+
 Require Import List
                Util
                refocusing_semantics.
@@ -719,11 +724,6 @@ Module Lam_KES_CBN_Strategy <: REF_STRATEGY Lam_KES_CBN_PreRefSem.
   Proof. intros k t ec. constructor. inversion 1. Qed.
 
 
-  (*Lemma search_order_antisym : forall k t ec ec0, 
-      k, t |~ ec << ec0 -> ~ k, t |~ ec0 << ec.
-  Proof. auto. Qed.*)
-
-
   Lemma search_order_trans   : forall k t ec0 ec1 ec2,
       k, t |~ ec0 << ec1 -> k, t |~ ec1 << ec2 -> k,t |~ ec0 << ec2.
   Proof. auto. Qed.
@@ -793,8 +793,8 @@ Module EAKrivineMachine := RefEvalApplyMachine Lam_KES_CBN_RefSem.
 
 Module Example.
 
-  Require Import refocusing_machine_facts 
-                 List (* to patch a module bug in Coq *).
+  Require Import refocusing_machine_facts
+                 List. (* needed to patch a module bug in Coq *)
 
   Module RAWF := SloppyRefEvalApplyMachine_Facts  Lam_KES_CBN_RefSem 
                                                   EAKrivineMachine.RAW.

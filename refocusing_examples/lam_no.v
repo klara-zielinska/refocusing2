@@ -1,3 +1,8 @@
+
+
+(* Lambda calculus with normal order and substitutions in one step example *)
+
+
 Require Import Program
                Util
                refocusing_semantics.

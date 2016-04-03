@@ -288,6 +288,7 @@ Module Type RED_MINI_LANG2.
   Axioms
   (decompose :                                                                forall t k,
        ~dead_ckind k -> exists d : decomp k, dec t k d)
+
   (value_redex :                                  forall {k} (v : value k) (r : redex k),
        value_to_term v <> redex_to_term r).
 
@@ -300,7 +301,6 @@ Module RED_LANG2_Facts (R : RED_MINI_LANG2).
 
   Import R.
 
-  (* Redex *)
 
   Definition only_trivial_dec t k :=                                        forall t' k',
       forall (c : context k k'), ~dead_ckind k' -> c[t'] = t -> 

@@ -31,6 +31,7 @@
 <H3>Table of content:</H3>
 <OL>
 <LI> Files-map</LI>
+<LI> Set-up environment</LI>
 <LI> Quick start</LI>
 <LI> Reduction semantics</LI>
 <LI> Reduction strategy</LI>
@@ -46,6 +47,12 @@
 <TABLE>
 
 <TR><TH>MODULE</TH><TH/><TH>FILE</TH></TR>
+
+<TR>
+<TD>abstract_machine</TD>
+<TD>-></TD>
+<TD>abstract_machine/abstract_machine.v</TD>
+</TR> 
 
 <TR>
 <TD>abstract_machine_facts</TD>
@@ -85,6 +92,19 @@
 
 </TABLE>
 </CODE>
+
+<H3>Set-up environment</H3>
+
+<P>To compile the library one may use the <CODE>make</CODE> command in 
+the main directory.</P>
+
+<P>To remove old binaries one may use the <CODE>make clean</CODE> command in
+the main directory.</P>
+</P>
+
+<P>To run Coq with the library loaded one may call <CODE>coqtop</CODE> with 
+the parameter <CODE>-R [dir_with_the_compiled_library] Top</CODE>.</P>
+
 
 <H3>Quick start</H3>
 

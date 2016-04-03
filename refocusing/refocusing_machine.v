@@ -1,13 +1,12 @@
 
 
-(*** Interface ***)
+(*** Interface part ***)
 
 Require Import Subset
                Entropy
                reduction_semantics
                refocusing_semantics.
 Require Export abstract_machine.
-
 
 
 
@@ -28,7 +27,6 @@ Module Type SLOPPY_REF_EVAL_APPLY_MACHINE (R : RED_REF_SEM) <: DET_ABSTRACT_MACH
 
   Definition configuration := conf.
   Definition load t                    : configuration := c_eval t [.].
-  (*Coercion   value_to_conf (v : value)   : configuration := c_apply [.] v.*)
   Definition final (c : configuration) : option value := 
       match c with
       | c_apply [.] v => Some v 
@@ -116,9 +114,6 @@ Module Type SLOPPY_REF_EVAL_APPLY_MACHINE (R : RED_REF_SEM) <: DET_ABSTRACT_MACH
        final st <> None -> ~exists st', st → st')
   (trans_computable :                                                     forall st1 st2,
        st1 → st2 <-> exists e, next_conf e st1 = Some st2)
-  (*finals_are_vals :                                                        forall st v,
-       final st = Some v <-> st = v*)
-
   (dnext_conf_alive :                                                     forall st1 st2,
       dnext_conf st1 = Some st2 -> alive_state st2)
   (trans_alive :                                                          forall st1 st2,
@@ -136,7 +131,6 @@ Module Type SLOPPY_REF_EVAL_APPLY_MACHINE (R : RED_REF_SEM) <: DET_ABSTRACT_MACH
   }.
 
 End SLOPPY_REF_EVAL_APPLY_MACHINE.
-
 
 
 
@@ -172,10 +166,6 @@ Module Type REF_EVAL_APPLY_MACHINE (R : PRECISE_RED_REF_SEM) <: DET_ABSTRACT_MAC
 
   Definition load t : configuration := 
       submember_by alive_state (RAW.c_eval t [.]) init_ckind_alive.
-
-  (*Definition value_to_conf (v : value) : configuration := 
-     submember_by alive_state (RAW.c_apply [.] v) init_ckind_alive.
-  Coercion value_to_conf : value >-> configuration.*)
 
   Definition final (c : configuration)     : option value := RAW.final c. 
   Definition decompile (c : configuration) : term         := RAW.decompile c.
@@ -331,7 +321,7 @@ End REF_PUSH_ENTER_MACHINE.*)
 
 
 
-(*** Implementation ***)
+(*** Implementation part ***)
 
 
 Require Import Util
@@ -360,7 +350,6 @@ Module SloppyRefEvalApplyMachine (R : RED_REF_SEM) <: SLOPPY_REF_EVAL_APPLY_MACH
 
 
   Definition load t                    : configuration := c_eval t [.].
-  (*Coercion   value_to_conf (v : value) : configuration := c_apply [.] v.*)
   Definition final (c : configuration) : option value := 
       match c with
       | c_apply [.] v => Some v 
@@ -511,21 +500,6 @@ Module SloppyRefEvalApplyMachine (R : RED_REF_SEM) <: SLOPPY_REF_EVAL_APPLY_MACH
     - destruct H as [ent H].
       apply trans_computable0...
   Qed.
-
-
-  (*Lemma finals_are_vals :                                                   forall c v,
-       final c = Some v <-> c = v.
-
-  Proof.
-    intros c v.
-    destruct c; simpl.
-    - intuition.
-    - destruct c.
-      + split; intro H;
-            inversion H; dep_subst;
-        solve [auto].
-      + intuition.
-  Qed.*)
 
 
   Lemma dnext_conf_alive :                                                forall st1 st2,

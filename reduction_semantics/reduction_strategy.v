@@ -96,12 +96,6 @@ Module Type RED_STRATEGY_STEP (R : RED_STRATEGY_LANG).
   Import R.
 
 
-  (* interm_dec k - result of functions performing one step of decomposition of 
-                    a term t from the symbol k to a redex.
-     in_red r      - t is a redex, t = r.
-     in_term t' ec - t = ec[t'] and to find a redex we are going to check t'.
-     in_val v      - there is no redexes in t, t = v.
-     in_dead       - result of the functions for arguments out of their domains. *)
   Inductive interm_dec k : Set :=
   | in_red  : redex k -> interm_dec k
   | in_term : term -> elem_context -> interm_dec k
@@ -111,13 +105,14 @@ Module Type RED_STRATEGY_STEP (R : RED_STRATEGY_LANG).
   Arguments in_term {k} _ _. Arguments in_dead {k}.
 
 
-  (* dec_term t k       - one step of decomposition of t from the symbol k if we
-                          have no information about subterms of t. 
-                          Domain:  term * { k : ckind | k is not dead }  
-     dec_context ec k v - one step of decomposition of a term ec[t] with an additional
-                          piece of information saying that t is a value v. 
-                          Domain:  elem_context * { (k, v) | k+>ec is not dead and
-                                                             v : value (k+>ec)     }  *)
+  (* dec_term t k       - one step of decomposition of t considered in the hole of
+                          the kind k if we have no information about subterms of t.
+                          Proper domain:  term * { k : ckind | k is not dead }
+     dec_context ec k v - one step of decomposition of a term ec[v] considered in
+                          the hole of the kind k after finding out that v is a value.
+                          Proper domain:  elem_context * { (k, v) | k+>ec is not dead
+                                                           and v : value (k+>ec)      }
+  *)
   Parameters
   (dec_term    : term -> forall k, interm_dec k)
   (dec_context : forall ec k, value (k+>ec) -> interm_dec k).
@@ -168,28 +163,28 @@ Module Type RED_STRATEGY (R : RED_STRATEGY_LANG).
   Notation "k , t |~  ec1 << ec2 " := (search_order k t ec1 ec2)
                (at level 70, t, ec1, ec2 at level 50, no associativity).
 
-  Axiom dec_term_term_top : 
-      forall t k {t' ec}, dec_term t k = in_term t' ec -> 
+  Axiom dec_term_term_top :
+      forall t k {t' ec}, dec_term t k = in_term t' ec ->
           forall ec',  ~ k, t |~ ec << ec'.
 
 
-  Axiom dec_context_red_bot : 
-      forall k ec v {r : redex k}, dec_context ec k v = in_red r -> 
+  Axiom dec_context_red_bot :
+      forall k ec v {r : redex k}, dec_context ec k v = in_red r ->
           forall ec',  ~ k, ec:[v] |~ ec' << ec.
 
-  Axiom dec_context_val_bot : 
-      forall k ec v {v' : value k}, dec_context ec k v = in_val v' -> 
+  Axiom dec_context_val_bot :
+      forall k ec v {v' : value k}, dec_context ec k v = in_val v' ->
           forall ec',  ~ k, ec:[v] |~ ec' << ec.
 
-  Axiom dec_context_term_next : 
-      forall ec0 k v {t ec1}, dec_context ec0 k v = in_term t ec1 -> 
-      (*1*) k, ec0:[v] |~ ec1 << ec0 /\ 
+  Axiom dec_context_term_next :
+      forall ec0 k v {t ec1}, dec_context ec0 k v = in_term t ec1 ->
+      (*1*) k, ec0:[v] |~ ec1 << ec0 /\
       (*2*) forall ec,  k, ec0:[v] |~ ec << ec0  ->  ~ k, ec0:[v] |~ ec1 << ec.
 
 
   Axiom elem_context_det : 
-      forall t ec {t'}, t = ec:[t'] -> 
-          forall k ec',  k, t |~ ec' << ec -> 
+      forall t ec {t'}, t = ec:[t'] ->
+          forall k ec',  k, t |~ ec' << ec ->
               exists (v : value (k+>ec)), t' = v.
 
 End RED_STRATEGY.

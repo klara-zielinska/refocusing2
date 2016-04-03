@@ -1,7 +1,6 @@
 
 
-
-(*** Interface ***)
+(*** Interface part ***)
 
 
 Require Import Program
@@ -107,46 +106,48 @@ Module Type RED_REF_SEM <: RED_SEM.
   Export ST.
 
 
-  Inductive dec_proc {k1} : forall {k2}, term -> context k1 k2 -> decomp k1 -> Prop :=
+  Inductive refocus_in {k1} : forall {k2}, term -> context k1 k2 -> decomp k1 -> Prop :=
 
-  | d_dec  : forall t {k2} (c : context k1 k2) r,
-               dec_term t k2 = in_red r -> 
-               dec_proc t c (d_red r c)
-  | d_v    : forall t {k2} (c : context k1 k2) d v,
-               dec_term t k2 = in_val v ->
-               decctx_proc v c d ->
-               dec_proc t c d
-  | d_term : forall t {k2} (c : context k1 k2) d t0 ec,
+  | ri_red  : forall t {k2} (c : context k1 k2) r,
+                dec_term t k2 = in_red r -> 
+                refocus_in t c (d_red r c)
+  | ri_val  : forall t {k2} (c : context k1 k2) d v,
+                dec_term t k2 = in_val v ->
+                refocus_out v c d ->
+                refocus_in t c d
+  | ri_step : forall t {k2} (c : context k1 k2) d t0 ec,
                dec_term t k2 = in_term t0 ec ->
-               dec_proc t0 (ec=:c) d ->
-               dec_proc t c d
+               refocus_in t0 (ec=:c) d ->
+               refocus_in t c d
 
-  with decctx_proc {k1} : forall {k2}, value k2 -> context k1 k2 -> decomp k1 -> Prop :=
+  with refocus_out {k1} : forall {k2}, value k2 -> context k1 k2 -> decomp k1 -> Prop :=
 
-  | dc_end  : forall (v : value k1),
+  | ro_end  : forall (v : value k1),
                 ~ dead_ckind k1 ->
-                decctx_proc v [.] (d_val v)
-  | dc_dec  : forall ec {k2} (c : context k1 k2) (v : value (k2+>ec)) r,
+                refocus_out v [.] (d_val v)
+  | ro_red  : forall ec {k2} (c : context k1 k2) (v : value (k2+>ec)) r,
                 dec_context ec k2 v = in_red r ->
-                decctx_proc v (ec=:c) (d_red r c)
-  | dc_val  : forall ec {k2} (c  : context k1 k2) (v : value (k2+>ec)) d v0,
+                refocus_out v (ec=:c) (d_red r c)
+  | ro_val  : forall ec {k2} (c  : context k1 k2) (v : value (k2+>ec)) d v0,
                 dec_context ec k2 v = in_val v0 ->
-                decctx_proc v0 c d ->
-                decctx_proc v (ec=:c) d
-  | dc_term : forall ec {k2} (c : context k1 k2) (v : value (k2+>ec)) d t ec0,
+                refocus_out v0 c d ->
+                refocus_out v (ec=:c) d
+  | ro_step : forall ec {k2} (c : context k1 k2) (v : value (k2+>ec)) d t ec0,
                 dec_context ec k2 v = in_term t ec0 ->
-                dec_proc t (ec0=:c) d ->
-                decctx_proc v (ec=:c) d.
+                refocus_in t (ec0=:c) d ->
+                refocus_out v (ec=:c) d.
 
-  Scheme dec_proc_Ind    := Induction for dec_proc    Sort Prop
-    with decctx_proc_Ind := Induction for decctx_proc Sort Prop.
+  Scheme refocus_in_Ind  := Induction for refocus_in  Sort Prop
+    with refocus_out_Ind := Induction for refocus_out Sort Prop.
 
 
   Axioms
-  (dec_proc_val_eqv_decctx :       forall {k2} (v : value k2) {k1} (c : context k1 k2) d,
-       dec_proc v c d <-> decctx_proc v c d)
-  (dec_proc_eqv_dec :                             forall t {k1 k2} (c : context k1 k2) d,
-      ~dead_ckind k2 -> (dec_proc t c d <-> dec c[t] k1 d)). 
+  (refocus_in_val_eqv_refocus_out :                            forall {k2} (v : value k2)
+                                                              {k1} (c : context k1 k2) d,
+       refocus_in v c d <-> refocus_out v c d)
+
+  (refocus_in_eqv_dec :                           forall t {k1 k2} (c : context k1 k2) d,
+      ~dead_ckind k2 -> (refocus_in t c d <-> dec c[t] k1 d)). 
 
 End RED_REF_SEM.
 
@@ -214,7 +215,7 @@ End REF_LANG_Help.
 
 
 
-(*** Implementation ***)
+(*** Implementation part ***)
 
 
 Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
@@ -290,45 +291,44 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
   Include R.
 
 
+  Inductive refocus_in {k1} : forall {k2}, term -> context k1 k2 -> decomp k1 -> Prop :=
 
-  Inductive dec_proc {k1} : forall {k2}, term -> context k1 k2 -> decomp k1 -> Prop :=
-
-  | d_dec  : forall t {k2} (c : context k1 k2) r,
-               dec_term t k2 = in_red r -> 
-               dec_proc t c (d_red r c)
-  | d_v    : forall t {k2} (c : context k1 k2) d v,
-               dec_term t k2 = in_val v ->
-               decctx_proc v c d ->
-               dec_proc t c d
-  | d_term : forall t {k2} (c : context k1 k2) d t0 ec,
+  | ri_red  : forall t {k2} (c : context k1 k2) r,
+                dec_term t k2 = in_red r -> 
+                refocus_in t c (d_red r c)
+  | ri_val  : forall t {k2} (c : context k1 k2) d v,
+                dec_term t k2 = in_val v ->
+                refocus_out v c d ->
+                refocus_in t c d
+  | ri_step : forall t {k2} (c : context k1 k2) d t0 ec,
                dec_term t k2 = in_term t0 ec ->
-               dec_proc t0 (ec=:c) d ->
-               dec_proc t c d
+               refocus_in t0 (ec=:c) d ->
+               refocus_in t c d
 
-  with decctx_proc {k1} : forall {k2}, value k2 -> context k1 k2 -> decomp k1 -> Prop :=
+  with refocus_out {k1} : forall {k2}, value k2 -> context k1 k2 -> decomp k1 -> Prop :=
 
-  | dc_end  : forall (v : value k1),
+  | ro_end  : forall (v : value k1),
                 ~ dead_ckind k1 ->
-                decctx_proc v [.] (d_val v)
-  | dc_dec  : forall ec {k2} (c : context k1 k2) (v : value (k2+>ec)) r,
+                refocus_out v [.] (d_val v)
+  | ro_red  : forall ec {k2} (c : context k1 k2) (v : value (k2+>ec)) r,
                 dec_context ec k2 v = in_red r ->
-                decctx_proc v (ec=:c) (d_red r c)
-  | dc_val  : forall ec {k2} (c  : context k1 k2) (v : value (k2+>ec)) d v0,
+                refocus_out v (ec=:c) (d_red r c)
+  | ro_val  : forall ec {k2} (c  : context k1 k2) (v : value (k2+>ec)) d v0,
                 dec_context ec k2 v = in_val v0 ->
-                decctx_proc v0 c d ->
-                decctx_proc v (ec=:c) d
-  | dc_term : forall ec {k2} (c : context k1 k2) (v : value (k2+>ec)) d t ec0,
+                refocus_out v0 c d ->
+                refocus_out v (ec=:c) d
+  | ro_step : forall ec {k2} (c : context k1 k2) (v : value (k2+>ec)) d t ec0,
                 dec_context ec k2 v = in_term t ec0 ->
-                dec_proc t (ec0=:c) d ->
-                decctx_proc v (ec=:c) d.
+                refocus_in t (ec0=:c) d ->
+                refocus_out v (ec=:c) d.
 
-  Scheme dec_proc_Ind    := Induction for dec_proc    Sort Prop
-    with decctx_proc_Ind := Induction for decctx_proc Sort Prop.
+  Scheme refocus_in_Ind  := Induction for refocus_in  Sort Prop
+    with refocus_out_Ind := Induction for refocus_out Sort Prop.
 
 
 
-  Lemma dec_not_dead :                          forall {t k1 k2} {c : context k1 k2} {d},
-      dec_proc t c d -> ~dead_ckind k2.
+  Lemma refocus_in_not_dead :                  forall {t k1 k2} {c : context k1 k2} {d},
+      refocus_in t c d -> ~dead_ckind k2.
 
   Proof.
     intros; intro.
@@ -340,8 +340,8 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
   Qed.
 
 
-  Lemma decctx_not_dead :                         forall {k1 k2} (c : context k1 k2) v d,
-      decctx_proc v c d -> ~dead_ckind k2.
+  Lemma refocus_out_not_dead :                    forall {k1 k2} (c : context k1 k2) v d,
+      refocus_out v c d -> ~dead_ckind k2.
 
   Proof with auto.
     intros; intro.
@@ -354,14 +354,14 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
   Qed.
 
 
-  Lemma dec_correct :                             forall t {k1 k2} (c : context k1 k2) d,
-      dec_proc t c d -> c[t] = d.
+  Lemma refocus_in_correct :                      forall t {k1 k2} (c : context k1 k2) d,
+      refocus_in t c d -> c[t] = d.
 
   Proof.
     intros t k1 k2 c d.
-    induction 1 using dec_proc_Ind with
-    (P := fun _ t c d (_ : dec_proc t c d)     => c[t] = d)
-    (P0:= fun _ v c d (_ : decctx_proc v c d)  => c[v] = d);
+    induction 1 using refocus_in_Ind with
+    (P := fun _ t c d (_ : refocus_in  t c d)     => c[t] = d)
+    (P0:= fun _ v c d (_ : refocus_out v c d)  => c[v] = d);
 
     simpl; auto;
     match goal with
@@ -374,8 +374,8 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
   Qed.
 
 
-  Lemma dec_val :                  forall {k2} (v : value k2) {k1} (c : context k1 k2) d,
-      dec_proc v c d -> decctx_proc v c d.
+  Lemma refocus_in_to_out :        forall {k2} (v : value k2) {k1} (c : context k1 k2) d,
+      refocus_in v c d -> refocus_out v c d.
 
   Proof with eauto.
     intros k2 v k1; remember (value_to_term v) as t; revert k2 v Heqt.
@@ -396,7 +396,7 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
       clear H; revert x H0 hh.
       induction ec using (well_founded_ind (wf_search k2 (v:term))); intros.
 
-      assert (decctx_proc x (ec=:c) d).
+      assert (refocus_out x (ec=:c) d).
       { apply (H1 x)... do 2 econstructor... }
 
       dependent destruction H2;
@@ -426,8 +426,8 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
   Qed.
 
 
-  Lemma val_dec :                forall {k2} {v : value k2} {k1} {c : context k1 k2} {d},
-      decctx_proc v c d -> dec_proc v c d.
+  Lemma refocus_out_to_in :      forall {k2} {v : value k2} {k1} {c : context k1 k2} {d},
+      refocus_out v c d -> refocus_in v c d.
 
   Proof with eauto.
     intros k2 v k1; remember (value_to_term v); revert k2 v Heqt.
@@ -439,7 +439,7 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
 
     - contradict (value_redex _ _ hh).
 
-    - apply (d_term _ _ _ _ _ Heqi).
+    - apply (ri_step _ _ _ _ _ Heqi).
 
       assert (~ dead_ckind (k2+>e)) as Hndk.
       { eapply dec_term_next_alive... }
@@ -470,12 +470,12 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
             try solve [simpl; congruence];
             subst t.
 
-        apply dc_term with (x0:R.term) e0...
+        apply ro_step with (x0:R.term) e0...
         apply (H1 e0)...
         * rewrite hh; eapply dec_context_term_next...
         * compute; congruence.
 
-      + eapply dc_val...
+      + eapply ro_val...
         assert (v0 = v).
         * apply (value_to_term_injective v0 v); congruence.
         * subst...
@@ -485,12 +485,12 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
     - assert (H1 := value_to_term_injective _ _ hh); subst; 
       econstructor...
 
-    - contradiction (decctx_not_dead _ _ _ H0).
+    - contradiction (refocus_out_not_dead _ _ _ H0).
   Qed.
 
 
-  Lemma dec_redex_self_e :                                      forall {k} (r : redex k),
-      dec_proc r [.] (d_red r [.]).
+  Lemma refocus_in_redex_self_e :                               forall {k} (r : redex k),
+      refocus_in r [.] (d_red r [.]).
 
   Proof with eauto.
     intros; 
@@ -516,7 +516,7 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
       generalize dependent v; generalize dependent e.
       induction e using (well_founded_ind (wf_search k r)); intros.
 
-      apply val_dec.
+      apply refocus_out_to_in.
       remember (dec_context e _ v); assert (ht := dec_context_correct e _ v);
       rewrite <- Heqi in ht; symmetry in Heqi.
 
@@ -546,31 +546,31 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
   Qed.
 
 
-  Lemma dec_redex_self :             forall {k2} (r : redex k2) {k1} (c : context k1 k2),
-      dec_proc r c (d_red r c).
+  Lemma refocus_in_redex_self :      forall {k2} (r : redex k2) {k1} (c : context k1 k2),
+      refocus_in r c (d_red r c).
 
   Proof with eauto.
       intros;
-      assert (H := dec_redex_self_e r);
+      assert (H := refocus_in_redex_self_e r);
       generalize c.
 
       (* induction on H *)
-      apply dec_proc_Ind with
+      apply refocus_in_Ind with
 
-      (P  := fun k2' t c0 d (_ : dec_proc t c0 d) => 
+      (P  := fun k2' t c0 d (_ : refocus_in t c0 d) =>
                  match d with
                  | d_val v      => True
-                 | d_red r' c1 => forall (c : context k1 k2), 
-                                         dec_proc t (c0~+c) (d_red r' (c1~+c))
+                 | d_red r' c1 => forall (c : context k1 k2),
+                                      refocus_in t (c0~+c) (d_red r' (c1~+c))
                  end)
-      (P0 := fun k2' v c0 d (_ : decctx_proc v c0 d) => 
+      (P0 := fun k2' v c0 d (_ : refocus_out v c0 d) => 
                  match d with
                  | d_val v      => True
-                 | d_red r' c1 => forall (c : context k1 k2), 
-                                         decctx_proc v (c0~+c) (d_red r' (c1~+c))
+                 | d_red r' c1 => forall (c : context k1 k2),
+                                      refocus_out v (c0~+c) (d_red r' (c1~+c))
                  end)
-      (d0 := H);
-      
+      (r := H);
+
       intros;
       try destruct d;
       unfold dec in *;
@@ -585,15 +585,15 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
 
 
 
-  Lemma dec_under_redex :          forall ec t {k} (r : redex k) {k0} (c : context k0 k),
-       ec:[t] = r -> ~dead_ckind (k+>ec) -> dec_proc t (ec=:c) (d_red r c).
+  Lemma refocus_in_under_redex :   forall ec t {k} (r : redex k) {k0} (c : context k0 k),
+       ec:[t] = r -> ~dead_ckind (k+>ec) -> refocus_in t (ec=:c) (d_red r c).
 
   Proof.
     intros ec t k r k0 c H H0.
     assert (exists (v : value (k+>ec)), t = v) as [v H1];
               eauto using redex_trivial1.
     subst.
-    apply val_dec.
+    apply refocus_out_to_in.
     induction ec using (well_founded_ind (wf_search k r)).
     remember (dec_context ec _ v) as D eqn:HeqD; destruct D;
     assert (H2 := dec_context_correct ec _ v);
@@ -606,8 +606,8 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
       symmetry; apply HeqD.
       assert (exists (v' : value (k+>e)), t = v') as [v' H3].
       { rewrite H2 in H; eauto using redex_trivial1, dec_context_next_alive. }
-      subst. 
-      apply val_dec.
+      subst.
+      apply refocus_out_to_in.
       apply H1.
       + symmetry in HeqD; destruct (dec_context_term_next _ _ _ HeqD) as [H3 _].
         congruence. 
@@ -620,15 +620,15 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
   Qed.
 
 
-  Lemma dec_under_value :        forall ec t {k} (v : value k) {k0} (c : context k0 k) d,
-      ec:[t] = v -> ~dead_ckind (k+>ec) -> decctx_proc v c d -> dec_proc t (ec=:c) d.
+  Lemma refocus_in_under_value : forall ec t {k} (v : value k) {k0} (c : context k0 k) d,
+      ec:[t] = v -> ~dead_ckind (k+>ec) -> refocus_out v c d -> refocus_in t (ec=:c) d.
 
   Proof.
     intros ec t k v k0 c d H H0 H1.
     assert (exists (v : value (k+>ec)), t = v) as [v0 H2];
               eauto using value_trivial1.
     subst.
-    apply val_dec.
+    apply refocus_out_to_in.
     induction ec using (well_founded_ind (wf_search k v)).
     remember (dec_context ec _ v0) as D eqn:HeqD; destruct D;
     assert (H3 := dec_context_correct ec _ v0);
@@ -640,8 +640,8 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
       + symmetry; apply HeqD.
       + assert (exists (v' : value (k+>e)), t = v') as [v' H4].
         { rewrite H3 in H; eauto using value_trivial1, dec_context_next_alive. }
-        subst. 
-        apply val_dec.
+        subst.
+        apply refocus_out_to_in.
         apply H2.
         * symmetry in HeqD; destruct (dec_context_term_next _ _ _ HeqD) as [H4 _].
           congruence. 
@@ -655,8 +655,9 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
   Qed.
 
 
-  Lemma dec_plug :    forall {k1 k2} (c : context k1 k2) {k3} {c0 : context k3 k1} {t d},
-      ~dead_ckind k2 -> dec_proc c[t] c0 d -> dec_proc t (c~+c0) d.
+  Lemma refocus_in_plug :                         forall {k1 k2} (c : context k1 k2) {k3}
+                                                              {c0 : context k3 k1} {t d},
+      ~dead_ckind k2 -> refocus_in c[t] c0 d -> refocus_in t (c~+c0) d.
 
   Proof with eauto.
       induction c; intros; simpl.
@@ -670,9 +671,9 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
             rewrite H in hh
             end.
 
-        + auto using dec_under_redex.
+        + auto using refocus_in_under_redex.
 
-        + eauto using dec_under_value.
+        + eauto using refocus_in_under_value.
 
         + destruct search_order_comp_if with ec:[t] ec0 ec k2 as [H3 | [H3 | H3]].
               compute...
@@ -686,8 +687,8 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
             {
                 clear H2; generalize dependent v; generalize dependent ec0.
                 induction ec0 using (well_founded_ind (wf_search k2 ec:[t])); intros.
-                
-                assert (H4 := dec_val _ _ _ H5).
+
+                assert (H4 := refocus_in_to_out _ _ _ H5).
                 dependent destruction H4;
                 inversion_ccons x.
                 - rewrite hh in H3; 
@@ -718,9 +719,9 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
   Qed.
 
 
-  Lemma dec_plug_rev :       forall {k1 k2} (c : context k1 k2) {k3} (c0 : context k3 k1)
-                                                                                     t d,
-          dec_proc t (c~+c0) d -> dec_proc c[t] c0 d.
+  Lemma refocus_in_plug_rev :                     forall {k1 k2} (c : context k1 k2) {k3}
+                                                                (c0 : context k3 k1) t d,
+          refocus_in t (c~+c0) d -> refocus_in c[t] c0 d.
 
   Proof with eauto.
       induction c; intros; simpl.
@@ -739,8 +740,8 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
         + cut (d = d_red r (c~+c0)).
           { intro; subst; constructor; auto. }
 
-          destruct (redex_trivial1 _ _ _ (dec_not_dead H) DTC2) as [v ?]; subst t.
-          eapply dec_val in H.
+          destruct (redex_trivial1 _ _ _ (refocus_in_not_dead H) DTC2) as [v ?]; subst t.
+          eapply refocus_in_to_out in H.
 
           clear HeqD.
           induction ec using (well_founded_ind (wf_search k2 r)).
@@ -763,14 +764,14 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
             eapply (H0 ec1);
             try solve
             [ rewrite <- DTC2; destruct (dec_context_term_next _ _ _ H); auto
-            | eauto using dec_val
-            | compute; congruence ]. 
+            | eauto using refocus_in_to_out
+            | compute; congruence ].
 
         + destruct search_order_comp_if with ec:[t] e ec k2 as [H1 | [H1 | H1]].
               compute...
               compute...
               eapply dec_term_next_alive...
-              eauto using dec_not_dead.
+              eauto using refocus_in_not_dead.
 
           * contradict (dec_term_term_top _ _ HeqD _ H1).
 
@@ -781,7 +782,7 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
               clear HeqD; generalize dependent v; generalize dependent e.
               induction e using (well_founded_ind (wf_search k2 ec:[t])); intros.
 
-              apply val_dec.
+              apply refocus_out_to_in.
               remember (dec_context e _ v) as D.
               destruct D;
                   symmetry in HeqD;
@@ -823,12 +824,13 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
             subst.
             econstructor 3...
 
-        + cut (decctx_proc v (c~+c0) d).
+        + cut (refocus_out v (c~+c0) d).
           { intro; econstructor; eauto. }
-          
-          destruct (value_trivial1 _ _ _ (dec_not_dead H) DTC2) as [v' ?]; subst t.
+
+          destruct (value_trivial1 _ _ _ (refocus_in_not_dead H) DTC2) as [v' ?].
+          subst t.
           capture_all value @value_to_term.
-          eapply dec_val in H.
+          eapply refocus_in_to_out in H.
 
           clear HeqD.
           induction ec using (well_founded_ind (wf_search k2 v)).
@@ -849,41 +851,42 @@ Module RedRefSem (PR : PRE_REF_SEM) (ST : REF_STRATEGY PR) <: RED_REF_SEM.
             apply (H0 ec1) with (v':=v'');
             solve
             [ destruct (dec_context_term_next ec k2 v' H); rewrite <- DTC2; eauto
-            | eauto using dec_context_next_alive, dec_val
+            | eauto using dec_context_next_alive, refocus_in_to_out
             | congruence ].
 
-        + exfalso; 
-          eapply dec_not_dead; 
+        + exfalso;
+          eapply refocus_in_not_dead; 
           eauto using death_propagation.
   Qed.
 
 
-  Lemma dec_value_self :                                        forall {k} (v : value k),
-      ~ dead_ckind k -> dec_proc v [.] (d_val v).
+  Lemma refocus_in_value_self :                                 forall {k} (v : value k),
+      ~ dead_ckind k -> refocus_in v [.] (d_val v).
 
   Proof with auto.
     intros.
-    apply val_dec.
+    apply refocus_out_to_in.
     constructor...
   Qed.
 
 
-  Theorem dec_proc_val_eqv_decctx :                       forall {k2} (v : value k2) {k1}
+  Theorem refocus_in_val_eqv_refocus_out :                forall {k2} (v : value k2) {k1}
                                                                    (c : context k1 k2) d,
-       dec_proc v c d <-> decctx_proc v c d.
+       refocus_in v c d <-> refocus_out v c d.
 
   Proof.
-    split; [apply dec_val | apply val_dec].
+    split; [apply refocus_in_to_out | apply refocus_out_to_in].
   Qed.
 
 
   Module DPT := RedDecProcEqvDec R.
 
-  Theorem dec_proc_eqv_dec :                      forall t {k1 k2} (c : context k1 k2) d,
-      ~dead_ckind k2 -> (dec_proc t c d <-> dec c[t] k1 d).
+  Theorem refocus_in_eqv_dec :                    forall t {k1 k2} (c : context k1 k2) d,
+      ~dead_ckind k2 -> (refocus_in t c d <-> dec c[t] k1 d).
 
-  Proof. eauto 6 using DPT.dec_proc_eqv_dec, dec_correct, dec_plug, dec_plug_rev, 
-                         dec_redex_self, dec_value_self. Qed.
+  Proof. eauto 6 using DPT.dec_proc_eqv_dec, refocus_in_correct, 
+                       refocus_in_plug, refocus_in_plug_rev,
+                       refocus_in_redex_self, refocus_in_value_self. Qed.
 
 End RedRefSem.
 

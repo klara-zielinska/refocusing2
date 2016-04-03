@@ -1,10 +1,13 @@
+
+
+(* Lambda calculus with normal order and simple explicit substitution example *)
+
+
 Require Import Program
                Util
                refocusing_semantics.
 
 
-
-(* Lambda calculus with simple explicit substitution for the normal-order strategy *)
 
 Module Lam_SES_NO_PreRefSem <: PRE_PRECISE_REF_SEM.
 
@@ -731,7 +734,13 @@ End Lam_SES_NO_Strategy.
 
 
 
-(* Contexts from the Johan Munk's paper *)
+(* Contexts from the Johan Munk's paper:
+   "Basic Research in Computer Science
+   A Study of Syntactic and Semantic Artifacts
+   and its Application to
+   Lambda Definability, Strong
+   Normalization, and Weak Normalization
+   in the Presence of State" *)
 
 Module Lam_SES_NO_AlterContexts.
 

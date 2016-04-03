@@ -86,28 +86,28 @@ Module Lam_NO_HandDecProc.
   Module RS := Lam_NO_RefSem.
 
 
-  Hint Constructors RS.dec_proc RS.decctx_proc dec_proc decctx_proc.
+  Hint Constructors RS.refocus_in RS.refocus_out dec_proc decctx_proc.
   Hint Transparent Lam_NO_Strategy.dec_term Lam_NO_Strategy.dec_context.
 
   Theorem dec_proc_eqv_RS :                       forall {k1 k2} (c : context k1 k2) t d,
-      dec_proc t c d <-> RS.dec_proc t c d.
+      dec_proc t c d <-> RS.refocus_in t c d.
 
   Proof.
     intros k1 k2 c t d; split; intro H.
 
   (* -> *) { 
     induction H using dec_proc_Ind with
-    (P0 := fun _ v c d _ => RS.decctx_proc v c d); eauto;
-    match goal with c : RS.context _ ?k |- RS.decctx_proc _ (?ec =: c) _ => 
+    (P0 := fun _ v c d _ => RS.refocus_out v c d); eauto;
+    match goal with c : RS.context _ ?k |- RS.refocus_out _ (?ec =: c) _ => 
     solve
-    [ eapply (RS.dc_dec ec c); eauto
-    | eapply (RS.dc_val ec c); eauto
-    | eapply (RS.dc_term ec c); eauto ]
+    [ eapply (RS.ro_red ec c); eauto
+    | eapply (RS.ro_val ec c); eauto
+    | eapply (RS.ro_step ec c); eauto ]
     end.
   }
 
  (* <- *) {
-    induction H using RS.dec_proc_Ind with
+    induction H using RS.refocus_in_Ind with
     (P0 := fun _ v c d _ => decctx_proc v c d);
     try match goal with
     | H : RS.ST.dec_term ?t ?k = _        |- _ => destruct t, k2; 
@@ -121,24 +121,24 @@ Module Lam_NO_HandDecProc.
 
 
   Theorem decctx_proc_eqv_RS :                    forall {k1 k2} (c : context k1 k2) v d,
-      decctx_proc v c d <-> RS.decctx_proc v c d.
+      decctx_proc v c d <-> RS.refocus_out v c d.
 
   Proof.
     intros k1 k2 c v d; split; intro H.
 
   (* -> *) {
     induction H using decctx_proc_Ind with
-    (P := fun _ t c d _ => RS.dec_proc t c d); eauto;
-    match goal with c : RS.context _ ?k |- RS.decctx_proc _ (?ec =: c) _ => 
+    (P := fun _ t c d _ => RS.refocus_in t c d); eauto;
+    match goal with c : RS.context _ ?k |- RS.refocus_out _ (?ec =: c) _ => 
     solve
-    [ eapply (RS.dc_dec ec c); eauto
-    | eapply (RS.dc_val ec c); eauto
-    | eapply (RS.dc_term ec c); eauto ]
+    [ eapply (RS.ro_red ec c); eauto
+    | eapply (RS.ro_val ec c); eauto
+    | eapply (RS.ro_step ec c); eauto ]
     end.
   }
 
   (* <- *) {
-    induction H using RS.decctx_proc_Ind with
+    induction H using RS.refocus_out_Ind with
     (P := fun _ t c d _ => dec_proc t c d);
     try match goal with
     | H : RS.ST.dec_term ?t ?k = _        |- _ => destruct t, k2; 

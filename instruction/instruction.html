@@ -418,6 +418,66 @@ End RED_SEM.
 </CODE-->
 
 <H3>Reduction strategy</H3>
+
+<P>A DFS reduction/evaluation strategy is an order 
+in which the generated machine ought to search for a redex 
+in a term. To apply our refocusing one needs to define such a strategy.</P>
+
+<P>In the library we do this by setting a family
+of strict orders, &lt;<SUB>k,t</SUB>, on elementary contexts indexed by 
+kinds and terms. 
+Each elementary context that is a prefix of some term determines a position
+in this term, i.e., if <CODE>t = ec[t']</CODE>, then the elementary context 
+<CODE>ec</CODE> appoints the subterm <CODE>t'</CODE> in the term <CODE>t</CODE>.
+Thus, by setting an order on elementary contexts that are prefixes of a term,
+we determinate an order on positions in the term. Because we can have
+multiple substrategies in which a term ought to be considered (multiple
+kinds of holes in which a term may be considered), 
+we can have a different order per 
+each kind. So, if <CODE>ec<SUB>1</SUB></CODE> &lt;<SUB>k,t</SUB> 
+<CODE>ec<SUB>2</SUB></CODE>, then it means 
+<CODE>t = ec<SUB>1</SUB>[t<SUB>1</SUB>] = 
+ec<SUB>2</SUB>[t<SUB>2</SUB>]</CODE> and 
+searching <CODE>t</CODE> w.r.t. the <CODE>k</CODE>-substrategy 
+should check the subterm <CODE>t<SUB>2</SUB></CODE> 
+before going to <CODE>t<SUB>1</SUB></CODE>.</P>
+
+<P>The basic interface describing our strategies is
+<CODE>RED_STRATEGY</CODE>.</P>
+
+<P>The operations of taking the greatest element and the predecessor for
+each of these orders have to be
+computable partial functions.
+Also, we need a computable operation
+that determines if a term is a potential redex or 
+a value after scanning all subterms in it. 
+If we want to generate a machine that 
+operates in small steps all these
+functions need to be small. In the library
+all these operations are given at once in terms of
+elementary decompositions.</P>
+
+<P>The interface responsible for elementary decompositions
+is <CODE>RED_STRATEGY_STEP</CODE>.</P>
+
+<!--elementary contexts are comparable, i.e., 
+$ec_1 \leq_{k,t} ec_2$ or $ec_1 \geq_{k,t} ec_2$
+iff
+$k \to \plug{k_1}{ec_1}$ and $k \to \plug{k_2}{ec_2}$ are
+productions in the grammar of contexts, and
+$ec_1,\: ec_2$ are prefixes of $t$, i.e., 
+$t = \plug{t_1}{ec_1} = \plug{t_2}{ec_2}$.
+The order determines that 
+The introduced orders are called a \emph{DFS evaluation strategy} in our
+refocusing as they describe a depth-first search order of evaluation that
+turns back from a term only if it has checked all possible subterms and it has
+found that the term is a value. This is captured by another 
+%required property
+condition, i.e., if $ec_1 <_{k,t} ec_2$, then $t = \plug{t_2}{ec_2}$ and
+$t_2 \in \mathcal{V}_k$.
+
+.-->
+
 <H3>Refocusing</H3>
 
 </DIV>

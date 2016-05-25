@@ -443,7 +443,8 @@ should check the subterm <CODE>t<SUB>2</SUB></CODE>
 before going to <CODE>t<SUB>1</SUB></CODE>.</P>
 
 <P>The basic interface describing our strategies is
-<CODE>RED_STRATEGY</CODE>.</P>
+<CODE>RED_STRATEGY</CODE> in <CODE>reduction_strategy</CODE>
+module.</P>
 
 <P>The operations of taking the greatest element and the predecessor for
 each of these orders have to be
@@ -458,7 +459,8 @@ all these operations are given at once in terms of
 elementary decompositions.</P>
 
 <P>The interface responsible for elementary decompositions
-is <CODE>RED_STRATEGY_STEP</CODE>.</P>
+is <CODE>RED_STRATEGY_STEP</CODE> in <CODE>reduction_strategy</CODE>
+module.</P>
 
 <!--elementary contexts are comparable, i.e., 
 $ec_1 \leq_{k,t} ec_2$ or $ec_1 \geq_{k,t} ec_2$
